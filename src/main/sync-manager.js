@@ -82,7 +82,7 @@ const INJECTION_SCRIPT = `
     if (!isFormElement(el)) return;
     var selector = getSelector(el);
     if (el.isContentEditable) {
-      send('inputvalue', { selector: selector, innerHTML: el.innerHTML });
+      send('inputvalue', { selector: selector, textContent: el.textContent });
     } else {
       send('inputvalue', { selector: selector, value: el.value });
     }
@@ -237,9 +237,9 @@ function createSyncManager(leftView, rightView) {
     }).catch(() => {});
   }
 
-  function replayInputValue({ selector, value, innerHTML }) {
+  function replayInputValue({ selector, value, textContent }) {
     // Escape for safe injection into JS string
-    const escaped = (innerHTML !== undefined ? innerHTML : value)
+    const escaped = (textContent !== undefined ? textContent : value)
       .replace(/\\/g, '\\\\')
       .replace(/'/g, "\\'")
       .replace(/\n/g, '\\n')
@@ -247,10 +247,10 @@ function createSyncManager(leftView, rightView) {
     const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
     let script;
-    if (innerHTML !== undefined) {
+    if (textContent !== undefined) {
       script = `(function(){
         var el = document.querySelector('${escapedSelector}');
-        if(el){ el.innerHTML='${escaped}'; el.dispatchEvent(new Event('input',{bubbles:true})); }
+        if(el){ el.textContent='${escaped}'; el.dispatchEvent(new Event('input',{bubbles:true})); }
       })()`;
     } else {
       script = `(function(){

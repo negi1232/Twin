@@ -143,11 +143,20 @@ function initUIControls() {
       lastReportPath = data.reportPath;
       const s = data.summary;
       const statusEl = document.getElementById('status-result');
-      statusEl.innerHTML =
-        `<span class="status-passed">Passed: ${s.passed}</span> | ` +
-        `<span class="status-failed">Failed: ${s.failed}</span> | ` +
-        `<span class="status-new">New: ${s.new}</span> | ` +
-        `<span class="status-deleted">Deleted: ${s.deleted}</span>`;
+      statusEl.textContent = '';
+      const items = [
+        { cls: 'status-passed', text: `Passed: ${s.passed}` },
+        { cls: 'status-failed', text: `Failed: ${s.failed}` },
+        { cls: 'status-new', text: `New: ${s.new}` },
+        { cls: 'status-deleted', text: `Deleted: ${s.deleted}` },
+      ];
+      items.forEach((item, i) => {
+        if (i > 0) statusEl.appendChild(document.createTextNode(' | '));
+        const span = document.createElement('span');
+        span.className = item.cls;
+        span.textContent = item.text;
+        statusEl.appendChild(span);
+      });
       if (s.failed > 0) {
         showToast(`Captured! ${s.failed} difference(s) found`, 'error');
       } else {

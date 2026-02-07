@@ -67,10 +67,12 @@ jest.mock('electron', () => ({
 }));
 
 jest.mock('fs', () => ({
+  realpathSync: jest.fn((p) => p),
   promises: {
     readdir: jest.fn().mockResolvedValue([]),
     mkdir: jest.fn().mockResolvedValue(undefined),
     readFile: jest.fn().mockResolvedValue(Buffer.from('fake-image-data')),
+    stat: jest.fn().mockResolvedValue({ size: 100 }),
   },
 }));
 
@@ -243,6 +245,18 @@ describe('ipc-handlers integration', () => {
         error: 'reg-cli failed',
         fileName: 'page_001.png',
       });
+    });
+
+    test('rejects invalid pageName with path traversal', async () => {
+      await expect(
+        handlers['capture-and-compare']({}, { pageName: '../../../etc/passwd' })
+      ).rejects.toThrow('Invalid page name');
+    });
+
+    test('rejects empty pageName', async () => {
+      await expect(
+        handlers['capture-and-compare']({}, { pageName: '' })
+      ).rejects.toThrow('Invalid page name');
     });
   });
 
@@ -460,6 +474,9 @@ describe('ipc-handlers integration', () => {
   // ===== read-directory =====
   describe('read-directory', () => {
     test('returns directory entries with name, isDirectory, and path', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/test'] });
+      await handlers['select-folder']({});
+
       const fs = require('fs');
       fs.promises.readdir.mockResolvedValue([
         { name: 'sub', isDirectory: () => true },
@@ -472,7 +489,14 @@ describe('ipc-handlers integration', () => {
       ]);
     });
 
+    test('rejects when no folder has been selected', async () => {
+      await expect(handlers['read-directory']({}, { dirPath: '/test' })).rejects.toThrow('Access denied: please select a folder first');
+    });
+
     test('propagates error on invalid directory', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/bad'] });
+      await handlers['select-folder']({});
+
       const fs = require('fs');
       fs.promises.readdir.mockRejectedValue(new Error('ENOENT'));
       await expect(handlers['read-directory']({}, { dirPath: '/bad' })).rejects.toThrow('ENOENT');
@@ -482,6 +506,9 @@ describe('ipc-handlers integration', () => {
   // ===== create-directory =====
   describe('create-directory', () => {
     test('creates directory with recursive option and returns path', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/test'] });
+      await handlers['select-folder']({});
+
       const fs = require('fs');
       fs.promises.mkdir.mockResolvedValue(undefined);
       const result = await handlers['create-directory']({}, { dirPath: '/test/new-folder' });
@@ -490,6 +517,9 @@ describe('ipc-handlers integration', () => {
     });
 
     test('propagates error on permission denied', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/root'] });
+      await handlers['select-folder']({});
+
       const fs = require('fs');
       fs.promises.mkdir.mockRejectedValue(new Error('EACCES'));
       await expect(handlers['create-directory']({}, { dirPath: '/root/no-access' })).rejects.toThrow('EACCES');
@@ -499,9 +529,13 @@ describe('ipc-handlers integration', () => {
   // ===== read-file-data =====
   describe('read-file-data', () => {
     test('reads image file and returns base64 data URL', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/test'] });
+      await handlers['select-folder']({});
+
       const fs = require('fs');
       const imgBuf = Buffer.from('PNG-DATA');
       fs.promises.readFile.mockResolvedValue(imgBuf);
+      fs.promises.stat.mockResolvedValue({ size: 100 });
       const result = await handlers['read-file-data']({}, { filePath: '/test/screenshot.png' });
       expect(fs.promises.readFile).toHaveBeenCalledWith('/test/screenshot.png');
       expect(result.dataUrl).toBe(`data:image/png;base64,${imgBuf.toString('base64')}`);
@@ -510,14 +544,31 @@ describe('ipc-handlers integration', () => {
     });
 
     test('handles jpg extension correctly', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/test'] });
+      await handlers['select-folder']({});
+
       const fs = require('fs');
       fs.promises.readFile.mockResolvedValue(Buffer.from('JPG'));
+      fs.promises.stat.mockResolvedValue({ size: 100 });
       const result = await handlers['read-file-data']({}, { filePath: '/test/photo.jpg' });
       expect(result.mimeType).toBe('image/jpeg');
     });
 
-    test('propagates error on file read failure', async () => {
+    test('rejects files exceeding 50MB size limit', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/test'] });
+      await handlers['select-folder']({});
+
       const fs = require('fs');
+      fs.promises.stat.mockResolvedValue({ size: 51 * 1024 * 1024 });
+      await expect(handlers['read-file-data']({}, { filePath: '/test/huge.png' })).rejects.toThrow('File too large to read (max 50MB)');
+    });
+
+    test('propagates error on file read failure', async () => {
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/bad'] });
+      await handlers['select-folder']({});
+
+      const fs = require('fs');
+      fs.promises.stat.mockResolvedValue({ size: 100 });
       fs.promises.readFile.mockRejectedValue(new Error('ENOENT'));
       await expect(handlers['read-file-data']({}, { filePath: '/bad/file.png' })).rejects.toThrow('ENOENT');
     });
