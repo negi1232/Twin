@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, globalShortcut } = require('electron');
+const { app, BrowserWindow, WebContentsView, globalShortcut } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./ipc-handlers');
 const { getStore } = require('./store');
@@ -19,11 +19,11 @@ function createViews() {
     nodeIntegration: false,
   };
 
-  leftView = new BrowserView({ webPreferences: viewPreferences });
-  rightView = new BrowserView({ webPreferences: viewPreferences });
+  leftView = new WebContentsView({ webPreferences: viewPreferences });
+  rightView = new WebContentsView({ webPreferences: viewPreferences });
 
-  mainWindow.addBrowserView(leftView);
-  mainWindow.addBrowserView(rightView);
+  mainWindow.contentView.addChildView(leftView);
+  mainWindow.contentView.addChildView(rightView);
 
   layoutViews();
 
