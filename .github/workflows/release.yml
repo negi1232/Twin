@@ -39,10 +39,10 @@ jobs:
       - run: npm ci
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npm run build:mac
+        run: npm run build:mac -- --publish never
       - name: Build (Linux/Windows)
         if: runner.os == 'Linux'
-        run: npx electron-builder --linux
+        run: npx electron-builder --linux --publish never
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
