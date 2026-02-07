@@ -19,9 +19,12 @@ test.afterAll(async () => {
 // ── ヘルパー ──
 
 async function launchApp() {
-  const app = await electron.launch({
-    args: [path.join(__dirname, '..', '..', 'src', 'main', 'index.js')],
-  });
+  const args = [path.join(__dirname, '..', '..', 'src', 'main', 'index.js')];
+  // CI Linux environments require --no-sandbox for Electron
+  if (process.env.CI) {
+    args.unshift('--no-sandbox');
+  }
+  const app = await electron.launch({ args });
 
   // BrowserView ではなくメインウィンドウ (index.html) を取得
   let page = null;
