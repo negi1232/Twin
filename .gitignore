@@ -21,6 +21,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.env.*.local
 
 # Internal spec (AI development notes)
 init.md

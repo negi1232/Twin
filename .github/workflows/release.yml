@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e11487 # v4
+      - uses: actions/setup-node@49933ea5 # v4
         with:
           node-version: 20
           cache: npm
@@ -33,8 +33,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e11487 # v4
+      - uses: actions/setup-node@49933ea5 # v4
         with:
           node-version: 20
           cache: npm
@@ -46,7 +46,7 @@ jobs:
         if: runner.os == 'Linux'
         run: npx electron-builder --linux --publish never
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d # v4
         with:
           name: build-${{ matrix.os }}
           path: dist/
@@ -58,8 +58,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@34e11487 # v4
+      - uses: actions/download-artifact@d3f86a10 # v4
         with:
           path: artifacts/
       - name: Collect release assets

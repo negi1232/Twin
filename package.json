@@ -28,5 +28,13 @@
     "jest-environment-jsdom": "^30.2.0"
   },
   "author": "negi1232",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/negi1232/Twin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/negi1232/Twin/issues"
+  },
+  "homepage": "https://github.com/negi1232/Twin#readme"
 }
