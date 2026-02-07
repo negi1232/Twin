@@ -226,10 +226,26 @@ describe('ipc-handlers integration', () => {
   // ===== open-report =====
   describe('open-report', () => {
     test('opens a new BrowserWindow and loads report file', () => {
-      handlers['open-report']({}, { reportPath: '/tmp/report/index.html' });
+      const path = require('path');
+      const reportPath = path.resolve('./snapshots', 'report.html');
+      handlers['open-report']({}, { reportPath });
       expect(mockBrowserWindow).toHaveBeenCalledWith(
-        expect.objectContaining({ width: 1200, height: 800 })
+        expect.objectContaining({
+          width: 1200,
+          height: 800,
+          webPreferences: expect.objectContaining({
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+          }),
+        })
       );
+    });
+
+    test('rejects report path outside snapshot directory', () => {
+      expect(() => {
+        handlers['open-report']({}, { reportPath: '/etc/passwd' });
+      }).toThrow('Report path must be within the snapshot directory');
     });
   });
 
@@ -243,6 +259,12 @@ describe('ipc-handlers integration', () => {
     test('navigates right view and saves URL to store', async () => {
       await handlers['navigate']({}, { url: 'http://new-right.com', target: 'right' });
       expect(mockRightView.webContents.loadURL).toHaveBeenCalledWith('http://new-right.com');
+    });
+
+    test('rejects non-http/https URLs', () => {
+      expect(() => {
+        handlers['navigate']({}, { url: 'file:///etc/passwd', target: 'left' });
+      }).toThrow('Only http: and https: URLs are allowed');
     });
   });
 
