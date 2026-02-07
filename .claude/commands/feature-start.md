@@ -14,7 +14,7 @@ Git Flow に従い、develop から新しい feature ブランチを作成しま
 3. `develop` ブランチが存在しなければ `main` から作成
 4. `develop` をチェックアウトし、最新を pull
 5. `feature/$ARGUMENTS` ブランチを作成してチェックアウト
-6. 作成したブランチ名をユーザーに報告
+6. 作成したブランチ名をユーザーに報告し、完了時は `/feature-finish` で PR を作成できることを案内する
 
 ## ルール
 - ブランチ名の形式: `feature/<引数>`

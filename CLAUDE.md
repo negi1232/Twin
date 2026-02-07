@@ -38,12 +38,36 @@ npm run build:mac  # Build for macOS
 npm run build:win  # Build for Windows
 ```
 
-## Git Workflow (Git Flow)
+## Git Workflow (Git Flow + PR-Based)
 - `main` - Production-ready code
 - `develop` - Integration branch for features
 - `feature/*` - New features (branch from develop)
 - `release/*` - Release preparation (branch from develop)
 - `hotfix/*` - Emergency fixes (branch from main)
+
+All branch merges are done via Pull Requests on GitHub, not local merges.
+
+### Workflow Commands
+
+**Feature workflow:**
+1. `/feature-start <name>` - Create feature branch from develop
+2. (develop the feature, commit changes)
+3. `/feature-finish` - Run tests/lint, push branch, create PR to develop
+4. (merge PR on GitHub)
+
+**Release workflow:**
+1. `/release-start <version>` - Create release branch from develop, bump version
+2. (final testing, bug fixes on release branch)
+3. `/release-finish` - Run tests/lint, push branch, create PR to main
+4. (merge PR on GitHub)
+5. `/release-complete <version>` - Tag merge commit, push tag (triggers release build), sync to develop
+
+**Hotfix workflow:**
+1. `/hotfix-start <name>` - Create hotfix branch from main
+2. (fix the issue, commit changes)
+3. `/hotfix-finish` - Run tests/lint, push branch, create PR to main
+4. (merge PR on GitHub)
+5. `/hotfix-complete <version>` - Tag merge commit, push tag (triggers release build), sync to develop
 
 ### Branch Naming Convention
 - `feature/<issue-number>-<short-description>` (e.g., `feature/12-dual-viewer`)

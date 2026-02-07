@@ -1,10 +1,12 @@
 ---
-description: 現在のブランチで Pull Request を作成する
+description: 現在のブランチで Pull Request を作成する（汎用）
 ---
 
-# プルリクエスト作成
+# プルリクエスト作成（汎用）
 
 現在のブランチの GitHub Pull Request を作成します。
+通常は `/feature-finish`、`/release-finish`、`/hotfix-finish` を使ってください。
+このコマンドは汎用的な PR 作成が必要な場合のフォールバックです。
 
 ## 手順
 
@@ -13,6 +15,7 @@ description: 現在のブランチで Pull Request を作成する
    - `feature/*` → ベース: `develop`
    - `hotfix/*` → ベース: `main`
    - `release/*` → ベース: `main`
+   - その他 → ユーザーにベースブランチを確認
 3. 現在のブランチを origin に push（未 push の場合）
 4. ベースブランチからの差分コミットログを取得
 5. Pull Request を作成:
@@ -25,3 +28,4 @@ description: 現在のブランチで Pull Request を作成する
 - ブランチ命名規則からベースブランチを自動判定する
 - PR の本文に「テスト計画」セクションを含める
 - 未コミットの変更がある場合は警告するがブロックしない
+- `feature/*`、`release/*`、`hotfix/*` ブランチの場合は対応する finish コマンドの使用を推奨する
