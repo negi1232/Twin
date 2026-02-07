@@ -25,9 +25,10 @@
         <button class="btn btn-preset" data-preset="4">FHD</button>
       </div>
       <div class="toolbar-actions">
-        <button id="toggle-sync" class="btn" title="Toggle Sync">Sync ON</button>
-        <button id="capture-btn" class="btn btn-primary" title="Capture & Compare (Cmd+Shift+S)">Capture</button>
-        <button id="report-btn" class="btn" title="Open Report (Cmd+Shift+O)">Report</button>
+        <button id="toggle-sync" class="btn sync-on" title="Toggle Sync"><span class="sync-dot"></span>Sync ON</button>
+        <button id="new-report-btn" class="btn btn-primary" title="New Report">&#x2795; New</button>
+        <button id="capture-btn" class="btn" title="Capture & Compare (Cmd+Shift+S)">&#x1F4F7; Capture</button>
+        <button id="report-btn" class="btn" title="Open Report (Cmd+Shift+O)">&#x1F4CB; Report</button>
         <button id="settings-btn" class="btn btn-icon" title="Settings (Cmd+,)">&#x2699;</button>
       </div>
     </div>
@@ -74,6 +75,29 @@
       </div>
     </div>
   </div>
+
+  <!-- New Report Modal -->
+  <div id="new-report-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <h2>New Report</h2>
+      <div class="form-group">
+        <label for="report-test-name">Test Name</label>
+        <input type="text" id="report-test-name" placeholder="e.g. login-page, top-hero" />
+      </div>
+      <div class="form-group">
+        <label for="report-description">Description (optional)</label>
+        <input type="text" id="report-description" placeholder="e.g. Login form layout check" />
+      </div>
+      <div class="modal-actions">
+        <button id="new-report-capture" class="btn btn-primary">Capture</button>
+        <button id="new-report-cancel" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
 
   <script src="scripts/device-presets.js"></script>
   <script src="scripts/sync.js"></script>

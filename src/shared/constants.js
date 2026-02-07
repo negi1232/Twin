@@ -1,4 +1,4 @@
-const TOOLBAR_HEIGHT = 48;
+const TOOLBAR_HEIGHT = 52;
 const STATUS_BAR_HEIGHT = 28;
 
 const DEFAULT_LEFT_URL = 'http://localhost:3000';

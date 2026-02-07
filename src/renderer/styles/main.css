@@ -1,26 +1,57 @@
+/* ============================================
+   Twin - Modern Dark Theme
+   ============================================ */
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-elevated: rgba(22, 27, 34, 0.8);
+  --accent-blue: #58a6ff;
+  --accent-purple: #7c3aed;
+  --accent-gradient: linear-gradient(135deg, #58a6ff, #7c3aed);
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --border-default: #30363d;
+  --border-muted: #21262d;
+  --glow-blue: 0 0 12px rgba(88, 166, 255, 0.3);
+  --glow-purple: 0 0 12px rgba(124, 58, 237, 0.3);
+  --status-passed: #3fb950;
+  --status-failed: #f85149;
+  --status-new: #d29922;
+  --status-deleted: #8b949e;
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #1e1e1e;
-  color: #e0e0e0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   overflow: hidden;
   height: 100vh;
 }
 
-/* Toolbar */
+/* ============================================
+   Toolbar - Glassmorphism
+   ============================================ */
 #toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
-  padding: 0 8px;
-  background: #2d2d2d;
-  border-bottom: 1px solid #404040;
+  height: 52px;
+  padding: 0 12px;
+  background: var(--bg-elevated);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-default);
   gap: 8px;
   -webkit-app-region: drag;
 }
@@ -32,7 +63,7 @@ body {
 .toolbar-section {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .toolbar-left,
@@ -44,84 +75,122 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .url-label {
-  font-size: 11px;
-  color: #888;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
   min-width: 55px;
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .url-input {
   flex: 1;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #1e1e1e;
-  color: #e0e0e0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-size: 12px;
   outline: none;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .url-input:focus {
-  border-color: #007acc;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
 }
 
-/* Buttons */
+/* ============================================
+   Buttons
+   ============================================ */
 .btn {
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #3c3c3c;
-  color: #e0e0e0;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  transition: all var(--transition-normal);
 }
 
 .btn:hover {
-  background: #4a4a4a;
+  background: #2d333b;
+  border-color: #444c56;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .btn:active {
-  background: #555;
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .btn-primary {
-  background: #007acc;
-  border-color: #007acc;
+  background: var(--accent-gradient);
+  border-color: transparent;
   color: #fff;
+  font-weight: 600;
+  position: relative;
+  animation: pulse-glow 3s ease-in-out infinite;
 }
 
 .btn-primary:hover {
-  background: #0098ff;
+  box-shadow: var(--glow-blue), var(--glow-purple);
+  transform: translateY(-1px);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(88, 166, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(88, 166, 255, 0.4), 0 0 12px rgba(124, 58, 237, 0.2);
+  }
 }
 
 .btn-icon {
-  width: 26px;
+  width: 28px;
   padding: 0;
   font-size: 14px;
   text-align: center;
+  border-radius: 6px;
 }
 
 .preset-buttons {
   display: flex;
-  gap: 2px;
+  gap: 3px;
 }
 
 .btn-preset {
   font-size: 10px;
-  padding: 0 6px;
-  height: 20px;
+  font-weight: 600;
+  padding: 0 8px;
+  height: 22px;
+  border-radius: 11px;
+  border-color: var(--border-default);
+  letter-spacing: 0.3px;
+  transition: all var(--transition-normal);
+}
+
+.btn-preset:hover {
+  transform: translateY(-1px);
 }
 
 .btn-preset.active {
-  background: #007acc;
-  border-color: #007acc;
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--glow-blue);
 }
 
 .toolbar-actions {
@@ -129,29 +198,63 @@ body {
   gap: 4px;
 }
 
-/* View Container */
+/* ============================================
+   View Container
+   ============================================ */
 #view-container {
   flex: 1;
-  background: #1e1e1e;
+  background: var(--bg-primary);
 }
 
-/* Status Bar */
+/* ============================================
+   Status Bar - Gradient
+   ============================================ */
 #status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
   display: flex;
   align-items: center;
   height: 28px;
   padding: 0 12px;
-  background: #007acc;
+  background: linear-gradient(90deg, #58a6ff, #7c3aed);
   color: #fff;
   font-size: 12px;
+  font-weight: 500;
   gap: 8px;
+  transition: background var(--transition-normal);
+  z-index: 100;
 }
 
 .status-divider {
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
-/* Modal */
+/* Status result color classes */
+.status-passed {
+  color: #d4ffd4;
+  font-weight: 600;
+}
+
+.status-failed {
+  color: #ffd4d4;
+  font-weight: 600;
+}
+
+.status-new {
+  color: #fff3cd;
+  font-weight: 600;
+}
+
+.status-deleted {
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+/* ============================================
+   Modal - Glassmorphism + Animation
+   ============================================ */
 .modal {
   position: fixed;
   top: 0;
@@ -162,6 +265,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 1;
+  transition: opacity var(--transition-normal);
 }
 
 .modal.hidden {
@@ -174,49 +279,169 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .modal-content {
   position: relative;
-  background: #2d2d2d;
-  border: 1px solid #404040;
-  border-radius: 8px;
-  padding: 24px;
-  width: 400px;
+  z-index: 1;
+  background: #1c2333;
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  border-radius: 12px;
+  padding: 28px;
+  width: 420px;
   max-width: 90%;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(88, 166, 255, 0.1),
+    0 0 30px rgba(88, 166, 255, 0.06);
+  animation: modal-enter 0.25s ease-out;
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .modal-content h2 {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   font-size: 16px;
+  font-weight: 600;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .form-group {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 12px;
-  color: #aaa;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .form-group input {
   width: 100%;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #1e1e1e;
-  color: #e0e0e0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #3a4250;
+  border-radius: 6px;
+  background: #0d1117;
+  color: var(--text-primary);
   font-size: 12px;
+  outline: none;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.form-group input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
+}
+
+/* ============================================
+   Sync indicator dot
+   ============================================ */
+/* ============================================
+   Toast Notification
+   ============================================ */
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.toast.hidden {
+  display: none;
+}
+
+.toast.toast-success {
+  background: linear-gradient(135deg, rgba(63, 185, 80, 0.9), rgba(35, 134, 54, 0.9));
+  border: 1px solid rgba(63, 185, 80, 0.5);
+}
+
+.toast.toast-error {
+  background: linear-gradient(135deg, rgba(248, 81, 73, 0.9), rgba(218, 54, 51, 0.9));
+  border: 1px solid rgba(248, 81, 73, 0.5);
+}
+
+/* ============================================
+   Sync indicator dot
+   ============================================ */
+/* ============================================
+   Sync Button States
+   ============================================ */
+#toggle-sync.sync-on {
+  background: rgba(63, 185, 80, 0.15);
+  border-color: rgba(63, 185, 80, 0.4);
+  color: #3fb950;
+}
+
+#toggle-sync.sync-on:hover {
+  background: rgba(63, 185, 80, 0.25);
+  border-color: rgba(63, 185, 80, 0.6);
+}
+
+#toggle-sync.sync-off {
+  background: rgba(248, 81, 73, 0.1);
+  border-color: rgba(248, 81, 73, 0.3);
+  color: #f85149;
+}
+
+#toggle-sync.sync-off:hover {
+  background: rgba(248, 81, 73, 0.2);
+  border-color: rgba(248, 81, 73, 0.5);
+}
+
+.sync-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3fb950;
+  margin-right: 4px;
+  vertical-align: middle;
+  transition: background var(--transition-normal);
+}
+
+.sync-dot.off {
+  background: #f85149;
 }
