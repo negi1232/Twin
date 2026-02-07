@@ -36,7 +36,7 @@ function buildScrollToScript(scrollX, scrollY) {
 function extractPathFromUrl(url) {
   try {
     return new URL(url).pathname;
-  } catch (_e) {
+  } catch {
     return '/';
   }
 }

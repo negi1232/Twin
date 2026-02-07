@@ -12,7 +12,7 @@ function isAllowedUrl(url) {
   try {
     const parsed = new URL(url);
     return ALLOWED_URL_SCHEMES.includes(parsed.protocol);
-  } catch (_e) {
+  } catch {
     return false;
   }
 }
@@ -252,7 +252,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
         const rightUrl = new URL(rightView.webContents.getURL());
         rightUrl.pathname = navPath;
         rightView.webContents.loadURL(rightUrl.toString()).catch(() => {});
-      } catch (_e) {
+      } catch {
         // ignore URL parse errors
       }
     });

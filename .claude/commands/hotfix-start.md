@@ -13,7 +13,9 @@ argument: ホットフィックス名（例: "45-crash-on-capture"）
 2. origin から最新を fetch
 3. `main` をチェックアウトし、最新を pull
 4. `hotfix/$ARGUMENTS` ブランチを作成してチェックアウト
-5. 作成したブランチ名をユーザーに報告
+5. 作成したブランチ名をユーザーに報告し、完了時のフローを案内する:
+   - `/hotfix-finish` で main への PR を作成
+   - PR マージ後に `/hotfix-complete <バージョン>` でタグ作成と develop 同期
 
 ## ルール
 - ブランチ名の形式: `hotfix/<引数>`

@@ -136,7 +136,7 @@ function createSyncManager(leftView, rightView) {
     let parsed;
     try {
       parsed = JSON.parse(message.slice(SYNC_PREFIX.length));
-    } catch (_e) {
+    } catch {
       return;
     }
 
