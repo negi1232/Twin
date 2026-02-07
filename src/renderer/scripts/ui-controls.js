@@ -15,8 +15,19 @@ function initUIControls() {
   const newReportCaptureBtn = document.getElementById('new-report-capture');
   const newReportCancelBtn = document.getElementById('new-report-cancel');
   const reportTestNameInput = document.getElementById('report-test-name');
+  const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarSelectFolderBtn = document.getElementById('sidebar-select-folder');
+  const sidebarTree = document.getElementById('sidebar-tree');
+
+  const sidebarSortSelect = document.getElementById('sidebar-sort');
+  const sidebarFilterRadios = document.querySelectorAll('input[name="sidebar-filter"]');
 
   let lastReportPath = null;
+  let sidebarOpen = false;
+  let currentFolderPath = null;
+  let currentEntries = [];
+  const SIDEBAR_WIDTH = 250;
 
   // URL navigation
   leftUrlInput.addEventListener('keydown', (e) => {
@@ -199,6 +210,130 @@ function initUIControls() {
     toast._timer = setTimeout(() => {
       toast.classList.remove('show');
     }, 2500);
+  }
+
+  // Sidebar toggle
+  toggleSidebarBtn.addEventListener('click', () => {
+    sidebarOpen = !sidebarOpen;
+    sidebar.classList.toggle('collapsed', !sidebarOpen);
+    const width = sidebarOpen ? SIDEBAR_WIDTH : 0;
+    window.electronAPI.setSidebarWidth({ width });
+  });
+
+  // Sidebar folder selection
+  sidebarSelectFolderBtn.addEventListener('click', async () => {
+    const folderPath = await window.electronAPI.selectFolder();
+    if (!folderPath) return;
+    currentFolderPath = folderPath;
+    await loadAndRenderTree();
+  });
+
+  // Sort change
+  sidebarSortSelect.addEventListener('change', async () => {
+    if (currentFolderPath) await loadAndRenderTree();
+  });
+
+  // Filter change
+  sidebarFilterRadios.forEach((radio) => {
+    radio.addEventListener('change', async () => {
+      if (currentFolderPath) await loadAndRenderTree();
+    });
+  });
+
+  function getSelectedFilter() {
+    const checked = document.querySelector('input[name="sidebar-filter"]:checked');
+    return checked ? checked.value : 'all';
+  }
+
+  function sortEntries(entries) {
+    const mode = sidebarSortSelect.value;
+    const sorted = entries.slice();
+    if (mode === 'name-asc') {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (mode === 'name-desc') {
+      sorted.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (mode === 'type') {
+      sorted.sort((a, b) => {
+        if (a.isDirectory === b.isDirectory) return a.name.localeCompare(b.name);
+        return a.isDirectory ? -1 : 1;
+      });
+    }
+    return sorted;
+  }
+
+  function filterEntries(entries) {
+    const filter = getSelectedFilter();
+    if (filter === 'directories') return entries.filter((e) => e.isDirectory);
+    if (filter === 'files') return entries.filter((e) => !e.isDirectory);
+    return entries;
+  }
+
+  async function loadAndRenderTree() {
+    try {
+      currentEntries = await window.electronAPI.readDirectory({ dirPath: currentFolderPath });
+    } catch (_e) {
+      currentEntries = [];
+    }
+    renderTreeFromEntries(currentEntries, sidebarTree, 0);
+  }
+
+  function renderTreeFromEntries(entries, container, depth) {
+    container.innerHTML = '';
+    const filtered = filterEntries(entries);
+    const sorted = sortEntries(filtered);
+    sorted.forEach((entry) => {
+      const item = document.createElement('div');
+      item.className = 'tree-item';
+      item.style.paddingLeft = `${8 + depth * 16}px`;
+      item.setAttribute('tabindex', '0');
+      item.setAttribute('role', entry.isDirectory ? 'treeitem' : 'none');
+
+      const icon = document.createElement('span');
+      icon.className = 'tree-icon';
+      icon.textContent = entry.isDirectory ? '\u25B6' : '\u2022';
+
+      const name = document.createElement('span');
+      name.className = 'tree-name';
+      name.textContent = entry.name;
+
+      item.appendChild(icon);
+      item.appendChild(name);
+      container.appendChild(item);
+
+      if (entry.isDirectory) {
+        const children = document.createElement('div');
+        children.className = 'tree-children';
+        container.appendChild(children);
+
+        async function toggleDir() {
+          const isExpanded = children.classList.contains('expanded');
+          if (isExpanded) {
+            children.classList.remove('expanded');
+            icon.textContent = '\u25B6';
+          } else {
+            if (children.children.length === 0) {
+              let childEntries;
+              try {
+                childEntries = await window.electronAPI.readDirectory({ dirPath: entry.path });
+              } catch (_e) {
+                childEntries = [];
+              }
+              renderTreeFromEntries(childEntries, children, depth + 1);
+            }
+            children.classList.add('expanded');
+            icon.textContent = '\u25BC';
+          }
+        }
+
+        item.addEventListener('click', toggleDir);
+        item.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleDir();
+          }
+        });
+      }
+    });
   }
 
   // Load initial URLs from settings
