@@ -40,21 +40,27 @@ function buildDOM() {
       <div id="sidebar-tree" class="sidebar-tree"></div>
     </div>
     <div id="settings-modal" class="modal hidden">
-      <input id="setting-matching-threshold" value="0" />
-      <input id="setting-threshold-rate" value="0" />
-      <input id="setting-snapshot-dir" value="./snapshots" />
-      <button id="settings-save"></button>
-      <button id="settings-cancel"></button>
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <input id="setting-matching-threshold" value="0" />
+        <input id="setting-threshold-rate" value="0" />
+        <input id="setting-snapshot-dir" value="./snapshots" />
+        <button id="settings-save"></button>
+        <button id="settings-cancel"></button>
+      </div>
     </div>
     <button id="new-report-btn"></button>
     <div id="new-report-modal" class="modal hidden">
-      <div id="new-report-folder-info" class="form-info hidden">
-        <span class="form-info-label">Save to</span>
-        <span id="new-report-folder-path" class="form-info-value"></span>
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div id="new-report-folder-info" class="form-info hidden">
+          <span class="form-info-label">Save to</span>
+          <span id="new-report-folder-path" class="form-info-value"></span>
+        </div>
+        <input id="report-test-name" />
+        <button id="new-report-capture"></button>
+        <button id="new-report-cancel"></button>
       </div>
-      <input id="report-test-name" />
-      <button id="new-report-capture"></button>
-      <button id="new-report-cancel"></button>
     </div>
     <span id="status-size">-- x --</span>
     <span id="status-zoom">Zoom: 100%</span>
