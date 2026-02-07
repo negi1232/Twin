@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: (payload) => ipcRenderer.invoke('save-settings', payload),
   setSyncEnabled: (payload) => ipcRenderer.invoke('set-sync-enabled', payload),
   getSyncEnabled: () => ipcRenderer.invoke('get-sync-enabled'),
+  setViewsVisible: (payload) => ipcRenderer.invoke('set-views-visible', payload),
   onCaptureResult: (cb) => ipcRenderer.on('capture-result', (_event, data) => cb(data)),
   onShortcutCapture: (cb) => ipcRenderer.on('shortcut-capture', () => cb()),
   onShortcutOpenReport: (cb) => ipcRenderer.on('shortcut-open-report', () => cb()),

@@ -203,4 +203,102 @@ describe('SyncManager', () => {
     manager._handleMessage(null, 0, SYNC_PREFIX + 'not-json');
     expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
   });
+
+  // --- click with unknown button ---
+  test('click with unknown button defaults to left', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { x: 10, y: 20, button: 'unknown' } });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', button: 'left' })
+    );
+  });
+
+  // --- rightView destroyed ---
+  test('does not replay when rightView is destroyed', () => {
+    rightView.webContents.isDestroyed.mockReturnValue(true);
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 0, scrollY: 0 } });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  // --- inject on destroyed leftView ---
+  test('inject does nothing when leftView is destroyed', () => {
+    leftView.webContents.isDestroyed.mockReturnValue(true);
+    manager.inject();
+    // inject was already called once in setup? No, just check the call after destroy
+    leftView.webContents.executeJavaScript.mockClear();
+    manager.inject();
+    expect(leftView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  // --- inject on null leftView ---
+  test('inject does nothing when leftView is null', () => {
+    const nullManager = createSyncManager(null, rightView);
+    nullManager.inject();
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  // --- start on null leftView ---
+  test('start does nothing when leftView is null', () => {
+    const nullManager = createSyncManager(null, rightView);
+    nullManager.start(); // should not throw
+  });
+
+  // --- stop on destroyed leftView ---
+  test('stop does nothing when leftView is destroyed', () => {
+    manager.start();
+    leftView.webContents.isDestroyed.mockReturnValue(true);
+    manager.stop(); // should not throw
+  });
+
+  // --- did-finish-load triggers inject ---
+  test('did-finish-load event triggers script injection', () => {
+    manager.start();
+    leftView.webContents.executeJavaScript.mockClear();
+    leftView._emit('did-finish-load');
+    expect(leftView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+  });
+
+  // --- alt / meta modifiers ---
+  test('keydown with alt and meta modifiers passes them through', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'keydown',
+      data: { key: 'a', code: 'KeyA', keyCode: 65, shift: false, ctrl: false, alt: true, meta: true },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'keyDown', modifiers: ['alt', 'meta'] })
+    );
+  });
+
+  // --- .catch() callbacks for rejection handling ---
+  test('replayScroll handles executeJavaScript rejection gracefully', async () => {
+    rightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('fail'));
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 0, scrollY: 0 } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalled();
+    // Wait for rejected promise to settle
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  test('replayInputValue handles executeJavaScript rejection gracefully', async () => {
+    rightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('fail'));
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#q', value: 'test' },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  test('inject handles executeJavaScript rejection gracefully', async () => {
+    leftView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('fail'));
+    manager.inject();
+    expect(leftView.webContents.executeJavaScript).toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 0));
+  });
 });

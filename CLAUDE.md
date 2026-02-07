@@ -59,6 +59,18 @@ npm run build:win  # Build for Windows
 Types: feat, fix, refactor, test, docs, style, chore, perf
 Scopes: main, renderer, shared, test, build, ci
 
+## Test Coverage Policy
+Coverage thresholds (enforced in `jest.config.js`):
+- **Statements**: 95%
+- **Branches**: 85%
+- **Functions**: 85%
+- **Lines**: 95%
+
+Test structure:
+- `__tests__/unit/` - Unit tests (Jest, jsdom for renderer code)
+- `__tests__/integration/` - Integration tests (Jest, mocked Electron IPC)
+- `__tests__/e2e/` - E2E tests (Playwright + Electron)
+
 ## Coding Guidelines
 - Use CommonJS (`require`/`module.exports`) throughout
 - Follow Electron security best practices: contextIsolation: true, nodeIntegration: false

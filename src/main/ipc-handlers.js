@@ -12,6 +12,8 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
 
   // Capture screenshots and run reg-cli comparison
   ipcMain.handle('capture-and-compare', async (_event, { pageName }) => {
+    if (!leftView || !rightView) throw new Error('Views not ready');
+
     const store = getStore();
     const snapshotDir = path.resolve(store.get('snapshotDir'));
 
@@ -24,17 +26,21 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
 
     try {
       const result = await runRegCli(snapshotDir, options);
-      mainWindow.webContents.send('capture-result', {
-        summary: result.summary,
-        reportPath: result.reportPath,
-        fileName,
-      });
+      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('capture-result', {
+          summary: result.summary,
+          reportPath: result.reportPath,
+          fileName,
+        });
+      }
       return result;
     } catch (error) {
-      mainWindow.webContents.send('capture-result', {
-        error: error.message,
-        fileName,
-      });
+      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('capture-result', {
+          error: error.message,
+          fileName,
+        });
+      }
       throw error;
     }
   });
@@ -51,17 +57,17 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
 
   // Reload browser views
   ipcMain.handle('reload-views', (_event, { target }) => {
-    if (target === 'left' || target === 'both') {
+    if ((target === 'left' || target === 'both') && leftView) {
       leftView.webContents.reload();
     }
-    if (target === 'right' || target === 'both') {
+    if ((target === 'right' || target === 'both') && rightView) {
       rightView.webContents.reload();
     }
   });
 
   // Change BrowserView size (device preset)
   ipcMain.handle('set-device-preset', (_event, { width, height }) => {
-    const TOOLBAR_HEIGHT = 48;
+    const TOOLBAR_HEIGHT = 52;
     if (leftView) {
       leftView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width, height });
     }
@@ -75,10 +81,10 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
 
   // Navigate to URL
   ipcMain.handle('navigate', (_event, { url, target }) => {
-    if (target === 'left' && leftView) {
+    if (target === 'left' && leftView && !leftView.webContents.isDestroyed()) {
       leftView.webContents.loadURL(url).catch(() => {});
       getStore().set('leftUrl', url);
-    } else if (target === 'right' && rightView) {
+    } else if (target === 'right' && rightView && !rightView.webContents.isDestroyed()) {
       rightView.webContents.loadURL(url).catch(() => {});
       getStore().set('rightUrl', url);
     }
@@ -103,6 +109,32 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
 
   ipcMain.handle('get-sync-enabled', () => {
     return { enabled: syncManager.isEnabled() };
+  });
+
+  // Hide/show BrowserViews when modal is open
+  let savedLeftBounds = null;
+  let savedRightBounds = null;
+
+  ipcMain.handle('set-views-visible', (_event, { visible }) => {
+    if (!visible) {
+      if (leftView) {
+        savedLeftBounds = leftView.getBounds();
+        leftView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      }
+      if (rightView) {
+        savedRightBounds = rightView.getBounds();
+        rightView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      }
+    } else {
+      if (leftView && savedLeftBounds) {
+        leftView.setBounds(savedLeftBounds);
+        savedLeftBounds = null;
+      }
+      if (rightView && savedRightBounds) {
+        rightView.setBounds(savedRightBounds);
+        savedRightBounds = null;
+      }
+    }
   });
 
   // Navigation sync (left → right)

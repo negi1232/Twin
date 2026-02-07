@@ -10,18 +10,23 @@ function initUIControls() {
   const settingsModal = document.getElementById('settings-modal');
   const settingsSaveBtn = document.getElementById('settings-save');
   const settingsCancelBtn = document.getElementById('settings-cancel');
+  const newReportBtn = document.getElementById('new-report-btn');
+  const newReportModal = document.getElementById('new-report-modal');
+  const newReportCaptureBtn = document.getElementById('new-report-capture');
+  const newReportCancelBtn = document.getElementById('new-report-cancel');
+  const reportTestNameInput = document.getElementById('report-test-name');
 
   let lastReportPath = null;
 
   // URL navigation
   leftUrlInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.isComposing) {
       window.electronAPI.navigate({ url: leftUrlInput.value, target: 'left' });
     }
   });
 
   rightUrlInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.isComposing) {
       window.electronAPI.navigate({ url: rightUrlInput.value, target: 'right' });
     }
   });
@@ -37,27 +42,66 @@ function initUIControls() {
 
   // Capture & Compare
   captureBtn.addEventListener('click', () => {
-    performCapture();
+    performCapture('page');
   });
 
-  function performCapture() {
-    const pageName = 'page';
+  function performCapture(pageName) {
     updateStatus('Capturing...');
     window.electronAPI.captureAndCompare({ pageName }).catch((err) => {
       updateStatus(`Error: ${err.message}`);
     });
   }
 
+  // New Report modal
+  newReportBtn.addEventListener('click', () => {
+    reportTestNameInput.value = '';
+    document.getElementById('report-description').value = '';
+    newReportModal.classList.remove('hidden');
+    window.electronAPI.setViewsVisible({ visible: false });
+    reportTestNameInput.focus();
+  });
+
+  newReportCaptureBtn.addEventListener('click', () => {
+    const testName = reportTestNameInput.value.trim();
+    if (!testName) {
+      reportTestNameInput.focus();
+      return;
+    }
+    newReportModal.classList.add('hidden');
+    window.electronAPI.setViewsVisible({ visible: true });
+    performCapture(testName);
+  });
+
+  newReportCancelBtn.addEventListener('click', () => {
+    newReportModal.classList.add('hidden');
+    window.electronAPI.setViewsVisible({ visible: true });
+  });
+
+  reportTestNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) {
+      newReportCaptureBtn.click();
+    }
+  });
+
   // Capture result handler
   window.electronAPI.onCaptureResult((data) => {
     if (data.error) {
       updateStatus(`Error: ${data.error}`);
+      showToast(`Capture failed: ${data.error}`, 'error');
     } else {
       lastReportPath = data.reportPath;
       const s = data.summary;
-      updateStatus(
-        `Passed: ${s.passed} | Failed: ${s.failed} | New: ${s.new} | Deleted: ${s.deleted}`
-      );
+      const statusEl = document.getElementById('status-result');
+      statusEl.innerHTML =
+        `<span class="status-passed">Passed: ${s.passed}</span> | ` +
+        `<span class="status-failed">Failed: ${s.failed}</span> | ` +
+        `<span class="status-new">New: ${s.new}</span> | ` +
+        `<span class="status-deleted">Deleted: ${s.deleted}</span>`;
+      if (s.failed > 0) {
+        showToast(`Captured! ${s.failed} difference(s) found`, 'error');
+      } else {
+        showToast('Captured! No differences found', 'success');
+      }
     }
   });
 
@@ -74,10 +118,13 @@ function initUIControls() {
 
   // Sync toggle (scroll + click + key sync)
   let syncEnabled = true;
+  toggleSyncBtn.classList.add('sync-on');
   toggleSyncBtn.addEventListener('click', () => {
     syncEnabled = !syncEnabled;
     window.electronAPI.setSyncEnabled({ enabled: syncEnabled });
-    toggleSyncBtn.textContent = syncEnabled ? 'Sync ON' : 'Sync OFF';
+    toggleSyncBtn.innerHTML = `<span class="sync-dot${syncEnabled ? '' : ' off'}"></span>${syncEnabled ? 'Sync ON' : 'Sync OFF'}`;
+    toggleSyncBtn.classList.toggle('sync-on', syncEnabled);
+    toggleSyncBtn.classList.toggle('sync-off', !syncEnabled);
     document.getElementById('status-sync').textContent = `Sync: ${syncEnabled ? 'ON' : 'OFF'}`;
   });
 
@@ -107,6 +154,7 @@ function initUIControls() {
 
   function openSettings() {
     settingsModal.classList.remove('hidden');
+    window.electronAPI.setViewsVisible({ visible: false });
     window.electronAPI.getSettings().then((settings) => {
       document.getElementById('setting-matching-threshold').value = settings.matchingThreshold;
       document.getElementById('setting-threshold-rate').value = settings.thresholdRate;
@@ -122,20 +170,35 @@ function initUIControls() {
     };
     window.electronAPI.saveSettings({ settings });
     settingsModal.classList.add('hidden');
+    window.electronAPI.setViewsVisible({ visible: true });
   });
 
   settingsCancelBtn.addEventListener('click', () => {
     settingsModal.classList.add('hidden');
+    window.electronAPI.setViewsVisible({ visible: true });
   });
 
   // Keyboard shortcut handlers from main process
-  window.electronAPI.onShortcutCapture(() => performCapture());
+  window.electronAPI.onShortcutCapture(() => performCapture('page'));
   window.electronAPI.onShortcutOpenReport(() => openLatestReport());
   window.electronAPI.onShortcutPreset((data) => applyPreset(data.index));
   window.electronAPI.onShortcutSettings(() => openSettings());
 
   function updateStatus(text) {
     document.getElementById('status-result').textContent = text;
+  }
+
+  function showToast(message, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast toast-${type}`;
+    // Force reflow to restart transition
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2500);
   }
 
   // Load initial URLs from settings

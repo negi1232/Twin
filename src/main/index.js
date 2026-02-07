@@ -7,7 +7,7 @@ let mainWindow = null;
 let leftView = null;
 let rightView = null;
 
-const TOOLBAR_HEIGHT = 48;
+const TOOLBAR_HEIGHT = 52;
 const STATUS_BAR_HEIGHT = 28;
 const preloadPath = path.join(__dirname, 'preload.js');
 
