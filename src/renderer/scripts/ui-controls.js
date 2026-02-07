@@ -114,7 +114,7 @@ function initUIControls() {
       const newPath = currentFolderPath + '/' + testName;
       try {
         await window.electronAPI.createDirectory({ dirPath: newPath });
-      } catch (_e) {
+      } catch {
         // folder may already exist, continue
       }
       await setSnapshotDir(newPath);
@@ -290,7 +290,7 @@ function initUIControls() {
       await loadAndRenderTree();
       await setSnapshotDir(newPath);
       showToast(`Folder created: ${name}`, 'success');
-    } catch (_e) {
+    } catch {
       showToast('Failed to create folder', 'error');
     }
   }
@@ -352,7 +352,7 @@ function initUIControls() {
   async function loadAndRenderTree() {
     try {
       currentEntries = await window.electronAPI.readDirectory({ dirPath: currentFolderPath });
-    } catch (_e) {
+    } catch {
       currentEntries = [];
     }
     renderTreeFromEntries(currentEntries, sidebarTree, 0);
@@ -425,7 +425,7 @@ function initUIControls() {
           let childEntries;
           try {
             childEntries = await window.electronAPI.readDirectory({ dirPath: entry.path });
-          } catch (_e) {
+          } catch {
             childEntries = [];
           }
           renderTreeFromEntries(childEntries, children, depth + 1);
@@ -501,7 +501,7 @@ function initUIControls() {
         previewFilename.textContent = data.fileName;
         previewImage.src = data.dataUrl;
         previewImage.alt = data.fileName;
-      } catch (_e) {
+      } catch {
         closePreview();
         showToast('Failed to load file', 'error');
       }
