@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, globalShortcut } = require('electron');
+const { app, BrowserWindow, WebContentsView, Menu } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./ipc-handlers');
 const { getStore } = require('./store');
@@ -88,6 +88,16 @@ function getSidebarWidth() {
   return sidebarWidth;
 }
 
+function isAppFocused() {
+  if (!mainWindow) return false;
+  if (mainWindow.isFocused()) return true;
+  if (leftView && !leftView.webContents.isDestroyed() && leftView.webContents.isFocused()) return true;
+  if (rightView && !rightView.webContents.isDestroyed() && rightView.webContents.isFocused()) return true;
+  return false;
+}
+
+let blurTimeout = null;
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -116,14 +126,41 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+      blurTimeout = null;
+    }
     mainWindow = null;
     leftView = null;
     rightView = null;
   });
 
   createViews();
-  registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth });
+  const { syncManager } = registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth });
   registerShortcuts();
+
+  // Re-inject sync script and resume sync when app regains focus
+  mainWindow.on('focus', () => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+      blurTimeout = null;
+    }
+    if (syncManager && syncManager.isPaused()) {
+      syncManager.resume();
+      syncManager.inject();
+    }
+  });
+
+  // Pause sync processing when app loses focus
+  mainWindow.on('blur', () => {
+    if (blurTimeout) clearTimeout(blurTimeout);
+    blurTimeout = setTimeout(() => {
+      if (!isAppFocused() && syncManager) {
+        syncManager.pause();
+      }
+      blurTimeout = null;
+    }, 150);
+  });
 
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -131,55 +168,107 @@ function createWindow() {
 }
 
 function registerShortcuts() {
-  // Cmd/Ctrl+R: Reload both views
-  globalShortcut.register('CommandOrControl+R', () => {
-    if (!mainWindow || !mainWindow.isFocused()) return;
-    if (leftView) leftView.webContents.reload();
-    if (rightView) rightView.webContents.reload();
-  });
+  const template = [
+    {
+      label: 'Twin',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        {
+          label: 'Settings',
+          accelerator: 'CommandOrControl+,',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-settings');
+          },
+        },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Reload Both Views',
+          accelerator: 'CommandOrControl+R',
+          click: () => {
+            if (leftView) leftView.webContents.reload();
+            if (rightView) rightView.webContents.reload();
+          },
+        },
+        {
+          label: 'Reload Active View',
+          accelerator: 'CommandOrControl+Shift+R',
+          click: () => {
+            if (leftView && leftView.webContents.isFocused()) {
+              leftView.webContents.reload();
+            } else if (rightView) {
+              rightView.webContents.reload();
+            }
+          },
+        },
+        { type: 'separator' },
+        ...['1', '2', '3', '4', '5'].map((key) => ({
+          label: `Device Preset ${key}`,
+          accelerator: `CommandOrControl+${key}`,
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-preset', { index: parseInt(key) - 1 });
+          },
+        })),
+      ],
+    },
+    {
+      label: 'Actions',
+      submenu: [
+        {
+          label: 'Capture & Compare',
+          accelerator: 'CommandOrControl+Shift+S',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-capture');
+          },
+        },
+        {
+          label: 'Open Latest Report',
+          accelerator: 'CommandOrControl+Shift+O',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-open-report');
+          },
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { role: 'close' },
+      ],
+    },
+  ];
 
-  // Cmd/Ctrl+Shift+R: Reload active view only
-  globalShortcut.register('CommandOrControl+Shift+R', () => {
-    if (!mainWindow || !mainWindow.isFocused()) return;
-    if (leftView && leftView.webContents.isFocused()) {
-      leftView.webContents.reload();
-    } else if (rightView) {
-      rightView.webContents.reload();
-    }
-  });
-
-  // Cmd/Ctrl+Shift+S: Capture & compare
-  globalShortcut.register('CommandOrControl+Shift+S', () => {
-    if (!mainWindow || !mainWindow.isFocused()) return;
-    mainWindow.webContents.send('shortcut-capture');
-  });
-
-  // Cmd/Ctrl+Shift+O: Open latest report
-  globalShortcut.register('CommandOrControl+Shift+O', () => {
-    if (!mainWindow || !mainWindow.isFocused()) return;
-    mainWindow.webContents.send('shortcut-open-report');
-  });
-
-  // Cmd/Ctrl+1~5: Device presets
-  const presetKeys = ['1', '2', '3', '4', '5'];
-  presetKeys.forEach((key) => {
-    globalShortcut.register(`CommandOrControl+${key}`, () => {
-      if (!mainWindow || !mainWindow.isFocused()) return;
-      mainWindow.webContents.send('shortcut-preset', { index: parseInt(key) - 1 });
-    });
-  });
-
-  // Cmd/Ctrl+,: Open settings
-  globalShortcut.register('CommandOrControl+,', () => {
-    if (!mainWindow || !mainWindow.isFocused()) return;
-    mainWindow.webContents.send('shortcut-settings');
-  });
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  globalShortcut.unregisterAll();
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -191,4 +280,4 @@ app.on('activate', () => {
   }
 });
 
-module.exports = { createWindow, layoutViews, setSidebarWidth, getSidebarWidth };
+module.exports = { createWindow, layoutViews, setSidebarWidth, getSidebarWidth, isAppFocused };

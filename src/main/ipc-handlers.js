@@ -246,7 +246,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   // Navigation sync (left → right)
   if (leftView) {
     leftView.webContents.on('did-navigate-in-page', (_event, url) => {
-      if (!syncManager.isEnabled()) return;
+      if (!syncManager.isEnabled() || syncManager.isPaused()) return;
       try {
         const navPath = new URL(url).pathname;
         const rightUrl = new URL(rightView.webContents.getURL());
@@ -257,6 +257,8 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       }
     });
   }
+
+  return { syncManager };
 }
 
 module.exports = { registerIpcHandlers };

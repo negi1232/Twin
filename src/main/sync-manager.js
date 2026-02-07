@@ -120,6 +120,7 @@ const INJECTION_SCRIPT = `
 
 function createSyncManager(leftView, rightView) {
   let enabled = true;
+  let paused = false;
 
   function isEnabled() {
     return enabled;
@@ -129,8 +130,20 @@ function createSyncManager(leftView, rightView) {
     enabled = !!value;
   }
 
+  function isPaused() {
+    return paused;
+  }
+
+  function pause() {
+    paused = true;
+  }
+
+  function resume() {
+    paused = false;
+  }
+
   function handleMessage(_event, level, message) {
-    if (!enabled) return;
+    if (!enabled || paused) return;
     if (!message.startsWith(SYNC_PREFIX)) return;
 
     let parsed;
@@ -313,6 +326,9 @@ function createSyncManager(leftView, rightView) {
     inject,
     isEnabled,
     setEnabled,
+    isPaused,
+    pause,
+    resume,
     // Exposed for testing
     _handleMessage: handleMessage,
     _replayScroll: replayScroll,

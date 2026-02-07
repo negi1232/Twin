@@ -238,6 +238,58 @@ describe('SyncManager', () => {
     expect(script).toContain('\\n');
   });
 
+  // --- Pause / Resume ---
+  test('isPaused returns false by default', () => {
+    expect(manager.isPaused()).toBe(false);
+  });
+
+  test('pause sets paused state to true', () => {
+    manager.pause();
+    expect(manager.isPaused()).toBe(true);
+  });
+
+  test('resume sets paused state to false', () => {
+    manager.pause();
+    manager.resume();
+    expect(manager.isPaused()).toBe(false);
+  });
+
+  test('does not replay when paused', () => {
+    manager.pause();
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 0, scrollY: 0 } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('resumes replaying after resume', () => {
+    manager.pause();
+    manager.resume();
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 10, scrollY: 20 } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledWith('window.scrollTo(10, 20)');
+  });
+
+  test('pause and enabled are independent', () => {
+    manager.pause();
+    manager.setEnabled(true);
+    expect(manager.isPaused()).toBe(true);
+    expect(manager.isEnabled()).toBe(true);
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 0, scrollY: 0 } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('pause is idempotent', () => {
+    manager.pause();
+    manager.pause();
+    expect(manager.isPaused()).toBe(true);
+  });
+
+  test('resume is idempotent', () => {
+    manager.resume();
+    expect(manager.isPaused()).toBe(false);
+  });
+
   // --- Disabled ---
   test('does not replay when disabled', () => {
     manager.setEnabled(false);
