@@ -69,6 +69,8 @@ jest.mock('electron', () => ({
 jest.mock('fs', () => ({
   promises: {
     readdir: jest.fn().mockResolvedValue([]),
+    mkdir: jest.fn().mockResolvedValue(undefined),
+    readFile: jest.fn().mockResolvedValue(Buffer.from('fake-image-data')),
   },
 }));
 
@@ -116,6 +118,7 @@ let mockSyncEnabled = true;
 const mockSyncManager = {
   start: jest.fn(),
   stop: jest.fn(),
+  inject: jest.fn(),
   isEnabled: jest.fn(() => mockSyncEnabled),
   setEnabled: jest.fn((v) => { mockSyncEnabled = v; }),
 };
@@ -158,7 +161,7 @@ describe('ipc-handlers integration', () => {
 
   // ===== Channel Registration =====
   describe('channel registration', () => {
-    test('registers all 13 expected IPC channels', () => {
+    test('registers all 16 expected IPC channels', () => {
       const expected = [
         'capture-and-compare',
         'open-report',
@@ -172,6 +175,9 @@ describe('ipc-handlers integration', () => {
         'set-views-visible',
         'select-folder',
         'read-directory',
+        'create-directory',
+        'read-file-data',
+        'reinject-sync',
         'set-sidebar-width',
       ];
       expected.forEach((channel) => {
@@ -338,13 +344,13 @@ describe('ipc-handlers integration', () => {
 
   // ===== set-views-visible =====
   describe('set-views-visible', () => {
-    test('hides views by setting bounds to zero', () => {
+    test('hides views by moving offscreen while preserving size', () => {
       mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 52, width: 375, height: 667 });
       mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 52, width: 375, height: 667 });
 
       handlers['set-views-visible']({}, { visible: false });
-      expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: 0, y: 0, width: 0, height: 0 });
-      expect(mockRightView.setBounds).toHaveBeenCalledWith({ x: 0, y: 0, width: 0, height: 0 });
+      expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: -9999, y: -9999, width: 375, height: 667 });
+      expect(mockRightView.setBounds).toHaveBeenCalledWith({ x: -9999, y: -9999, width: 375, height: 667 });
     });
 
     test('restores views to saved bounds', () => {
@@ -377,11 +383,11 @@ describe('ipc-handlers integration', () => {
 
   // ===== select-folder =====
   describe('select-folder', () => {
-    test('returns selected folder path and saves to store', async () => {
+    test('returns selected folder path without saving to store', async () => {
       mockDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/my/folder'] });
       const result = await handlers['select-folder']({});
       expect(result).toBe('/my/folder');
-      expect(mockStoreData.snapshotDir).toBe('/my/folder');
+      expect(mockStoreData.snapshotDir).toBeUndefined();
     });
 
     test('returns null when dialog is canceled', async () => {
@@ -425,6 +431,59 @@ describe('ipc-handlers integration', () => {
       const fs = require('fs');
       fs.promises.readdir.mockRejectedValue(new Error('ENOENT'));
       await expect(handlers['read-directory']({}, { dirPath: '/bad' })).rejects.toThrow('ENOENT');
+    });
+  });
+
+  // ===== create-directory =====
+  describe('create-directory', () => {
+    test('creates directory with recursive option and returns path', async () => {
+      const fs = require('fs');
+      fs.promises.mkdir.mockResolvedValue(undefined);
+      const result = await handlers['create-directory']({}, { dirPath: '/test/new-folder' });
+      expect(fs.promises.mkdir).toHaveBeenCalledWith('/test/new-folder', { recursive: true });
+      expect(result).toEqual({ path: '/test/new-folder' });
+    });
+
+    test('propagates error on permission denied', async () => {
+      const fs = require('fs');
+      fs.promises.mkdir.mockRejectedValue(new Error('EACCES'));
+      await expect(handlers['create-directory']({}, { dirPath: '/root/no-access' })).rejects.toThrow('EACCES');
+    });
+  });
+
+  // ===== read-file-data =====
+  describe('read-file-data', () => {
+    test('reads image file and returns base64 data URL', async () => {
+      const fs = require('fs');
+      const imgBuf = Buffer.from('PNG-DATA');
+      fs.promises.readFile.mockResolvedValue(imgBuf);
+      const result = await handlers['read-file-data']({}, { filePath: '/test/screenshot.png' });
+      expect(fs.promises.readFile).toHaveBeenCalledWith('/test/screenshot.png');
+      expect(result.dataUrl).toBe(`data:image/png;base64,${imgBuf.toString('base64')}`);
+      expect(result.mimeType).toBe('image/png');
+      expect(result.fileName).toBe('screenshot.png');
+    });
+
+    test('handles jpg extension correctly', async () => {
+      const fs = require('fs');
+      fs.promises.readFile.mockResolvedValue(Buffer.from('JPG'));
+      const result = await handlers['read-file-data']({}, { filePath: '/test/photo.jpg' });
+      expect(result.mimeType).toBe('image/jpeg');
+    });
+
+    test('propagates error on file read failure', async () => {
+      const fs = require('fs');
+      fs.promises.readFile.mockRejectedValue(new Error('ENOENT'));
+      await expect(handlers['read-file-data']({}, { filePath: '/bad/file.png' })).rejects.toThrow('ENOENT');
+    });
+  });
+
+  // ===== reinject-sync =====
+  describe('reinject-sync', () => {
+    test('calls syncManager.inject and returns success', () => {
+      const result = handlers['reinject-sync']({});
+      expect(mockSyncManager.inject).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
     });
   });
 

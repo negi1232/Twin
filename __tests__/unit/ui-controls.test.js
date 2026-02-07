@@ -14,8 +14,19 @@ function buildDOM() {
     <button id="report-btn"></button>
     <button id="settings-btn"></button>
     <button id="toggle-sync"></button>
+    <button id="reload-sync-btn"></button>
     <div id="sidebar" class="sidebar collapsed">
       <button id="sidebar-select-folder"></button>
+      <button id="sidebar-new-folder"></button>
+      <div id="sidebar-new-folder-form" class="sidebar-new-folder-form hidden">
+        <input type="text" id="sidebar-new-folder-name" />
+        <button id="sidebar-new-folder-ok"></button>
+        <button id="sidebar-new-folder-cancel"></button>
+      </div>
+      <div class="sidebar-output-info">
+        <span class="sidebar-output-label">Output</span>
+        <span id="sidebar-output-dir" class="sidebar-output-path">Not set</span>
+      </div>
       <div class="sidebar-controls">
         <select id="sidebar-sort">
           <option value="name-asc">Name A-Z</option>
@@ -37,14 +48,30 @@ function buildDOM() {
     </div>
     <button id="new-report-btn"></button>
     <div id="new-report-modal" class="modal hidden">
+      <div id="new-report-folder-info" class="form-info hidden">
+        <span class="form-info-label">Save to</span>
+        <span id="new-report-folder-path" class="form-info-value"></span>
+      </div>
       <input id="report-test-name" />
-      <input id="report-description" />
       <button id="new-report-capture"></button>
       <button id="new-report-cancel"></button>
     </div>
     <span id="status-size">-- x --</span>
+    <span id="status-zoom">Zoom: 100%</span>
     <span id="status-sync">Sync: ON</span>
     <span id="status-result">Ready</span>
+    <div id="preview-modal" class="modal hidden">
+      <div class="modal-overlay" id="preview-overlay"></div>
+      <div class="preview-content">
+        <div class="preview-header">
+          <span id="preview-filename" class="preview-filename"></span>
+          <button id="preview-close" class="btn btn-icon preview-close-btn">&times;</button>
+        </div>
+        <div class="preview-body">
+          <img id="preview-image" class="preview-image" alt="" />
+        </div>
+      </div>
+    </div>
     <div id="toast" class="toast hidden"></div>
     <div class="preset-buttons">
       <button class="btn btn-preset" data-preset="0">SE</button>
@@ -76,7 +103,10 @@ function mockElectronAPI() {
     setViewsVisible: jest.fn().mockResolvedValue(undefined),
     selectFolder: jest.fn().mockResolvedValue(null),
     readDirectory: jest.fn().mockResolvedValue([]),
+    createDirectory: jest.fn().mockResolvedValue({ path: '/test/new' }),
+    readFileData: jest.fn().mockResolvedValue({ dataUrl: 'data:image/png;base64,abc', mimeType: 'image/png', fileName: 'test.png' }),
     setSidebarWidth: jest.fn().mockResolvedValue(undefined),
+    reinjectSync: jest.fn().mockResolvedValue({ success: true }),
     onCaptureResult: jest.fn(),
     onShortcutCapture: jest.fn(),
     onShortcutOpenReport: jest.fn(),
@@ -167,6 +197,15 @@ describe('ui-controls', () => {
       document.getElementById('reload-right').click();
       expect(api.reloadViews).toHaveBeenCalledWith({ target: 'right' });
     });
+
+    test('reload-sync-btn reloads both views and re-injects sync', async () => {
+      init();
+      await flush();
+      document.getElementById('reload-sync-btn').click();
+      await flush();
+      expect(api.reloadViews).toHaveBeenCalledWith({ target: 'both' });
+      expect(api.reinjectSync).toHaveBeenCalled();
+    });
   });
 
   // ===== Capture Button =====
@@ -244,20 +283,50 @@ describe('ui-controls', () => {
       document.getElementById('new-report-btn').click();
       document.getElementById('report-test-name').value = '  ';
       document.getElementById('new-report-capture').click();
+      await flush();
       expect(api.captureAndCompare).not.toHaveBeenCalled();
       expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
     });
 
-    test('valid test name triggers capture, closes modal, and restores BrowserViews', async () => {
+    test('valid test name triggers capture without folder (no sidebar)', async () => {
       init();
       await flush();
       document.getElementById('new-report-btn').click();
       api.setViewsVisible.mockClear();
       document.getElementById('report-test-name').value = 'login-page';
       document.getElementById('new-report-capture').click();
+      await flush();
+      expect(api.createDirectory).not.toHaveBeenCalled();
       expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'login-page' });
       expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
+    test('valid test name with open folder creates subfolder and captures', async () => {
+      api.selectFolder.mockResolvedValue('/vrt-tests');
+      api.readDirectory.mockResolvedValue([]);
+      init();
+      await flush();
+      // Open a folder first
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      // Now click New
+      document.getElementById('new-report-btn').click();
+      expect(document.getElementById('new-report-folder-info').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('new-report-folder-path').textContent).toBe('/vrt-tests/');
+      document.getElementById('report-test-name').value = 'login-page';
+      document.getElementById('new-report-capture').click();
+      await flush();
+      expect(api.createDirectory).toHaveBeenCalledWith({ dirPath: '/vrt-tests/login-page' });
+      expect(api.saveSettings).toHaveBeenCalledWith({ settings: { snapshotDir: '/vrt-tests/login-page' } });
+      expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'login-page' });
+    });
+
+    test('folder info is hidden when no folder is open', async () => {
+      init();
+      await flush();
+      document.getElementById('new-report-btn').click();
+      expect(document.getElementById('new-report-folder-info').classList.contains('hidden')).toBe(true);
     });
 
     test('cancel closes modal and restores BrowserViews', async () => {
@@ -277,6 +346,7 @@ describe('ui-controls', () => {
       const nameInput = document.getElementById('report-test-name');
       nameInput.value = 'my-test';
       nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await flush();
       expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'my-test' });
     });
 
@@ -287,6 +357,7 @@ describe('ui-controls', () => {
       const nameInput = document.getElementById('report-test-name');
       nameInput.value = 'テスト';
       nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
+      await flush();
       expect(api.captureAndCompare).not.toHaveBeenCalled();
     });
   });
@@ -483,6 +554,7 @@ describe('ui-controls', () => {
       expect(sidebar.classList.contains('collapsed')).toBe(true);
       document.getElementById('toggle-sidebar').click();
       expect(sidebar.classList.contains('collapsed')).toBe(false);
+      expect(document.body.classList.contains('sidebar-open')).toBe(true);
       expect(api.setSidebarWidth).toHaveBeenCalledWith({ width: 250 });
     });
 
@@ -492,6 +564,7 @@ describe('ui-controls', () => {
       document.getElementById('toggle-sidebar').click();
       document.getElementById('toggle-sidebar').click();
       expect(document.getElementById('sidebar').classList.contains('collapsed')).toBe(true);
+      expect(document.body.classList.contains('sidebar-open')).toBe(false);
       expect(api.setSidebarWidth).toHaveBeenLastCalledWith({ width: 0 });
     });
 
@@ -756,6 +829,350 @@ describe('ui-controls', () => {
       });
       expect(items[0].getAttribute('role')).toBe('treeitem');
       expect(items[1].getAttribute('role')).toBe('none');
+    });
+
+    // --- Output directory selection ---
+    test('sidebar shows output directory from settings on init', async () => {
+      api.getSettings.mockResolvedValue({
+        leftUrl: 'http://localhost:3000',
+        rightUrl: 'http://localhost:3001',
+        matchingThreshold: 0,
+        thresholdRate: 0,
+        snapshotDir: '/home/user/snapshots',
+      });
+      api.readDirectory.mockResolvedValue([]);
+      init();
+      await flush();
+      const outputDisplay = document.getElementById('sidebar-output-dir');
+      expect(outputDisplay.textContent).toBe('snapshots');
+      expect(outputDisplay.title).toBe('/home/user/snapshots');
+    });
+
+    test('relative snapshotDir does not auto-load tree', async () => {
+      api.getSettings.mockResolvedValue({
+        leftUrl: 'http://localhost:3000',
+        rightUrl: 'http://localhost:3001',
+        matchingThreshold: 0,
+        thresholdRate: 0,
+        snapshotDir: './snapshots',
+      });
+      init();
+      await flush();
+      expect(api.readDirectory).not.toHaveBeenCalled();
+    });
+
+    test('absolute snapshotDir auto-loads parent folder tree on init', async () => {
+      api.getSettings.mockResolvedValue({
+        leftUrl: 'http://localhost:3000',
+        rightUrl: 'http://localhost:3001',
+        matchingThreshold: 0,
+        thresholdRate: 0,
+        snapshotDir: '/home/user/snapshots',
+      });
+      api.readDirectory.mockResolvedValue([
+        { name: 'snapshots', isDirectory: true, path: '/home/user/snapshots' },
+      ]);
+      init();
+      await flush();
+      expect(api.readDirectory).toHaveBeenCalledWith({ dirPath: '/home/user' });
+    });
+
+    test('clicking pin button on directory sets it as snapshotDir', async () => {
+      await openFolderWithEntries([
+        { name: 'output', isDirectory: true, path: '/test/output' },
+      ]);
+      const pinBtn = document.querySelector('.tree-pin-btn');
+      expect(pinBtn).not.toBeNull();
+      pinBtn.click();
+      await flush();
+      expect(api.saveSettings).toHaveBeenCalledWith({
+        settings: { snapshotDir: '/test/output' },
+      });
+    });
+
+    test('pin button click does not expand/collapse directory', async () => {
+      await openFolderWithEntries([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]);
+      const pinBtn = document.querySelector('.tree-pin-btn');
+      pinBtn.click();
+      await flush();
+      const children = document.querySelector('.tree-children');
+      expect(children.classList.contains('expanded')).toBe(false);
+    });
+
+    test('active output directory has tree-item-active-output class after pin', async () => {
+      await openFolderWithEntries([
+        { name: 'output', isDirectory: true, path: '/test/output' },
+        { name: 'other', isDirectory: true, path: '/test/other' },
+      ]);
+      // Click pin on first directory to set it as output
+      const pinBtn = document.querySelector('.tree-pin-btn');
+      pinBtn.click();
+      await flush();
+      // After pin click, tree re-renders with active class
+      const items = document.getElementById('sidebar-tree').querySelectorAll('.tree-item');
+      expect(items[0].classList.contains('tree-item-active-output')).toBe(true);
+      expect(items[1].classList.contains('tree-item-active-output')).toBe(false);
+    });
+
+    test('file entries do not have pin button', async () => {
+      await openFolderWithEntries([
+        { name: 'file.txt', isDirectory: false, path: '/test/file.txt' },
+      ]);
+      const pinBtns = document.querySelectorAll('.tree-pin-btn');
+      expect(pinBtns.length).toBe(0);
+    });
+
+    test('output dir display updates when pin button is clicked', async () => {
+      await openFolderWithEntries([
+        { name: 'my-output', isDirectory: true, path: '/test/my-output' },
+      ]);
+      const pinBtn = document.querySelector('.tree-pin-btn');
+      pinBtn.click();
+      await flush();
+      const outputDisplay = document.getElementById('sidebar-output-dir');
+      expect(outputDisplay.textContent).toBe('my-output');
+      expect(outputDisplay.title).toBe('/test/my-output');
+    });
+
+    // --- New Folder ---
+    test('new folder button does nothing without open folder', async () => {
+      init();
+      await flush();
+      document.getElementById('sidebar-new-folder').click();
+      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+    });
+
+    test('new folder button shows form when folder is open', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      const form = document.getElementById('sidebar-new-folder-form');
+      expect(form.classList.contains('hidden')).toBe(false);
+    });
+
+    test('new folder cancel hides form', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      document.getElementById('sidebar-new-folder-cancel').click();
+      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+    });
+
+    test('new folder OK creates directory and sets as output', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      document.getElementById('sidebar-new-folder-name').value = 'vrt-test';
+      document.getElementById('sidebar-new-folder-ok').click();
+      await flush();
+      expect(api.createDirectory).toHaveBeenCalledWith({ dirPath: '/test/vrt-test' });
+      expect(api.saveSettings).toHaveBeenCalledWith({
+        settings: { snapshotDir: '/test/vrt-test' },
+      });
+    });
+
+    test('new folder OK with empty name does nothing', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      document.getElementById('sidebar-new-folder-name').value = '   ';
+      document.getElementById('sidebar-new-folder-ok').click();
+      await flush();
+      expect(api.createDirectory).not.toHaveBeenCalled();
+    });
+
+    test('Enter key in new folder input creates folder', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      const input = document.getElementById('sidebar-new-folder-name');
+      input.value = 'my-test';
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await flush();
+      expect(api.createDirectory).toHaveBeenCalledWith({ dirPath: '/test/my-test' });
+    });
+
+    test('Escape key in new folder input hides form', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      const input = document.getElementById('sidebar-new-folder-name');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+    });
+
+    test('new folder creation error shows error toast', async () => {
+      api.createDirectory.mockRejectedValue(new Error('EACCES'));
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      document.getElementById('sidebar-new-folder-name').value = 'bad-folder';
+      document.getElementById('sidebar-new-folder-ok').click();
+      await flush();
+      const toast = document.getElementById('toast');
+      expect(toast.className).toContain('toast-error');
+    });
+
+    test('new folder hides form after successful creation', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-new-folder').click();
+      document.getElementById('sidebar-new-folder-name').value = 'new-dir';
+      document.getElementById('sidebar-new-folder-ok').click();
+      await flush();
+      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+    });
+
+    // --- File Preview ---
+    test('clicking an image file opens preview modal immediately and loads data', async () => {
+      await openFolderWithEntries([
+        { name: 'screenshot.png', isDirectory: false, path: '/test/screenshot.png' },
+      ]);
+      const fileItem = document.querySelector('.tree-item');
+      api.setViewsVisible.mockClear();
+      fileItem.click();
+      // Modal and view hiding happen immediately (before async load)
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
+      await flush();
+      // After data loads, image is set
+      expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/screenshot.png' });
+      expect(document.getElementById('preview-image').src).toContain('data:image/png');
+      expect(document.getElementById('preview-filename').textContent).toBe('test.png');
+    });
+
+    test('clicking HTML file opens report via openReport', async () => {
+      await openFolderWithEntries([
+        { name: 'report.html', isDirectory: false, path: '/test/report.html' },
+      ]);
+      document.querySelector('.tree-item').click();
+      await flush();
+      expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/test/report.html' });
+      expect(api.readFileData).not.toHaveBeenCalled();
+    });
+
+    test('closing preview modal hides it and restores views', async () => {
+      await openFolderWithEntries([
+        { name: 'img.jpg', isDirectory: false, path: '/test/img.jpg' },
+      ]);
+      document.querySelector('.tree-item').click();
+      await flush();
+      api.setViewsVisible.mockClear();
+      document.getElementById('preview-close').click();
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
+    test('clicking overlay closes preview modal', async () => {
+      await openFolderWithEntries([
+        { name: 'img.png', isDirectory: false, path: '/test/img.png' },
+      ]);
+      document.querySelector('.tree-item').click();
+      await flush();
+      api.setViewsVisible.mockClear();
+      document.getElementById('preview-overlay').click();
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
+    test('Escape key closes preview modal', async () => {
+      await openFolderWithEntries([
+        { name: 'img.webp', isDirectory: false, path: '/test/img.webp' },
+      ]);
+      document.querySelector('.tree-item').click();
+      await flush();
+      api.setViewsVisible.mockClear();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
+    test('non-previewable files do not trigger preview and have inert class', async () => {
+      await openFolderWithEntries([
+        { name: 'data.json', isDirectory: false, path: '/test/data.json' },
+      ]);
+      const item = document.querySelector('.tree-item');
+      expect(item.classList.contains('tree-item-inert')).toBe(true);
+      item.click();
+      await flush();
+      expect(api.readFileData).not.toHaveBeenCalled();
+      expect(api.openReport).not.toHaveBeenCalled();
+    });
+
+    test('previewable files have tree-item-previewable class', async () => {
+      // sorted name-asc: data.txt, img.png, report.html
+      await openFolderWithEntries([
+        { name: 'img.png', isDirectory: false, path: '/test/img.png' },
+        { name: 'report.html', isDirectory: false, path: '/test/report.html' },
+        { name: 'data.txt', isDirectory: false, path: '/test/data.txt' },
+      ]);
+      const items = document.querySelectorAll('.tree-item');
+      // data.txt - inert
+      expect(items[0].classList.contains('tree-item-inert')).toBe(true);
+      // img.png - previewable
+      expect(items[1].classList.contains('tree-item-previewable')).toBe(true);
+      // report.html - previewable
+      expect(items[2].classList.contains('tree-item-previewable')).toBe(true);
+    });
+
+    test('Enter key on image file opens preview', async () => {
+      await openFolderWithEntries([
+        { name: 'img.gif', isDirectory: false, path: '/test/img.gif' },
+      ]);
+      const item = document.querySelector('.tree-item');
+      item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await flush();
+      expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/img.gif' });
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+    });
+
+    test('tree preserves expanded state after capture result', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory
+        .mockResolvedValueOnce([
+          { name: 'sub', isDirectory: true, path: '/test/sub' },
+        ])
+        .mockResolvedValueOnce([
+          { name: 'child.png', isDirectory: false, path: '/test/sub/child.png' },
+        ])
+        // After capture triggers loadAndRenderTree -> root re-read
+        .mockResolvedValueOnce([
+          { name: 'sub', isDirectory: true, path: '/test/sub' },
+        ])
+        // Auto-expand of 'sub' during rebuild
+        .mockResolvedValueOnce([
+          { name: 'child.png', isDirectory: false, path: '/test/sub/child.png' },
+          { name: 'new.png', isDirectory: false, path: '/test/sub/new.png' },
+        ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      // Expand 'sub'
+      document.getElementById('sidebar-tree').querySelector('.tree-item').click();
+      await flush();
+      expect(document.querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+      // Trigger capture result
+      const cb = api.onCaptureResult.mock.calls[0][0];
+      cb({
+        summary: { passed: 1, failed: 0, new: 1, deleted: 0 },
+        reportPath: '/tmp/report.html',
+      });
+      await flush();
+      // 'sub' should still be expanded with updated children
+      expect(document.querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+      const childNames = Array.from(document.querySelectorAll('.tree-children .tree-name'))
+        .map((el) => el.textContent);
+      expect(childNames).toContain('new.png');
+    });
+
+    test('readFileData error closes preview and shows error toast', async () => {
+      api.readFileData.mockRejectedValue(new Error('EACCES'));
+      await openFolderWithEntries([
+        { name: 'bad.png', isDirectory: false, path: '/test/bad.png' },
+      ]);
+      document.querySelector('.tree-item').click();
+      // Modal opens immediately before async load
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      await flush();
+      // After error, modal is closed
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      const toast = document.getElementById('toast');
+      expect(toast.className).toContain('toast-error');
     });
   });
 

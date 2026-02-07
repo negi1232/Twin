@@ -72,18 +72,73 @@ describe('SyncManager', () => {
     );
   });
 
-  // --- Click sync ---
-  test('click message replays mouseDown + mouseUp on right view', () => {
-    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { x: 50, y: 75, button: 'left' } });
+  // --- Hover sync (element-based) ---
+  test('hover message finds element on right view and sends mouseMove to its center', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 150, y: 200 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#my-btn' } });
     manager._handleMessage(null, 0, msg);
 
-    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(2);
-    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'mouseDown', x: 50, y: 75, button: 'left' })
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledWith(
+      expect.stringContaining('#my-btn')
     );
     expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'mouseUp', x: 50, y: 75, button: 'left' })
+      expect.objectContaining({ type: 'mouseMove', x: 150, y: 200 })
     );
+  });
+
+  test('hover message does nothing when element not found on right view', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce(null);
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#missing' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  test('hover message handles executeJavaScript rejection gracefully', async () => {
+    rightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('fail'));
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#btn' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  // --- Click sync (element-based) ---
+  test('click message finds element on right view and sends mouseDown + mouseUp', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 100, y: 50 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledWith(
+      expect.stringContaining('#btn')
+    );
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', x: 100, y: 50, button: 'left' })
+    );
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseUp', x: 100, y: 50, button: 'left' })
+    );
+  });
+
+  test('click message does nothing when element not found on right view', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce(null);
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#missing', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  test('click message handles executeJavaScript rejection gracefully', async () => {
+    rightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('fail'));
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
   });
 
   // --- Key sync ---
@@ -205,10 +260,12 @@ describe('SyncManager', () => {
   });
 
   // --- click with unknown button ---
-  test('click with unknown button defaults to left', () => {
-    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { x: 10, y: 20, button: 'unknown' } });
+  test('click with unknown button defaults to left', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 10, y: 20 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#link', button: 'unknown' } });
     manager._handleMessage(null, 0, msg);
 
+    await new Promise((r) => setTimeout(r, 0));
     expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'mouseDown', button: 'left' })
     );
