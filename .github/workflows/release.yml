@@ -3,18 +3,19 @@ name: Release
 on:
   push:
     tags: ['v*']
-  pull_request:
-    branches: [main]
-    types: [closed]
+
+permissions:
+  contents: read
 
 jobs:
   e2e-test:
     name: E2E Tests
+    if: github.event.pull_request.merged == true || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -24,6 +25,7 @@ jobs:
 
   build:
     name: Build
+    if: github.event.pull_request.merged == true || startsWith(github.ref, 'refs/tags/v')
     needs: e2e-test
     strategy:
       matrix:
@@ -31,8 +33,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -40,11 +42,41 @@ jobs:
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: npm run build:mac -- --publish never
-      - name: Build (Linux/Windows)
+      - name: Build (Linux)
         if: runner.os == 'Linux'
         run: npx electron-builder --linux --publish never
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: build-${{ matrix.os }}
           path: dist/
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts/
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+          cp artifacts/build-macos-latest/*.dmg release-assets/ 2>/dev/null || true
+          cp artifacts/build-macos-latest/*.zip release-assets/ 2>/dev/null || true
+          cp artifacts/build-ubuntu-latest/*.AppImage release-assets/ 2>/dev/null || true
+          cp artifacts/build-ubuntu-latest/*.deb release-assets/ 2>/dev/null || true
+          cp artifacts/build-ubuntu-latest/*.snap release-assets/ 2>/dev/null || true
+          ls -la release-assets/
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" \
+            --title "Twin $TAG" \
+            --generate-notes \
+            release-assets/*
