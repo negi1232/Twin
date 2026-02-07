@@ -199,6 +199,154 @@ body {
 }
 
 /* ============================================
+   Sidebar Toggle Button
+   ============================================ */
+.toolbar-toggle {
+  flex: 0 0 auto;
+}
+
+/* ============================================
+   Sidebar File Browser
+   ============================================ */
+.sidebar {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  bottom: 28px;
+  width: 250px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-default);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width var(--transition-normal);
+}
+
+.sidebar.collapsed {
+  width: 0;
+  border-right: none;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.sidebar-header .btn-sm {
+  width: 100%;
+  height: 28px;
+  font-size: 11px;
+}
+
+.sidebar-controls {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 32px;
+}
+
+.sidebar-select {
+  flex: 1;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 11px;
+  outline: none;
+}
+
+.sidebar-select:focus {
+  border-color: var(--accent-blue);
+}
+
+.sidebar-filter-group {
+  flex-wrap: wrap;
+}
+
+.sidebar-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.sidebar-radio input[type="radio"] {
+  margin: 0;
+  accent-color: var(--accent-blue);
+}
+
+.sidebar-tree {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.tree-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.tree-icon {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  margin-right: 4px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-children {
+  display: none;
+}
+
+.tree-children.expanded {
+  display: block;
+}
+
+/* ============================================
    View Container
    ============================================ */
 #view-container {

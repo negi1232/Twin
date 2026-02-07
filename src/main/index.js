@@ -6,6 +6,7 @@ const { getStore } = require('./store');
 let mainWindow = null;
 let leftView = null;
 let rightView = null;
+let sidebarWidth = 0;
 
 const TOOLBAR_HEIGHT = 52;
 const STATUS_BAR_HEIGHT = 28;
@@ -52,20 +53,30 @@ function layoutViews() {
 
   const { width, height } = mainWindow.getContentBounds();
   const contentHeight = height - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
-  const halfWidth = Math.floor(width / 2);
+  const availableWidth = width - sidebarWidth;
+  const halfWidth = Math.floor(availableWidth / 2);
 
   leftView.setBounds({
-    x: 0,
+    x: sidebarWidth,
     y: TOOLBAR_HEIGHT,
     width: halfWidth,
     height: contentHeight,
   });
   rightView.setBounds({
-    x: halfWidth,
+    x: sidebarWidth + halfWidth,
     y: TOOLBAR_HEIGHT,
-    width: width - halfWidth,
+    width: availableWidth - halfWidth,
     height: contentHeight,
   });
+}
+
+function setSidebarWidth(w) {
+  sidebarWidth = w;
+  layoutViews();
+}
+
+function getSidebarWidth() {
+  return sidebarWidth;
 }
 
 function createWindow() {
@@ -96,7 +107,7 @@ function createWindow() {
   });
 
   createViews();
-  registerIpcHandlers({ mainWindow, leftView, rightView });
+  registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth });
   registerShortcuts();
 
   if (process.argv.includes('--dev')) {
@@ -165,4 +176,4 @@ app.on('activate', () => {
   }
 });
 
-module.exports = { createWindow, layoutViews };
+module.exports = { createWindow, layoutViews, setSidebarWidth, getSidebarWidth };

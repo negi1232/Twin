@@ -56,9 +56,20 @@ const mockBrowserWindow = jest.fn().mockImplementation(() => ({
   loadFile: jest.fn(),
 }));
 
+const mockDialog = {
+  showOpenDialog: jest.fn().mockResolvedValue({ canceled: false, filePaths: ['/selected/folder'] }),
+};
+
 jest.mock('electron', () => ({
   ipcMain: mockIpcMain,
   BrowserWindow: mockBrowserWindow,
+  dialog: mockDialog,
+}));
+
+jest.mock('fs', () => ({
+  promises: {
+    readdir: jest.fn().mockResolvedValue([]),
+  },
 }));
 
 jest.mock('../../src/main/screenshot', () => ({
@@ -112,6 +123,15 @@ jest.mock('../../src/main/sync-manager', () => ({
   createSyncManager: jest.fn(() => mockSyncManager),
 }));
 
+let mockSidebarWidth = 0;
+const mockSetSidebarWidth = jest.fn((w) => { mockSidebarWidth = w; });
+const mockGetSidebarWidth = jest.fn(() => mockSidebarWidth);
+
+jest.mock('../../src/main/index', () => ({
+  setSidebarWidth: jest.fn(),
+  getSidebarWidth: jest.fn(() => 0),
+}));
+
 // ---------- Tests ----------
 
 describe('ipc-handlers integration', () => {
@@ -120,12 +140,15 @@ describe('ipc-handlers integration', () => {
     Object.keys(handlers).forEach((k) => delete handlers[k]);
     Object.keys(mockStoreData).forEach((k) => delete mockStoreData[k]);
     mockSyncEnabled = true;
+    mockSidebarWidth = 0;
 
     const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
     registerIpcHandlers({
       mainWindow: mockMainWindow,
       leftView: mockLeftView,
       rightView: mockRightView,
+      setSidebarWidth: mockSetSidebarWidth,
+      getSidebarWidth: mockGetSidebarWidth,
     });
   });
 
@@ -135,7 +158,7 @@ describe('ipc-handlers integration', () => {
 
   // ===== Channel Registration =====
   describe('channel registration', () => {
-    test('registers all 10 expected IPC channels', () => {
+    test('registers all 13 expected IPC channels', () => {
       const expected = [
         'capture-and-compare',
         'open-report',
@@ -147,6 +170,9 @@ describe('ipc-handlers integration', () => {
         'set-sync-enabled',
         'get-sync-enabled',
         'set-views-visible',
+        'select-folder',
+        'read-directory',
+        'set-sidebar-width',
       ];
       expected.forEach((channel) => {
         expect(handlers[channel]).toBeDefined();
@@ -237,7 +263,21 @@ describe('ipc-handlers integration', () => {
 
   // ===== set-device-preset =====
   describe('set-device-preset', () => {
-    test('sets bounds on both views and resizes main window', () => {
+    test('sets bounds on both views and resizes main window with sidebar offset', () => {
+      mockSidebarWidth = 250;
+      mockGetSidebarWidth.mockReturnValue(250);
+      handlers['set-device-preset']({}, { width: 375, height: 667 });
+      expect(mockLeftView.setBounds).toHaveBeenCalledWith(
+        expect.objectContaining({ x: 250, y: 52, width: 375, height: 667 })
+      );
+      expect(mockRightView.setBounds).toHaveBeenCalledWith(
+        expect.objectContaining({ x: 625, y: 52, width: 375, height: 667 })
+      );
+      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(1000, 667 + 52 + 28);
+    });
+
+    test('sets bounds without sidebar offset when sidebar is closed', () => {
+      mockGetSidebarWidth.mockReturnValue(0);
       handlers['set-device-preset']({}, { width: 375, height: 667 });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith(
         expect.objectContaining({ x: 0, y: 52, width: 375, height: 667 })
@@ -332,6 +372,81 @@ describe('ipc-handlers integration', () => {
       // Should not throw
       handlers['set-views-visible']({}, { visible: false });
       handlers['set-views-visible']({}, { visible: true });
+    });
+  });
+
+  // ===== select-folder =====
+  describe('select-folder', () => {
+    test('returns selected folder path and saves to store', async () => {
+      mockDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/my/folder'] });
+      const result = await handlers['select-folder']({});
+      expect(result).toBe('/my/folder');
+      expect(mockStoreData.snapshotDir).toBe('/my/folder');
+    });
+
+    test('returns null when dialog is canceled', async () => {
+      mockDialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+      const result = await handlers['select-folder']({});
+      expect(result).toBeNull();
+    });
+
+    test('returns null when mainWindow is null', async () => {
+      jest.resetModules();
+      Object.keys(handlers).forEach((k) => delete handlers[k]);
+      const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
+      registerIpcHandlers({
+        mainWindow: null,
+        leftView: mockLeftView,
+        rightView: mockRightView,
+        setSidebarWidth: mockSetSidebarWidth,
+        getSidebarWidth: mockGetSidebarWidth,
+      });
+      const result = await handlers['select-folder']({});
+      expect(result).toBeNull();
+    });
+  });
+
+  // ===== read-directory =====
+  describe('read-directory', () => {
+    test('returns directory entries with name, isDirectory, and path', async () => {
+      const fs = require('fs');
+      fs.promises.readdir.mockResolvedValue([
+        { name: 'sub', isDirectory: () => true },
+        { name: 'file.txt', isDirectory: () => false },
+      ]);
+      const result = await handlers['read-directory']({}, { dirPath: '/test' });
+      expect(result).toEqual([
+        { name: 'sub', isDirectory: true, path: expect.stringContaining('sub') },
+        { name: 'file.txt', isDirectory: false, path: expect.stringContaining('file.txt') },
+      ]);
+    });
+
+    test('propagates error on invalid directory', async () => {
+      const fs = require('fs');
+      fs.promises.readdir.mockRejectedValue(new Error('ENOENT'));
+      await expect(handlers['read-directory']({}, { dirPath: '/bad' })).rejects.toThrow('ENOENT');
+    });
+  });
+
+  // ===== set-sidebar-width =====
+  describe('set-sidebar-width', () => {
+    test('calls setSidebarWidth and returns width', () => {
+      const result = handlers['set-sidebar-width']({}, { width: 250 });
+      expect(mockSetSidebarWidth).toHaveBeenCalledWith(250);
+      expect(result).toEqual({ width: 250 });
+    });
+
+    test('handles null setSidebarWidth gracefully', () => {
+      jest.resetModules();
+      Object.keys(handlers).forEach((k) => delete handlers[k]);
+      const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
+      registerIpcHandlers({
+        mainWindow: mockMainWindow,
+        leftView: mockLeftView,
+        rightView: mockRightView,
+      });
+      const result = handlers['set-sidebar-width']({}, { width: 250 });
+      expect(result).toEqual({ width: 250 });
     });
   });
 
