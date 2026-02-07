@@ -15,7 +15,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "electron-store": "^8.0.0",
+    "electron-store": "^11.0.2",
     "reg-cli": "^0.18.0"
   },
   "devDependencies": {
