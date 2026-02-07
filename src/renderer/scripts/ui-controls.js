@@ -72,11 +72,13 @@ function initUIControls() {
     }
   }
 
-  // Sync toggle
+  // Sync toggle (scroll + click + key sync)
+  let syncEnabled = true;
   toggleSyncBtn.addEventListener('click', () => {
-    const enabled = toggleSync();
-    toggleSyncBtn.textContent = enabled ? 'Sync ON' : 'Sync OFF';
-    document.getElementById('status-sync').textContent = `Sync: ${enabled ? 'ON' : 'OFF'}`;
+    syncEnabled = !syncEnabled;
+    window.electronAPI.setSyncEnabled({ enabled: syncEnabled });
+    toggleSyncBtn.textContent = syncEnabled ? 'Sync ON' : 'Sync OFF';
+    document.getElementById('status-sync').textContent = `Sync: ${syncEnabled ? 'ON' : 'OFF'}`;
   });
 
   // Device presets

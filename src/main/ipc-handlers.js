@@ -3,8 +3,13 @@ const path = require('path');
 const { captureScreenshots } = require('./screenshot');
 const { runRegCli } = require('./reg-runner');
 const { getSettings, saveSettings, getStore } = require('./store');
+const { createSyncManager } = require('./sync-manager');
 
 function registerIpcHandlers({ mainWindow, leftView, rightView }) {
+  // --- Sync Manager ---
+  const syncManager = createSyncManager(leftView, rightView);
+  syncManager.start();
+
   // Capture screenshots and run reg-cli comparison
   ipcMain.handle('capture-and-compare', async (_event, { pageName }) => {
     const store = getStore();
@@ -90,47 +95,20 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
     return { success: true };
   });
 
-  // Scroll sync — inject listener into left view after page loads
-  // (BrowserViews have no preload, so we use executeJavaScript)
+  // Sync toggle
+  ipcMain.handle('set-sync-enabled', (_event, { enabled }) => {
+    syncManager.setEnabled(enabled);
+    return { enabled: syncManager.isEnabled() };
+  });
+
+  ipcMain.handle('get-sync-enabled', () => {
+    return { enabled: syncManager.isEnabled() };
+  });
+
+  // Navigation sync (left → right)
   if (leftView) {
-    leftView.webContents.on('did-finish-load', () => {
-      leftView.webContents.executeJavaScript(`
-        (function() {
-          if (window.__twinScrollSync) return;
-          window.__twinScrollSync = true;
-          let ticking = false;
-          window.addEventListener('scroll', function() {
-            if (!ticking) {
-              requestAnimationFrame(function() {
-                const data = JSON.stringify({ scrollX: window.scrollX, scrollY: window.scrollY });
-                document.title = '__twin_scroll__' + data;
-                ticking = false;
-              });
-              ticking = true;
-            }
-          });
-        })();
-      `).catch(() => {});
-    });
-
-    // Pick up scroll data via page-title-updated (works without preload)
-    leftView.webContents.on('page-title-updated', (_event, title) => {
-      if (title.startsWith('__twin_scroll__')) {
-        try {
-          const { scrollX, scrollY } = JSON.parse(title.replace('__twin_scroll__', ''));
-          if (rightView) {
-            rightView.webContents.executeJavaScript(
-              `window.scrollTo(${scrollX}, ${scrollY})`
-            ).catch(() => {});
-          }
-        } catch (_e) {
-          // ignore parse errors
-        }
-      }
-    });
-
-    // Navigation sync
     leftView.webContents.on('did-navigate-in-page', (_event, url) => {
+      if (!syncManager.isEnabled()) return;
       try {
         const navPath = new URL(url).pathname;
         const rightUrl = new URL(rightView.webContents.getURL());
@@ -141,15 +119,6 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
       }
     });
   }
-
-  // Keep legacy IPC handler for main window preload compatibility
-  ipcMain.on('sync-scroll', (_event, { scrollX, scrollY }) => {
-    if (rightView) {
-      rightView.webContents.executeJavaScript(
-        `window.scrollTo(${scrollX}, ${scrollY})`
-      ).catch(() => {});
-    }
-  });
 }
 
 module.exports = { registerIpcHandlers };
