@@ -9,16 +9,20 @@ Electron-based desktop app for comparing Git branches side by side with visual r
 - **Settings Storage**: electron-store
 - **Testing**: Jest (unit/integration), Playwright (E2E)
 - **Linting**: ESLint 9 (flat config)
+- **Git Hooks**: Husky (pre-commit, pre-push)
 - **Build**: electron-builder
+- **CI/CD**: GitHub Actions
 
 ## Project Structure
 ```
-src/main/         - Electron main process (index.js, ipc-handlers, screenshot, reg-runner, preload, store)
+src/main/         - Electron main process (index.js, ipc-handlers, sync-manager, screenshot, reg-runner, preload, store)
 src/renderer/     - Renderer process (HTML, CSS, JS for UI)
 src/shared/       - Shared constants
 __tests__/unit/   - Unit tests (Jest)
 __tests__/integration/ - Integration tests (Jest)
 __tests__/e2e/    - E2E tests (Playwright)
+.github/workflows/ - CI/CD (ci.yml, release.yml)
+.husky/           - Git hooks (pre-commit, pre-push)
 snapshots/        - Screenshot output (gitignored)
 ```
 
