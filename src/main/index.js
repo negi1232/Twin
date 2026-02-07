@@ -107,13 +107,14 @@ function createWindow() {
 function registerShortcuts() {
   // Cmd/Ctrl+R: Reload both views
   globalShortcut.register('CommandOrControl+R', () => {
+    if (!mainWindow || !mainWindow.isFocused()) return;
     if (leftView) leftView.webContents.reload();
     if (rightView) rightView.webContents.reload();
   });
 
   // Cmd/Ctrl+Shift+R: Reload active view only
   globalShortcut.register('CommandOrControl+Shift+R', () => {
-    // Reload the focused view
+    if (!mainWindow || !mainWindow.isFocused()) return;
     if (leftView && leftView.webContents.isFocused()) {
       leftView.webContents.reload();
     } else if (rightView) {
@@ -123,33 +124,29 @@ function registerShortcuts() {
 
   // Cmd/Ctrl+Shift+S: Capture & compare
   globalShortcut.register('CommandOrControl+Shift+S', () => {
-    if (mainWindow) {
-      mainWindow.webContents.send('shortcut-capture');
-    }
+    if (!mainWindow || !mainWindow.isFocused()) return;
+    mainWindow.webContents.send('shortcut-capture');
   });
 
   // Cmd/Ctrl+Shift+O: Open latest report
   globalShortcut.register('CommandOrControl+Shift+O', () => {
-    if (mainWindow) {
-      mainWindow.webContents.send('shortcut-open-report');
-    }
+    if (!mainWindow || !mainWindow.isFocused()) return;
+    mainWindow.webContents.send('shortcut-open-report');
   });
 
   // Cmd/Ctrl+1~5: Device presets
   const presetKeys = ['1', '2', '3', '4', '5'];
   presetKeys.forEach((key) => {
     globalShortcut.register(`CommandOrControl+${key}`, () => {
-      if (mainWindow) {
-        mainWindow.webContents.send('shortcut-preset', { index: parseInt(key) - 1 });
-      }
+      if (!mainWindow || !mainWindow.isFocused()) return;
+      mainWindow.webContents.send('shortcut-preset', { index: parseInt(key) - 1 });
     });
   });
 
   // Cmd/Ctrl+,: Open settings
   globalShortcut.register('CommandOrControl+,', () => {
-    if (mainWindow) {
-      mainWindow.webContents.send('shortcut-settings');
-    }
+    if (!mainWindow || !mainWindow.isFocused()) return;
+    mainWindow.webContents.send('shortcut-settings');
   });
 }
 
