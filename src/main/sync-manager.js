@@ -45,13 +45,35 @@ const INJECTION_SCRIPT = `
     }
   }, { passive: true });
 
-  // --- Click sync ---
+  // --- Hover sync (element-based, throttled via rAF) ---
+  var hoverTicking = false;
+  var lastHoverSelector = null;
+  window.addEventListener('mousemove', function(e) {
+    if (!hoverTicking) {
+      requestAnimationFrame(function() {
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        if (el) {
+          var selector = getSelector(el);
+          if (selector !== lastHoverSelector) {
+            send('hover', { selector: selector });
+            lastHoverSelector = selector;
+          }
+        }
+        hoverTicking = false;
+      });
+      hoverTicking = true;
+    }
+  }, { passive: true });
+
+  // --- Click sync (element-based) ---
   window.addEventListener('click', function(e) {
-    send('click', {
-      x: e.clientX,
-      y: e.clientY,
-      button: e.button === 0 ? 'left' : e.button === 1 ? 'middle' : 'right',
-    });
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    if (el) {
+      send('click', {
+        selector: getSelector(el),
+        button: e.button === 0 ? 'left' : e.button === 1 ? 'middle' : 'right',
+      });
+    }
   }, true);
 
   // --- Input value sync (handles IME, paste, autocomplete) ---
@@ -125,6 +147,9 @@ function createSyncManager(leftView, rightView) {
       case 'scroll':
         replayScroll(data);
         break;
+      case 'hover':
+        replayHover(data);
+        break;
       case 'click':
         replayClick(data);
         break;
@@ -146,24 +171,57 @@ function createSyncManager(leftView, rightView) {
     ).catch(() => {});
   }
 
-  function replayClick({ x, y, button }) {
+  function replayHover({ selector }) {
+    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const script = `(function(){
+      var el = document.querySelector('${escapedSelector}');
+      if (el) {
+        var rect = el.getBoundingClientRect();
+        return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+      }
+      return null;
+    })()`;
+    rightView.webContents.executeJavaScript(script).then((coords) => {
+      if (coords) {
+        rightView.webContents.sendInputEvent({
+          type: 'mouseMove',
+          x: coords.x,
+          y: coords.y,
+        });
+      }
+    }).catch(() => {});
+  }
+
+  function replayClick({ selector, button }) {
     const buttonMap = { left: 'left', middle: 'middle', right: 'right' };
     const btn = buttonMap[button] || 'left';
-
-    rightView.webContents.sendInputEvent({
-      type: 'mouseDown',
-      x,
-      y,
-      button: btn,
-      clickCount: 1,
-    });
-    rightView.webContents.sendInputEvent({
-      type: 'mouseUp',
-      x,
-      y,
-      button: btn,
-      clickCount: 1,
-    });
+    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const script = `(function(){
+      var el = document.querySelector('${escapedSelector}');
+      if (el) {
+        var rect = el.getBoundingClientRect();
+        return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+      }
+      return null;
+    })()`;
+    rightView.webContents.executeJavaScript(script).then((coords) => {
+      if (coords) {
+        rightView.webContents.sendInputEvent({
+          type: 'mouseDown',
+          x: coords.x,
+          y: coords.y,
+          button: btn,
+          clickCount: 1,
+        });
+        rightView.webContents.sendInputEvent({
+          type: 'mouseUp',
+          x: coords.x,
+          y: coords.y,
+          button: btn,
+          clickCount: 1,
+        });
+      }
+    }).catch(() => {});
   }
 
   function replayInputValue({ selector, value, innerHTML }) {
@@ -238,6 +296,9 @@ function createSyncManager(leftView, rightView) {
 
     // Listen for sync messages from injected script
     leftView.webContents.on('console-message', handleMessage);
+
+    // Inject immediately in case page is already loaded
+    inject();
   }
 
   function stop() {
@@ -255,6 +316,7 @@ function createSyncManager(leftView, rightView) {
     // Exposed for testing
     _handleMessage: handleMessage,
     _replayScroll: replayScroll,
+    _replayHover: replayHover,
     _replayClick: replayClick,
     _replayInputValue: replayInputValue,
     _replayKey: replayKey,

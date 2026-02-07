@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; img-src 'self' data:;">
   <title>Twin - Visual Regression Testing</title>
   <link rel="stylesheet" href="styles/main.css">
 </head>
@@ -29,6 +29,7 @@
       </div>
       <div class="toolbar-actions">
         <button id="toggle-sync" class="btn sync-on" title="Toggle Sync"><span class="sync-dot"></span>Sync ON</button>
+        <button id="reload-sync-btn" class="btn btn-icon" title="Reload &amp; Re-sync (Cmd+R)">&#x21bb;</button>
         <button id="new-report-btn" class="btn btn-primary" title="New Report">&#x2795; New</button>
         <button id="capture-btn" class="btn" title="Capture & Compare (Cmd+Shift+S)">&#x1F4F7; Capture</button>
         <button id="report-btn" class="btn" title="Open Report (Cmd+Shift+O)">&#x1F4CB; Report</button>
@@ -47,6 +48,16 @@
   <div id="sidebar" class="sidebar collapsed">
     <div class="sidebar-header">
       <button id="sidebar-select-folder" class="btn btn-sm">Open Folder</button>
+      <button id="sidebar-new-folder" class="btn btn-sm btn-icon" title="New Folder">&#x2795;</button>
+    </div>
+    <div id="sidebar-new-folder-form" class="sidebar-new-folder-form hidden">
+      <input type="text" id="sidebar-new-folder-name" class="sidebar-new-folder-input" placeholder="folder name" />
+      <button id="sidebar-new-folder-ok" class="btn btn-sm btn-primary">OK</button>
+      <button id="sidebar-new-folder-cancel" class="btn btn-sm">&#x2715;</button>
+    </div>
+    <div class="sidebar-output-info">
+      <span class="sidebar-output-label">Output</span>
+      <span id="sidebar-output-dir" class="sidebar-output-path" title="">Not set</span>
     </div>
     <div class="sidebar-controls">
       <div class="sidebar-control-group">
@@ -73,6 +84,8 @@
   <!-- Status Bar -->
   <div id="status-bar">
     <span id="status-size">-- x --</span>
+    <span class="status-divider">|</span>
+    <span id="status-zoom">Zoom: 100%</span>
     <span class="status-divider">|</span>
     <span id="status-sync">Sync: ON</span>
     <span class="status-divider">|</span>
@@ -108,17 +121,31 @@
     <div class="modal-overlay"></div>
     <div class="modal-content">
       <h2>New Report</h2>
+      <div id="new-report-folder-info" class="form-info hidden">
+        <span class="form-info-label">Save to</span>
+        <span id="new-report-folder-path" class="form-info-value"></span>
+      </div>
       <div class="form-group">
         <label for="report-test-name">Test Name</label>
         <input type="text" id="report-test-name" placeholder="e.g. login-page, top-hero" />
       </div>
-      <div class="form-group">
-        <label for="report-description">Description (optional)</label>
-        <input type="text" id="report-description" placeholder="e.g. Login form layout check" />
-      </div>
       <div class="modal-actions">
         <button id="new-report-capture" class="btn btn-primary">Capture</button>
         <button id="new-report-cancel" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Preview Modal -->
+  <div id="preview-modal" class="modal hidden">
+    <div class="modal-overlay" id="preview-overlay"></div>
+    <div class="preview-content">
+      <div class="preview-header">
+        <span id="preview-filename" class="preview-filename"></span>
+        <button id="preview-close" class="btn btn-icon preview-close-btn">&times;</button>
+      </div>
+      <div class="preview-body">
+        <img id="preview-image" class="preview-image" alt="" />
       </div>
     </div>
   </div>

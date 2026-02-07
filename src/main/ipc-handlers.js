@@ -69,6 +69,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   // Change BrowserView size (device preset)
   ipcMain.handle('set-device-preset', (_event, { width, height }) => {
     const TOOLBAR_HEIGHT = 52;
+    const STATUS_BAR_HEIGHT = 28;
     const sw = getSidebarWidth ? getSidebarWidth() : 0;
     if (leftView) {
       leftView.setBounds({ x: sw, y: TOOLBAR_HEIGHT, width, height });
@@ -77,7 +78,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       rightView.setBounds({ x: sw + width, y: TOOLBAR_HEIGHT, width, height });
     }
     if (mainWindow) {
-      mainWindow.setContentSize(sw + width * 2, height + TOOLBAR_HEIGHT + 28);
+      mainWindow.setContentSize(sw + width * 2, height + TOOLBAR_HEIGHT + STATUS_BAR_HEIGHT);
     }
   });
 
@@ -121,11 +122,11 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     if (!visible) {
       if (leftView) {
         savedLeftBounds = leftView.getBounds();
-        leftView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        leftView.setBounds({ x: -9999, y: -9999, width: savedLeftBounds.width, height: savedLeftBounds.height });
       }
       if (rightView) {
         savedRightBounds = rightView.getBounds();
-        rightView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        rightView.setBounds({ x: -9999, y: -9999, width: savedRightBounds.width, height: savedRightBounds.height });
       }
     } else {
       if (leftView && savedLeftBounds) {
@@ -146,9 +147,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       properties: ['openDirectory'],
     });
     if (result.canceled || result.filePaths.length === 0) return null;
-    const folderPath = result.filePaths[0];
-    getStore().set('snapshotDir', folderPath);
-    return folderPath;
+    return result.filePaths[0];
   });
 
   // Read directory contents (one level)
@@ -159,6 +158,35 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       isDirectory: entry.isDirectory(),
       path: path.join(dirPath, entry.name),
     }));
+  });
+
+  // Create a new directory
+  ipcMain.handle('create-directory', async (_event, { dirPath }) => {
+    await fs.promises.mkdir(dirPath, { recursive: true });
+    return { path: dirPath };
+  });
+
+  // Read file data as base64 data URL (for image preview)
+  ipcMain.handle('read-file-data', async (_event, { filePath }) => {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeMap = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+    };
+    const mimeType = mimeMap[ext] || 'application/octet-stream';
+    const buf = await fs.promises.readFile(filePath);
+    const dataUrl = `data:${mimeType};base64,${buf.toString('base64')}`;
+    return { dataUrl, mimeType, fileName: path.basename(filePath) };
+  });
+
+  // Re-inject sync script into left BrowserView
+  ipcMain.handle('reinject-sync', () => {
+    syncManager.inject();
+    return { success: true };
   });
 
   // Set sidebar width and re-layout views

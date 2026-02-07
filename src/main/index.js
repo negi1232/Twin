@@ -32,6 +32,12 @@ function createViews() {
   const leftUrl = store.get('leftUrl', 'http://localhost:3000');
   const rightUrl = store.get('rightUrl', 'http://localhost:3001');
 
+  // Reset zoom on BrowserViews to clear any cached values
+  leftView.webContents.setZoomFactor(1.0);
+  leftView.webContents.setZoomLevel(0);
+  rightView.webContents.setZoomFactor(1.0);
+  rightView.webContents.setZoomLevel(0);
+
   leftView.webContents.loadURL(leftUrl).catch(() => {});
   rightView.webContents.loadURL(rightUrl).catch(() => {});
 
@@ -52,19 +58,22 @@ function layoutViews() {
   if (!mainWindow || !leftView || !rightView) return;
 
   const { width, height } = mainWindow.getContentBounds();
-  const contentHeight = height - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
-  const availableWidth = width - sidebarWidth;
+  const toolbarH = TOOLBAR_HEIGHT;
+  const statusBarH = STATUS_BAR_HEIGHT;
+  const sw = sidebarWidth;
+  const contentHeight = height - toolbarH - statusBarH;
+  const availableWidth = width - sw;
   const halfWidth = Math.floor(availableWidth / 2);
 
   leftView.setBounds({
-    x: sidebarWidth,
-    y: TOOLBAR_HEIGHT,
+    x: sw,
+    y: toolbarH,
     width: halfWidth,
     height: contentHeight,
   });
   rightView.setBounds({
-    x: sidebarWidth + halfWidth,
-    y: TOOLBAR_HEIGHT,
+    x: sw + halfWidth,
+    y: toolbarH,
     width: availableWidth - halfWidth,
     height: contentHeight,
   });
@@ -95,6 +104,12 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  // Force zoom to 1.0 — clear any cached zoom from previous sessions
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.setZoomFactor(1.0);
+    mainWindow.webContents.setZoomLevel(0);
+  });
 
   mainWindow.on('resize', () => {
     layoutViews();
