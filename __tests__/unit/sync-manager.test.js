@@ -87,15 +87,32 @@ describe('SyncManager', () => {
   });
 
   // --- Key sync ---
-  test('keydown message replays keyDown on right view', () => {
+  test('keydown for printable char sends keyDown + char', () => {
     const msg = SYNC_PREFIX + JSON.stringify({
       type: 'keydown',
       data: { key: 'a', code: 'KeyA', keyCode: 65, shift: false, ctrl: false, alt: false, meta: false },
     });
     manager._handleMessage(null, 0, msg);
 
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(2);
     expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'keyDown', modifiers: [] })
+    );
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'char', keyCode: 'a', modifiers: [] })
+    );
+  });
+
+  test('keydown for non-printable key (Enter) sends only keyDown', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'keydown',
+      data: { key: 'Enter', code: 'Enter', keyCode: 13, shift: false, ctrl: false, alt: false, meta: false },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(1);
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'keyDown' })
     );
   });
 
@@ -109,15 +126,19 @@ describe('SyncManager', () => {
     expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'keyDown', modifiers: ['shift', 'control'] })
     );
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'char', keyCode: 'A', modifiers: ['shift', 'control'] })
+    );
   });
 
-  test('keyup message replays keyUp on right view', () => {
+  test('keyup message replays keyUp only (no char)', () => {
     const msg = SYNC_PREFIX + JSON.stringify({
       type: 'keyup',
       data: { key: 'a', code: 'KeyA', keyCode: 65, shift: false, ctrl: false, alt: false, meta: false },
     });
     manager._handleMessage(null, 0, msg);
 
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(1);
     expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'keyUp' })
     );

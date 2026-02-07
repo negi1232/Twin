@@ -126,18 +126,29 @@ function createSyncManager(leftView, rightView) {
     });
   }
 
-  function replayKey(type, { keyCode, shift, ctrl, alt, meta }) {
+  function replayKey(type, { key, keyCode, shift, ctrl, alt, meta }) {
     const modifiers = [];
     if (shift) modifiers.push('shift');
     if (ctrl) modifiers.push('control');
     if (alt) modifiers.push('alt');
     if (meta) modifiers.push('meta');
 
+    const keyChar = String.fromCharCode(keyCode);
+
     rightView.webContents.sendInputEvent({
       type,
-      keyCode: String.fromCharCode(keyCode),
+      keyCode: keyChar,
       modifiers,
     });
+
+    // Send 'char' event on keyDown for printable characters to insert text into form fields
+    if (type === 'keyDown' && key && key.length === 1) {
+      rightView.webContents.sendInputEvent({
+        type: 'char',
+        keyCode: key,
+        modifiers,
+      });
+    }
   }
 
   function inject() {
