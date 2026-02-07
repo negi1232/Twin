@@ -213,16 +213,16 @@ describe('SyncManager', () => {
     expect(script).toContain('こんにちは');
   });
 
-  test('inputvalue for contenteditable sets innerHTML', () => {
+  test('inputvalue for contenteditable sets textContent', () => {
     const msg = SYNC_PREFIX + JSON.stringify({
       type: 'inputvalue',
-      data: { selector: '.editor', innerHTML: '<p>テスト</p>' },
+      data: { selector: '.editor', textContent: 'テスト' },
     });
     manager._handleMessage(null, 0, msg);
 
     expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
     const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
-    expect(script).toContain('innerHTML');
+    expect(script).toContain('textContent');
     expect(script).toContain('テスト');
   });
 

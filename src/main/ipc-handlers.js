@@ -18,9 +18,13 @@ function isAllowedUrl(url) {
 }
 
 function isPathUnderBase(targetPath, basePath) {
-  const resolved = path.resolve(targetPath);
-  const resolvedBase = path.resolve(basePath);
-  return resolved.startsWith(resolvedBase + path.sep) || resolved === resolvedBase;
+  try {
+    const resolved = fs.realpathSync(targetPath);
+    const resolvedBase = fs.realpathSync(basePath);
+    return resolved.startsWith(resolvedBase + path.sep) || resolved === resolvedBase;
+  } catch {
+    return false;
+  }
 }
 
 function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }) {
@@ -31,6 +35,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   // Capture screenshots and run reg-cli comparison
   ipcMain.handle('capture-and-compare', async (_event, { pageName }) => {
     if (!leftView || !rightView) throw new Error('Views not ready');
+    if (!pageName || !/^[a-zA-Z0-9_-]{1,100}$/.test(pageName)) {
+      throw new Error('Invalid page name: only alphanumeric, underscore, and hyphen allowed (max 100 chars)');
+    }
 
     const store = getStore();
     const snapshotDir = path.resolve(store.get('snapshotDir'));
@@ -187,8 +194,8 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   // Read directory contents (one level)
   ipcMain.handle('read-directory', async (_event, { dirPath }) => {
     const resolved = path.resolve(dirPath);
-    if (allowedBasePath && !isPathUnderBase(resolved, allowedBasePath)) {
-      throw new Error('Access denied: path is outside the selected folder');
+    if (!allowedBasePath || !isPathUnderBase(resolved, allowedBasePath)) {
+      throw new Error('Access denied: please select a folder first');
     }
     const entries = await fs.promises.readdir(resolved, { withFileTypes: true });
     return entries.map((entry) => ({
@@ -201,8 +208,8 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   // Create a new directory
   ipcMain.handle('create-directory', async (_event, { dirPath }) => {
     const resolved = path.resolve(dirPath);
-    if (allowedBasePath && !isPathUnderBase(resolved, allowedBasePath)) {
-      throw new Error('Access denied: path is outside the selected folder');
+    if (!allowedBasePath || !isPathUnderBase(resolved, allowedBasePath)) {
+      throw new Error('Access denied: please select a folder first');
     }
     await fs.promises.mkdir(resolved, { recursive: true });
     return { path: resolved };
@@ -211,8 +218,8 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   // Read file data as base64 data URL (for image preview)
   ipcMain.handle('read-file-data', async (_event, { filePath }) => {
     const resolved = path.resolve(filePath);
-    if (allowedBasePath && !isPathUnderBase(resolved, allowedBasePath)) {
-      throw new Error('Access denied: path is outside the selected folder');
+    if (!allowedBasePath || !isPathUnderBase(resolved, allowedBasePath)) {
+      throw new Error('Access denied: please select a folder first');
     }
     const ext = path.extname(resolved).toLowerCase();
     const mimeMap = {
@@ -224,6 +231,11 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       '.svg': 'image/svg+xml',
     };
     const mimeType = mimeMap[ext] || 'application/octet-stream';
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    const stats = await fs.promises.stat(resolved);
+    if (stats.size > MAX_FILE_SIZE) {
+      throw new Error('File too large to read (max 50MB)');
+    }
     const buf = await fs.promises.readFile(resolved);
     const dataUrl = `data:${mimeType};base64,${buf.toString('base64')}`;
     return { dataUrl, mimeType, fileName: path.basename(resolved) };
