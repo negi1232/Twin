@@ -1,184 +1,257 @@
-# Twin
+<p align="center">
+  <img src="docs/screenshots/app-overview.png" alt="Twin - Visual Regression Testing" width="800" />
+</p>
 
-**Visual Regression Testing Desktop App**
+<h1 align="center">Twin</h1>
 
-2つの Web ページを左右に並べて同時に表示・操作し、スクリーンショット比較で視覚的な差分を検出する Electron 製デスクトップアプリ。localhost でもリモート URL でも使えます。
+<p align="center">
+  <strong>Visual Regression Testing Desktop App</strong><br />
+  2つの Web ページを左右に並べて表示・同期操作し、スクリーンショット比較で視覚的な差分を検出する Electron 製デスクトップアプリ
+</p>
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ ☰ [Expected URL ↻]  SE 14P iPad DT FHD  Sync New 📷 📋 ⚙  [Actual URL ↻] │
-├──────────┬──────────────────┬───────────────────────────────────┤
-│ Sidebar  │  BrowserView #1  │  BrowserView #2                   │
-│ [Open]   │  Expected        │  Actual                           │
-│ Sort: ▼  │  localhost:3000  │  localhost:3001                    │
-│ ○All ○D  │                  │                                   │
-│ 📁 src/  │                  │                                   │
-│ 📄 pkg   │                  │                                   │
-├──────────┴──────────────────┴───────────────────────────────────┤
-│ Status Bar: 375 x 667  │  Sync: ON  │  Passed: 3 / Failed: 1  │
-└─────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <a href="https://github.com/negi1232/Twin/actions/workflows/ci.yml"><img src="https://github.com/negi1232/Twin/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/Electron-40-47848F?logo=electron&logoColor=white" alt="Electron 40" />
+  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-lightgrey" alt="Platform" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+</p>
 
-## 特徴
+---
 
-- **デュアルビューア** — BrowserView 2枚で新旧ブランチを左右同時表示
-- **操作同期** — スクロール・クリック・キー入力・ページ遷移を左→右に自動同期
-- **IME対応** — 日本語入力（変換確定）を値ベースで正確に同期
-- **ワンクリック比較** — スクリーンショット撮影 → reg-cli で差分検出 → HTML レポート生成
-- **デバイスプリセット** — iPhone SE / iPhone 14 Pro / iPad / Desktop / Full HD をワンクリック切替
-- **レポート表示** — reg-cli のリッチな HTML レポート（透明度スライダー・スワイプ比較・差分ハイライト）
-- **ファイルブラウザ** — サイドバーで任意のフォルダをツリー表示。ソート（名前/タイプ）・フィルタ（全て/ディレクトリ/ファイル）・キーボード操作に対応
-- **設定永続化** — URL・閾値・スナップショット保存先を electron-store で永続化
+## Overview
 
-## 必要環境
+Twin は、**Expected（期待値）** と **Actual（実際）** の2つの Web ページを左右に並べて同時に表示・操作し、ワンクリックでスクリーンショットの差分を検出できるデスクトップアプリです。
 
-- **Node.js** 18 以上
-- **OS** macOS 12+ / Windows 10+
+localhost の開発サーバーでもリモート URL でも使えるため、ブランチ間のビジュアルリグレッションテストに最適です。
 
-## セットアップ
+## Features
+
+| 機能 | 説明 |
+|---|---|
+| **Dual Viewer** | 左右2画面で新旧ページを同時表示 |
+| **Sync Mode** | スクロール・クリック・キー入力・ページ遷移を左→右に自動同期 |
+| **One-click Capture** | スクリーンショット撮影 → reg-cli で差分検出 → HTML レポート生成 |
+| **Device Presets** | iPhone SE / 14 Pro / iPad / Desktop / Full HD をワンクリック切替 |
+| **Rich Report** | reg-cli のリッチな HTML レポート（透明度スライダー・スワイプ比較・差分ハイライト） |
+| **File Browser** | サイドバーでフォルダをツリー表示。ソート・フィルタ・キーボード操作対応 |
+| **IME Support** | 日本語入力（変換確定）を値ベースで正確に同期 |
+| **Persistent Settings** | URL・閾値・スナップショット保存先を自動保存 |
+
+## Screenshots
+
+<!-- TODO: アプリの実際のスクリーンショットに差し替えてください -->
+
+<table>
+  <tr>
+    <td align="center"><strong>メイン画面</strong></td>
+    <td align="center"><strong>キャプチャ結果</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/main-window.png" alt="メイン画面" width="400" /></td>
+    <td><img src="docs/screenshots/capture-result.png" alt="キャプチャ結果" width="400" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>サイドバー</strong></td>
+    <td align="center"><strong>設定モーダル</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/sidebar.png" alt="サイドバー" width="400" /></td>
+    <td><img src="docs/screenshots/settings-modal.png" alt="設定モーダル" width="400" /></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><strong>reg-cli レポート</strong></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img src="docs/screenshots/report.png" alt="レポート画面" width="600" /></td>
+  </tr>
+</table>
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+
+- **macOS** 12+ or **Windows** 10+
+
+### Install
 
 ```bash
-git clone <repository-url>
-cd twin
+git clone https://github.com/negi1232/Twin.git
+cd Twin
 npm install
 ```
 
-## 使い方
-
-### 起動
+### Launch
 
 ```bash
 npm start          # アプリを起動
 npm run dev        # DevTools 付きで起動
 ```
 
+## Usage
+
 ### 基本フロー
 
-1. Expected（左）と Actual（右）の URL を入力して Enter
-2. デバイスプリセット（SE / 14P / iPad / DT / FHD）でビューサイズを選択
+```
+1. URL を入力        2. プリセット選択      3. Capture で比較
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│ Expected URL │    │ SE 14P iPad  │    │  📷 Capture  │
+│ Actual   URL │    │ DT FHD       │    │              │
+└──────────────┘    └──────────────┘    └──────────────┘
+                                              │
+4. 結果をステータスバーで確認          5. Report で詳細表示
+┌─────────────────────────┐    ┌──────────────┐
+│ Passed: 3 | Failed: 1  │    │  📋 Report   │
+└─────────────────────────┘    └──────────────┘
+```
+
+1. **Expected**（左）と **Actual**（右）の URL を入力して Enter
+2. デバイスプリセット（**SE** / **14P** / **iPad** / **DT** / **FHD**）でビューサイズを選択
 3. **Capture** ボタンでスクリーンショット撮影 & reg-cli 比較を実行
-4. ステータスバーに結果サマリが表示される
+4. ステータスバーに **Passed / Failed / New / Deleted** の結果サマリが表示される
 5. **Report** ボタンで reg-cli の HTML レポートを別ウィンドウで確認
 
 ### New Report
 
-**New** ボタンからテスト名を付けてキャプチャ。ページ単位で名前を分けて管理できます。
+**+ New** ボタンからテスト名を付けてキャプチャ。ページごとに名前を分けて管理できます。
 
-### ファイルブラウザ（サイドバー）
+<img src="docs/screenshots/new-report-modal.png" alt="New Report モーダル" width="400" />
 
-ツールバー左端の **☰** ボタンでサイドバーを開閉できます。
+### File Browser (Sidebar)
+
+ツールバー左端の **☰** ボタンでサイドバーを開閉。
 
 - **Open Folder** — ネイティブダイアログでフォルダを選択し、ツリー表示
-- **Sort** — セレクトボックスでソート順を切替（名前昇順・降順・タイプ別）
-- **Filter** — ラジオボタンでフィルタ（全て・ディレクトリのみ・ファイルのみ）
-- **キーボード操作** — Tab でフォーカス移動、Enter / Space でフォルダ展開・折りたたみ
+- **Sort** — 名前昇順・降順・タイプ別でソート
+- **Filter** — 全て / ディレクトリのみ / ファイルのみ
+- **Keyboard** — Tab でフォーカス移動、Enter / Space でフォルダ展開・折りたたみ
 - フォルダ選択時にスナップショット保存先が自動設定されます
 
-### 同期
+### Sync Mode
 
-**Sync ON/OFF** トグルで操作同期を切替。ON の状態では左画面のスクロール・クリック・キー入力・フォーム入力・ページ遷移が右画面に自動反映されます。
+**Sync ON/OFF** トグルで操作同期を切替。ON の状態では左画面の操作が右画面に自動反映されます。
 
-## キーボードショートカット
+| 同期される操作 |
+|---|
+| スクロール（垂直・水平） |
+| マウスクリック |
+| キーボード入力 |
+| フォーム入力（IME 対応） |
+| ページ遷移 |
 
-| ショートカット | 機能 |
+## Keyboard Shortcuts
+
+| Shortcut | Action |
 |---|---|
 | `Cmd/Ctrl + R` | 左右両方をリロード |
 | `Cmd/Ctrl + Shift + R` | アクティブ側のみリロード |
 | `Cmd/Ctrl + Shift + S` | スクリーンショット撮影 & 比較 |
 | `Cmd/Ctrl + Shift + O` | 最新レポートを開く |
-| `Cmd/Ctrl + 1〜5` | デバイスプリセット切替 |
+| `Cmd/Ctrl + 1` ~ `5` | デバイスプリセット切替 (SE / 14P / iPad / DT / FHD) |
 | `Cmd/Ctrl + ,` | 設定モーダルを開く |
 
-## 設定
+## Settings
 
-設定モーダル（`Cmd/Ctrl + ,`）から変更可能:
+設定モーダル（`Cmd/Ctrl + ,`）から変更可能。値は自動保存されます。
 
-| 項目 | 説明 | デフォルト |
+| Setting | Description | Default |
 |---|---|---|
-| Matching Threshold | ピクセル差分感度（0〜1, 小さいほど厳密） | 0 |
-| Threshold Rate | 変更検知率しきい値（0〜1） | 0 |
-| Snapshot Directory | スクリーンショット保存先 | ./snapshots |
+| **Matching Threshold** | ピクセル差分の感度 (0〜1, 小さいほど厳密) | `0` |
+| **Threshold Rate** | 変更検知率のしきい値 (0〜1) | `0` |
+| **Snapshot Directory** | スクリーンショットの保存先パス | `./snapshots` |
 
-## 開発
+## Development
 
-### コマンド
+### Commands
 
 ```bash
-npm test           # ユニット・統合テスト + カバレッジ
+npm test           # Unit / Integration テスト + カバレッジ
 npm run test:watch # ウォッチモード
 npm run test:e2e   # E2E テスト (Playwright + Electron)
 npm run lint       # ESLint
-npm run build:mac  # macOS 向けビルド
-npm run build:win  # Windows 向けビルド
+npm run build:mac  # macOS ビルド (.dmg)
+npm run build:win  # Windows ビルド (.exe)
 ```
 
-### テスト構成
+### Test Coverage
 
-```
-__tests__/
-├── unit/           # ユニットテスト (Jest)
-├── integration/    # 統合テスト (Jest)
-├── e2e/            # E2E テスト (Playwright)
-└── fixtures/       # テスト用モックサーバー・画像
-```
+テストカバレッジの閾値は CI で強制されます。
 
-### カバレッジ閾値
-
-| 指標 | 閾値 |
+| Metric | Threshold |
 |---|---|
 | Statements | 95% |
 | Branches | 85% |
 | Functions | 85% |
 | Lines | 95% |
 
-### 技術スタック
+```
+__tests__/
+├── unit/           # ユニットテスト (Jest)
+├── integration/    # 統合テスト (Jest + mocked IPC)
+├── e2e/            # E2E テスト (Playwright + Electron)
+└── fixtures/       # テスト用モックサーバー・画像
+```
 
-| 技術 | 用途 |
+### Tech Stack
+
+| Technology | Purpose |
 |---|---|
-| Electron 28 | デスクトップアプリ基盤 (Chromium + Node.js) |
-| reg-cli | 画像比較・差分検出・HTML レポート生成 |
-| electron-store | 設定の JSON 永続化 |
-| Jest | ユニット・統合テスト |
-| Playwright | E2E テスト（Electron モード） |
-| ESLint 9 | リンター（flat config） |
-| Husky | Git フック（pre-commit, pre-push） |
-| electron-builder | Win/Mac パッケージング |
-| GitHub Actions | CI/CD |
+| [Electron](https://www.electronjs.org/) 40 | Desktop app framework (Chromium + Node.js) |
+| [reg-cli](https://github.com/reg-viz/reg-cli) | Image diff & HTML report generation |
+| [electron-store](https://github.com/sindresorhus/electron-store) | Persistent JSON settings |
+| [Jest](https://jestjs.io/) | Unit & integration tests |
+| [Playwright](https://playwright.dev/) | E2E tests (Electron mode) |
+| [ESLint](https://eslint.org/) 9 | Linter (flat config) |
+| [Husky](https://typicode.github.io/husky/) | Git hooks (pre-commit, pre-push) |
+| [electron-builder](https://www.electron.build/) | Cross-platform packaging |
+| [GitHub Actions](https://github.com/features/actions) | CI/CD |
 
-### プロジェクト構成
+### Architecture
 
 ```
 src/
-├── main/              # Electron メインプロセス
-│   ├── index.js       # エントリポイント, BrowserWindow/View 生成
-│   ├── ipc-handlers.js # IPC ハンドラ
-│   ├── sync-manager.js # 操作同期（スクロール・クリック・キー・フォーム入力）
-│   ├── screenshot.js   # capturePage() ラッパー
-│   ├── reg-runner.js   # reg-cli 実行・結果パース
-│   ├── preload.js      # contextBridge API 公開
-│   └── store.js        # electron-store 設定管理
-├── renderer/          # レンダラープロセス
+├── main/                # Electron Main Process
+│   ├── index.js         # Entry point — BrowserWindow / WebContentsView
+│   ├── ipc-handlers.js  # IPC message handlers
+│   ├── sync-manager.js  # Scroll / click / key / form sync
+│   ├── screenshot.js    # capturePage() wrapper
+│   ├── reg-runner.js    # reg-cli execution & result parsing
+│   ├── preload.js       # contextBridge API exposure
+│   └── store.js         # electron-store settings manager
+├── renderer/            # Renderer Process (browser-safe)
 │   ├── index.html
 │   ├── styles/main.css
 │   └── scripts/
-│       ├── app.js
-│       ├── ui-controls.js
-│       ├── sync.js
-│       └── device-presets.js
+│       ├── app.js              # Main app controller
+│       ├── ui-controls.js      # Toolbar & modal interactions
+│       ├── sync.js             # Sync toggle UI
+│       └── device-presets.js   # Device size presets
 └── shared/
-    └── constants.js
+    └── constants.js     # Shared constants
 ```
 
-### Git ワークフロー
+### Git Workflow
 
-[Git Flow](https://nvie.com/posts/a-successful-git-branching-model/) を採用:
+[Git Flow](https://nvie.com/posts/a-successful-git-branching-model/) ベースの PR 駆動ワークフロー:
 
-- `main` — プロダクションリリース
-- `develop` — 開発統合ブランチ
-- `feature/*` — 新機能
-- `release/*` — リリース準備
-- `hotfix/*` — 緊急修正
+```
+main ──────●──────────●──────────●──── (production releases)
+           ↑          ↑          ↑
+           │  hotfix/* │ release/*│
+           │          │          │
+develop ───┴──────────┴──────────┴──── (integration)
+            ↑   ↑   ↑
+     feature/*  feature/*  feature/*
+```
 
-## ライセンス
+| Branch | Purpose |
+|---|---|
+| `main` | Production-ready releases |
+| `develop` | Integration branch |
+| `feature/*` | New features (from develop) |
+| `release/*` | Release preparation (from develop) |
+| `hotfix/*` | Emergency fixes (from main) |
 
-MIT
+## License
+
+[MIT](LICENSE)
