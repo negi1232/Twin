@@ -22,12 +22,19 @@ Thumbs.db
 .env
 .env.local
 
+# Internal spec (AI development notes)
+init.md
+
 # Coverage
 coverage/
 
 # Logs
 *.log
 npm-debug.log*
+
+# Test artifacts
+playwright-report/
+test-results/
 
 # Electron builder
 *.dmg
