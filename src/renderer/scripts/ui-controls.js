@@ -1,4 +1,39 @@
 function initUIControls() {
+  // Focus trap utility for modals
+  const FOCUSABLE_SELECTOR = 'input:not([disabled]):not([type="hidden"]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const focusTrapHandlers = new WeakMap();
+
+  function trapFocus(modal) {
+    const handler = (e) => {
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(modal.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !modal.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !modal.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    focusTrapHandlers.set(modal, handler);
+    document.addEventListener('keydown', handler);
+  }
+
+  function releaseFocus(modal) {
+    const handler = focusTrapHandlers.get(modal);
+    if (handler) {
+      document.removeEventListener('keydown', handler);
+      focusTrapHandlers.delete(modal);
+    }
+  }
+
   const leftUrlInput = document.getElementById('left-url');
   const rightUrlInput = document.getElementById('right-url');
   const reloadLeftBtn = document.getElementById('reload-left');
@@ -100,6 +135,7 @@ function initUIControls() {
     newReportModal.classList.remove('hidden');
     window.electronAPI.setViewsVisible({ visible: false });
     reportTestNameInput.focus();
+    trapFocus(newReportModal);
   });
 
   newReportCaptureBtn.addEventListener('click', async () => {
@@ -108,8 +144,7 @@ function initUIControls() {
       reportTestNameInput.focus();
       return;
     }
-    newReportModal.classList.add('hidden');
-    window.electronAPI.setViewsVisible({ visible: true });
+    closeNewReport();
     if (currentFolderPath) {
       const newPath = currentFolderPath + '/' + testName;
       try {
@@ -124,8 +159,17 @@ function initUIControls() {
   });
 
   newReportCancelBtn.addEventListener('click', () => {
+    closeNewReport();
+  });
+
+  function closeNewReport() {
     newReportModal.classList.add('hidden');
+    releaseFocus(newReportModal);
     window.electronAPI.setViewsVisible({ visible: true });
+  }
+
+  newReportModal.querySelector('.modal-overlay').addEventListener('click', () => {
+    closeNewReport();
   });
 
   reportTestNameInput.addEventListener('keydown', (e) => {
@@ -222,7 +266,9 @@ function initUIControls() {
       document.getElementById('setting-matching-threshold').value = settings.matchingThreshold;
       document.getElementById('setting-threshold-rate').value = settings.thresholdRate;
       document.getElementById('setting-snapshot-dir').value = settings.snapshotDir;
+      document.getElementById('setting-matching-threshold').focus();
     });
+    trapFocus(settingsModal);
   }
 
   settingsSaveBtn.addEventListener('click', () => {
@@ -232,13 +278,21 @@ function initUIControls() {
       snapshotDir: document.getElementById('setting-snapshot-dir').value,
     };
     window.electronAPI.saveSettings({ settings });
-    settingsModal.classList.add('hidden');
-    window.electronAPI.setViewsVisible({ visible: true });
+    closeSettings();
   });
 
   settingsCancelBtn.addEventListener('click', () => {
+    closeSettings();
+  });
+
+  function closeSettings() {
     settingsModal.classList.add('hidden');
+    releaseFocus(settingsModal);
     window.electronAPI.setViewsVisible({ visible: true });
+  }
+
+  settingsModal.querySelector('.modal-overlay').addEventListener('click', () => {
+    closeSettings();
   });
 
   // Keyboard shortcut handlers from main process
@@ -505,6 +559,7 @@ function initUIControls() {
       previewImage.alt = '';
       previewModal.classList.remove('hidden');
       window.electronAPI.setViewsVisible({ visible: false });
+      trapFocus(previewModal);
       try {
         const data = await window.electronAPI.readFileData({ filePath });
         previewFilename.textContent = data.fileName;
@@ -519,15 +574,24 @@ function initUIControls() {
 
   function closePreview() {
     previewModal.classList.add('hidden');
+    releaseFocus(previewModal);
     previewImage.src = '';
     window.electronAPI.setViewsVisible({ visible: true });
   }
 
   previewCloseBtn.addEventListener('click', closePreview);
   previewOverlay.addEventListener('click', closePreview);
+
+  // Escape key closes any open modal
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !previewModal.classList.contains('hidden')) {
-      closePreview();
+    if (e.key === 'Escape') {
+      if (!previewModal.classList.contains('hidden')) {
+        closePreview();
+      } else if (!settingsModal.classList.contains('hidden')) {
+        closeSettings();
+      } else if (!newReportModal.classList.contains('hidden')) {
+        closeNewReport();
+      }
     }
   });
 

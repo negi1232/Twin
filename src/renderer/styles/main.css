@@ -539,6 +539,7 @@ body.sidebar-open #status-bar {
 /* Pin button (set as output) */
 .tree-pin-btn {
   opacity: 0;
+  pointer-events: none;
   background: none;
   border: none;
   cursor: pointer;
@@ -554,6 +555,7 @@ body.sidebar-open #status-bar {
 
 .tree-item:hover .tree-pin-btn {
   opacity: 0.6;
+  pointer-events: auto;
 }
 
 .tree-pin-btn:hover {
