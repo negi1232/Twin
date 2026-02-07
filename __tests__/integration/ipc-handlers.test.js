@@ -115,12 +115,16 @@ jest.mock('../../src/main/store', () => ({
 }));
 
 let mockSyncEnabled = true;
+let mockSyncPaused = false;
 const mockSyncManager = {
   start: jest.fn(),
   stop: jest.fn(),
   inject: jest.fn(),
   isEnabled: jest.fn(() => mockSyncEnabled),
   setEnabled: jest.fn((v) => { mockSyncEnabled = v; }),
+  isPaused: jest.fn(() => mockSyncPaused),
+  pause: jest.fn(() => { mockSyncPaused = true; }),
+  resume: jest.fn(() => { mockSyncPaused = false; }),
 };
 jest.mock('../../src/main/sync-manager', () => ({
   createSyncManager: jest.fn(() => mockSyncManager),
@@ -143,6 +147,7 @@ describe('ipc-handlers integration', () => {
     Object.keys(handlers).forEach((k) => delete handlers[k]);
     Object.keys(mockStoreData).forEach((k) => delete mockStoreData[k]);
     mockSyncEnabled = true;
+    mockSyncPaused = false;
     mockSidebarWidth = 0;
 
     const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
@@ -157,6 +162,24 @@ describe('ipc-handlers integration', () => {
 
   afterEach(() => {
     jest.resetModules();
+  });
+
+  // ===== Return value =====
+  describe('return value', () => {
+    test('registerIpcHandlers returns syncManager', () => {
+      jest.resetModules();
+      Object.keys(handlers).forEach((k) => delete handlers[k]);
+      const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
+      const result = registerIpcHandlers({
+        mainWindow: mockMainWindow,
+        leftView: mockLeftView,
+        rightView: mockRightView,
+        setSidebarWidth: mockSetSidebarWidth,
+        getSidebarWidth: mockGetSidebarWidth,
+      });
+      expect(result).toHaveProperty('syncManager');
+      expect(result.syncManager).toBe(mockSyncManager);
+    });
   });
 
   // ===== Channel Registration =====
@@ -560,6 +583,15 @@ describe('ipc-handlers integration', () => {
       const handler = getNavigateHandler();
       mockRightView.webContents.loadURL.mockClear();
       handler({}, 'http://localhost:3000/other');
+      expect(mockRightView.webContents.loadURL).not.toHaveBeenCalled();
+    });
+
+    test('does not sync navigation when paused', () => {
+      mockSyncPaused = true;
+      mockSyncManager.isPaused.mockReturnValue(true);
+      const handler = getNavigateHandler();
+      mockRightView.webContents.loadURL.mockClear();
+      handler({}, 'http://localhost:3000/path');
       expect(mockRightView.webContents.loadURL).not.toHaveBeenCalled();
     });
 

@@ -88,6 +88,16 @@ function getSidebarWidth() {
   return sidebarWidth;
 }
 
+function isAppFocused() {
+  if (!mainWindow) return false;
+  if (mainWindow.isFocused()) return true;
+  if (leftView && !leftView.webContents.isDestroyed() && leftView.webContents.isFocused()) return true;
+  if (rightView && !rightView.webContents.isDestroyed() && rightView.webContents.isFocused()) return true;
+  return false;
+}
+
+let blurTimeout = null;
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -116,14 +126,41 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+      blurTimeout = null;
+    }
     mainWindow = null;
     leftView = null;
     rightView = null;
   });
 
   createViews();
-  registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth });
+  const { syncManager } = registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth });
   registerShortcuts();
+
+  // Re-inject sync script and resume sync when app regains focus
+  mainWindow.on('focus', () => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+      blurTimeout = null;
+    }
+    if (syncManager && syncManager.isPaused()) {
+      syncManager.resume();
+      syncManager.inject();
+    }
+  });
+
+  // Pause sync processing when app loses focus
+  mainWindow.on('blur', () => {
+    if (blurTimeout) clearTimeout(blurTimeout);
+    blurTimeout = setTimeout(() => {
+      if (!isAppFocused() && syncManager) {
+        syncManager.pause();
+      }
+      blurTimeout = null;
+    }, 150);
+  });
 
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -243,4 +280,4 @@ app.on('activate', () => {
   }
 });
 
-module.exports = { createWindow, layoutViews, setSidebarWidth, getSidebarWidth };
+module.exports = { createWindow, layoutViews, setSidebarWidth, getSidebarWidth, isAppFocused };
