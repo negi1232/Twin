@@ -16,6 +16,16 @@ function buildDOM() {
     <button id="toggle-sync"></button>
     <div id="sidebar" class="sidebar collapsed">
       <button id="sidebar-select-folder"></button>
+      <div class="sidebar-controls">
+        <select id="sidebar-sort">
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
+          <option value="type">Type</option>
+        </select>
+        <label><input type="radio" name="sidebar-filter" value="all" checked />All</label>
+        <label><input type="radio" name="sidebar-filter" value="directories" />Dirs</label>
+        <label><input type="radio" name="sidebar-filter" value="files" />Files</label>
+      </div>
       <div id="sidebar-tree" class="sidebar-tree"></div>
     </div>
     <div id="settings-modal" class="modal hidden">
@@ -444,6 +454,28 @@ describe('ui-controls', () => {
 
   // ===== Sidebar =====
   describe('Sidebar', () => {
+    const mixedEntries = [
+      { name: 'beta.txt', isDirectory: false, path: '/test/beta.txt' },
+      { name: 'alpha', isDirectory: true, path: '/test/alpha' },
+      { name: 'gamma.js', isDirectory: false, path: '/test/gamma.js' },
+      { name: 'delta', isDirectory: true, path: '/test/delta' },
+    ];
+
+    function getTreeNames() {
+      return Array.from(document.getElementById('sidebar-tree').querySelectorAll('.tree-item > .tree-name'))
+        .map((el) => el.textContent);
+    }
+
+    async function openFolderWithEntries(entries) {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue(entries || mixedEntries);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+    }
+
+    // --- Toggle ---
     test('clicking toggle-sidebar opens sidebar and sets width', async () => {
       init();
       await flush();
@@ -457,28 +489,20 @@ describe('ui-controls', () => {
     test('clicking toggle-sidebar twice closes sidebar', async () => {
       init();
       await flush();
-      const sidebar = document.getElementById('sidebar');
       document.getElementById('toggle-sidebar').click();
       document.getElementById('toggle-sidebar').click();
-      expect(sidebar.classList.contains('collapsed')).toBe(true);
+      expect(document.getElementById('sidebar').classList.contains('collapsed')).toBe(true);
       expect(api.setSidebarWidth).toHaveBeenLastCalledWith({ width: 0 });
     });
 
+    // --- Folder selection ---
     test('selecting a folder renders tree entries', async () => {
-      api.selectFolder.mockResolvedValue('/test/folder');
-      api.readDirectory.mockResolvedValue([
-        { name: 'subdir', isDirectory: true, path: '/test/folder/subdir' },
-        { name: 'file.txt', isDirectory: false, path: '/test/folder/file.txt' },
+      await openFolderWithEntries([
+        { name: 'subdir', isDirectory: true, path: '/test/subdir' },
+        { name: 'file.txt', isDirectory: false, path: '/test/file.txt' },
       ]);
-      init();
-      await flush();
-      document.getElementById('sidebar-select-folder').click();
-      await flush();
-      const tree = document.getElementById('sidebar-tree');
-      const items = tree.querySelectorAll('.tree-item');
+      const items = document.getElementById('sidebar-tree').querySelectorAll('.tree-item');
       expect(items.length).toBe(2);
-      expect(items[0].querySelector('.tree-name').textContent).toBe('subdir');
-      expect(items[1].querySelector('.tree-name').textContent).toBe('file.txt');
     });
 
     test('selecting null folder does not render tree', async () => {
@@ -487,10 +511,10 @@ describe('ui-controls', () => {
       await flush();
       document.getElementById('sidebar-select-folder').click();
       await flush();
-      const tree = document.getElementById('sidebar-tree');
-      expect(tree.children.length).toBe(0);
+      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
     });
 
+    // --- Expand / Collapse ---
     test('clicking a directory expands children', async () => {
       api.selectFolder.mockResolvedValue('/test');
       api.readDirectory.mockResolvedValueOnce([
@@ -502,11 +526,9 @@ describe('ui-controls', () => {
       await flush();
       document.getElementById('sidebar-select-folder').click();
       await flush();
-      const tree = document.getElementById('sidebar-tree');
-      const dirItem = tree.querySelector('.tree-item');
-      dirItem.click();
+      document.getElementById('sidebar-tree').querySelector('.tree-item').click();
       await flush();
-      const children = tree.querySelector('.tree-children');
+      const children = document.getElementById('sidebar-tree').querySelector('.tree-children');
       expect(children.classList.contains('expanded')).toBe(true);
       expect(children.querySelector('.tree-name').textContent).toBe('child.txt');
     });
@@ -527,8 +549,7 @@ describe('ui-controls', () => {
       await flush();
       dirItem.click();
       await flush();
-      const children = document.getElementById('sidebar-tree').querySelector('.tree-children');
-      expect(children.classList.contains('expanded')).toBe(false);
+      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(false);
     });
 
     test('readDirectory error is handled gracefully', async () => {
@@ -538,8 +559,203 @@ describe('ui-controls', () => {
       await flush();
       document.getElementById('sidebar-select-folder').click();
       await flush();
-      const tree = document.getElementById('sidebar-tree');
-      expect(tree.children.length).toBe(0);
+      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
+    });
+
+    test('child directory readDirectory error is handled gracefully', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]).mockRejectedValueOnce(new Error('EPERM'));
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      document.getElementById('sidebar-tree').querySelector('.tree-item').click();
+      await flush();
+      const children = document.getElementById('sidebar-tree').querySelector('.tree-children');
+      expect(children.classList.contains('expanded')).toBe(true);
+      expect(children.querySelectorAll('.tree-item').length).toBe(0);
+    });
+
+    // --- Sort select ---
+    test('sort select name-asc sorts alphabetically', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-sort').value = 'name-asc';
+      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      expect(getTreeNames()).toEqual(['alpha', 'beta.txt', 'delta', 'gamma.js']);
+    });
+
+    test('sort select name-desc sorts reverse alphabetically', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-sort').value = 'name-desc';
+      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      expect(getTreeNames()).toEqual(['gamma.js', 'delta', 'beta.txt', 'alpha']);
+    });
+
+    test('sort select type groups directories first', async () => {
+      await openFolderWithEntries();
+      document.getElementById('sidebar-sort').value = 'type';
+      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      const names = getTreeNames();
+      expect(names).toEqual(['alpha', 'delta', 'beta.txt', 'gamma.js']);
+    });
+
+    test('sort change without folder does nothing', async () => {
+      init();
+      await flush();
+      document.getElementById('sidebar-sort').value = 'name-desc';
+      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
+    });
+
+    // --- Filter radio buttons ---
+    test('filter radio "directories" shows only directories', async () => {
+      await openFolderWithEntries();
+      const radio = document.querySelector('input[name="sidebar-filter"][value="directories"]');
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      const names = getTreeNames();
+      expect(names.every((n) => !n.includes('.'))).toBe(true);
+      expect(names.length).toBe(2);
+    });
+
+    test('filter radio "files" shows only files', async () => {
+      await openFolderWithEntries();
+      const radio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      const names = getTreeNames();
+      expect(names.every((n) => n.includes('.'))).toBe(true);
+      expect(names.length).toBe(2);
+    });
+
+    test('filter radio "all" shows everything', async () => {
+      await openFolderWithEntries();
+      // Switch to files first
+      const filesRadio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      filesRadio.checked = true;
+      filesRadio.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      // Then switch back to all
+      const allRadio = document.querySelector('input[name="sidebar-filter"][value="all"]');
+      allRadio.checked = true;
+      allRadio.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      expect(getTreeNames().length).toBe(4);
+    });
+
+    test('filter change without folder does nothing', async () => {
+      init();
+      await flush();
+      const radio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
+    });
+
+    test('sort and filter combine correctly', async () => {
+      await openFolderWithEntries();
+      // Filter to directories only
+      const dirsRadio = document.querySelector('input[name="sidebar-filter"][value="directories"]');
+      dirsRadio.checked = true;
+      dirsRadio.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      // Sort descending
+      document.getElementById('sidebar-sort').value = 'name-desc';
+      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      expect(getTreeNames()).toEqual(['delta', 'alpha']);
+    });
+
+    // --- Keyboard navigation ---
+    test('Enter key expands a directory', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]).mockResolvedValueOnce([
+        { name: 'child.txt', isDirectory: false, path: '/test/sub/child.txt' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await flush();
+      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+    });
+
+    test('Space key expands a directory', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]).mockResolvedValueOnce([
+        { name: 'inner.js', isDirectory: false, path: '/test/sub/inner.js' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      await flush();
+      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+    });
+
+    test('Enter key collapses an expanded directory', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]).mockResolvedValueOnce([
+        { name: 'child.txt', isDirectory: false, path: '/test/sub/child.txt' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      dirItem.click();
+      await flush();
+      dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await flush();
+      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(false);
+    });
+
+    test('non-Enter/Space key does not toggle directory', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+      await flush();
+      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(false);
+    });
+
+    // --- Accessibility ---
+    test('tree items have tabindex and role attributes', async () => {
+      await openFolderWithEntries([
+        { name: 'dir', isDirectory: true, path: '/test/dir' },
+        { name: 'file.txt', isDirectory: false, path: '/test/file.txt' },
+      ]);
+      const items = document.getElementById('sidebar-tree').querySelectorAll('.tree-item');
+      items.forEach((item) => {
+        expect(item.getAttribute('tabindex')).toBe('0');
+      });
+      expect(items[0].getAttribute('role')).toBe('treeitem');
+      expect(items[1].getAttribute('role')).toBe('none');
     });
   });
 

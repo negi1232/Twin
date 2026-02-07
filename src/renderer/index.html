@@ -48,6 +48,22 @@
     <div class="sidebar-header">
       <button id="sidebar-select-folder" class="btn btn-sm">Open Folder</button>
     </div>
+    <div class="sidebar-controls">
+      <div class="sidebar-control-group">
+        <label for="sidebar-sort" class="sidebar-label">Sort</label>
+        <select id="sidebar-sort" class="sidebar-select">
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
+          <option value="type">Type</option>
+        </select>
+      </div>
+      <div class="sidebar-control-group sidebar-filter-group">
+        <span class="sidebar-label">Filter</span>
+        <label class="sidebar-radio"><input type="radio" name="sidebar-filter" value="all" checked />All</label>
+        <label class="sidebar-radio"><input type="radio" name="sidebar-filter" value="directories" />Dirs</label>
+        <label class="sidebar-radio"><input type="radio" name="sidebar-filter" value="files" />Files</label>
+      </div>
+    </div>
     <div id="sidebar-tree" class="sidebar-tree"></div>
   </div>
 
