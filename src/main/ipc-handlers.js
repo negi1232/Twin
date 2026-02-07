@@ -6,6 +6,23 @@ const { runRegCli } = require('./reg-runner');
 const { getSettings, saveSettings, getStore } = require('./store');
 const { createSyncManager } = require('./sync-manager');
 
+const ALLOWED_URL_SCHEMES = ['http:', 'https:'];
+
+function isAllowedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_URL_SCHEMES.includes(parsed.protocol);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function isPathUnderBase(targetPath, basePath) {
+  const resolved = path.resolve(targetPath);
+  const resolvedBase = path.resolve(basePath);
+  return resolved.startsWith(resolvedBase + path.sep) || resolved === resolvedBase;
+}
+
 function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }) {
   // --- Sync Manager ---
   const syncManager = createSyncManager(leftView, rightView);
@@ -48,12 +65,22 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
 
   // Open reg-cli HTML report in new window
   ipcMain.handle('open-report', (_event, { reportPath }) => {
+    const resolved = path.resolve(reportPath);
+    const snapshotBase = path.resolve(getStore().get('snapshotDir'));
+    if (!isPathUnderBase(resolved, snapshotBase)) {
+      throw new Error('Report path must be within the snapshot directory');
+    }
     const reportWindow = new BrowserWindow({
       width: 1200,
       height: 800,
       title: 'Twin - VRT Report',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
     });
-    reportWindow.loadFile(reportPath);
+    reportWindow.loadFile(resolved);
   });
 
   // Reload browser views
@@ -84,6 +111,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
 
   // Navigate to URL
   ipcMain.handle('navigate', (_event, { url, target }) => {
+    if (!isAllowedUrl(url)) {
+      throw new Error('Only http: and https: URLs are allowed');
+    }
     if (target === 'left' && leftView && !leftView.webContents.isDestroyed()) {
       leftView.webContents.loadURL(url).catch(() => {});
       getStore().set('leftUrl', url);
@@ -147,28 +177,44 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       properties: ['openDirectory'],
     });
     if (result.canceled || result.filePaths.length === 0) return null;
+    allowedBasePath = result.filePaths[0];
     return result.filePaths[0];
   });
 
+  // Validate that a path is under a user-selected folder
+  let allowedBasePath = null;
+
   // Read directory contents (one level)
   ipcMain.handle('read-directory', async (_event, { dirPath }) => {
-    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    const resolved = path.resolve(dirPath);
+    if (allowedBasePath && !isPathUnderBase(resolved, allowedBasePath)) {
+      throw new Error('Access denied: path is outside the selected folder');
+    }
+    const entries = await fs.promises.readdir(resolved, { withFileTypes: true });
     return entries.map((entry) => ({
       name: entry.name,
       isDirectory: entry.isDirectory(),
-      path: path.join(dirPath, entry.name),
+      path: path.join(resolved, entry.name),
     }));
   });
 
   // Create a new directory
   ipcMain.handle('create-directory', async (_event, { dirPath }) => {
-    await fs.promises.mkdir(dirPath, { recursive: true });
-    return { path: dirPath };
+    const resolved = path.resolve(dirPath);
+    if (allowedBasePath && !isPathUnderBase(resolved, allowedBasePath)) {
+      throw new Error('Access denied: path is outside the selected folder');
+    }
+    await fs.promises.mkdir(resolved, { recursive: true });
+    return { path: resolved };
   });
 
   // Read file data as base64 data URL (for image preview)
   ipcMain.handle('read-file-data', async (_event, { filePath }) => {
-    const ext = path.extname(filePath).toLowerCase();
+    const resolved = path.resolve(filePath);
+    if (allowedBasePath && !isPathUnderBase(resolved, allowedBasePath)) {
+      throw new Error('Access denied: path is outside the selected folder');
+    }
+    const ext = path.extname(resolved).toLowerCase();
     const mimeMap = {
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
@@ -178,9 +224,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       '.svg': 'image/svg+xml',
     };
     const mimeType = mimeMap[ext] || 'application/octet-stream';
-    const buf = await fs.promises.readFile(filePath);
+    const buf = await fs.promises.readFile(resolved);
     const dataUrl = `data:${mimeType};base64,${buf.toString('base64')}`;
-    return { dataUrl, mimeType, fileName: path.basename(filePath) };
+    return { dataUrl, mimeType, fileName: path.basename(resolved) };
   });
 
   // Re-inject sync script into left BrowserView
