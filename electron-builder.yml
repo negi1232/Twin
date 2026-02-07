@@ -1,0 +1,16 @@
+appId: com.twin.vrt
+productName: Twin
+directories:
+  output: dist
+files:
+  - src/**/*
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+    - portable

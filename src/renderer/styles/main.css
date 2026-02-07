@@ -1,0 +1,222 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* Toolbar */
+#toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 8px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #404040;
+  gap: 8px;
+  -webkit-app-region: drag;
+}
+
+#toolbar * {
+  -webkit-app-region: no-drag;
+}
+
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-left,
+.toolbar-right {
+  flex: 1;
+}
+
+.toolbar-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.url-label {
+  font-size: 11px;
+  color: #888;
+  min-width: 55px;
+  text-align: center;
+}
+
+.url-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  font-size: 12px;
+  outline: none;
+}
+
+.url-input:focus {
+  border-color: #007acc;
+}
+
+/* Buttons */
+.btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #3c3c3c;
+  color: #e0e0e0;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: #4a4a4a;
+}
+
+.btn:active {
+  background: #555;
+}
+
+.btn-primary {
+  background: #007acc;
+  border-color: #007acc;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #0098ff;
+}
+
+.btn-icon {
+  width: 26px;
+  padding: 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.btn-preset {
+  font-size: 10px;
+  padding: 0 6px;
+  height: 20px;
+}
+
+.btn-preset.active {
+  background: #007acc;
+  border-color: #007acc;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* View Container */
+#view-container {
+  flex: 1;
+  background: #1e1e1e;
+}
+
+/* Status Bar */
+#status-bar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  background: #007acc;
+  color: #fff;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.status-divider {
+  opacity: 0.5;
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+  position: relative;
+  background: #2d2d2d;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90%;
+}
+
+.modal-content h2 {
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.form-group input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  font-size: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}

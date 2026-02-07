@@ -1,0 +1,27 @@
+const TOOLBAR_HEIGHT = 48;
+const STATUS_BAR_HEIGHT = 28;
+
+const DEFAULT_LEFT_URL = 'http://localhost:3000';
+const DEFAULT_RIGHT_URL = 'http://localhost:3001';
+const DEFAULT_SNAPSHOT_DIR = './snapshots';
+
+const IPC_CHANNELS = {
+  CAPTURE_AND_COMPARE: 'capture-and-compare',
+  CAPTURE_RESULT: 'capture-result',
+  OPEN_REPORT: 'open-report',
+  RELOAD_VIEWS: 'reload-views',
+  SET_DEVICE_PRESET: 'set-device-preset',
+  NAVIGATE: 'navigate',
+  GET_SETTINGS: 'get-settings',
+  SAVE_SETTINGS: 'save-settings',
+  SYNC_SCROLL: 'sync-scroll',
+};
+
+module.exports = {
+  TOOLBAR_HEIGHT,
+  STATUS_BAR_HEIGHT,
+  DEFAULT_LEFT_URL,
+  DEFAULT_RIGHT_URL,
+  DEFAULT_SNAPSHOT_DIR,
+  IPC_CHANNELS,
+};

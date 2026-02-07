@@ -1,0 +1,31 @@
+{
+  "name": "twin",
+  "version": "1.0.0",
+  "description": "Visual Regression Testing Desktop App - Compare Git branches side by side",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron src/main/index.js",
+    "dev": "electron src/main/index.js --dev",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:e2e": "playwright test",
+    "lint": "eslint src/",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "electron-store": "^8.0.0",
+    "reg-cli": "^0.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "eslint": "^9.0.0",
+    "husky": "^9.1.7",
+    "jest": "^29.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}

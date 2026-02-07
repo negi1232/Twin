@@ -1,0 +1,171 @@
+const { app, BrowserWindow, BrowserView, globalShortcut } = require('electron');
+const path = require('path');
+const { registerIpcHandlers } = require('./ipc-handlers');
+const { getStore } = require('./store');
+
+let mainWindow = null;
+let leftView = null;
+let rightView = null;
+
+const TOOLBAR_HEIGHT = 48;
+const STATUS_BAR_HEIGHT = 28;
+const preloadPath = path.join(__dirname, 'preload.js');
+
+function createViews() {
+  // BrowserViews load external sites — no preload/sandbox needed
+  const viewPreferences = {
+    contextIsolation: true,
+    nodeIntegration: false,
+  };
+
+  leftView = new BrowserView({ webPreferences: viewPreferences });
+  rightView = new BrowserView({ webPreferences: viewPreferences });
+
+  mainWindow.addBrowserView(leftView);
+  mainWindow.addBrowserView(rightView);
+
+  layoutViews();
+
+  // Load saved URLs or defaults
+  const store = getStore();
+  const leftUrl = store.get('leftUrl', 'http://localhost:3000');
+  const rightUrl = store.get('rightUrl', 'http://localhost:3001');
+
+  leftView.webContents.loadURL(leftUrl).catch(() => {});
+  rightView.webContents.loadURL(rightUrl).catch(() => {});
+
+  // Error handling — ignore ERR_ABORTED (-3) which fires on normal redirects
+  leftView.webContents.on('did-fail-load', (_event, code, description, url) => {
+    if (code !== -3) {
+      console.error(`Left view failed to load ${url}: ${description}`);
+    }
+  });
+  rightView.webContents.on('did-fail-load', (_event, code, description, url) => {
+    if (code !== -3) {
+      console.error(`Right view failed to load ${url}: ${description}`);
+    }
+  });
+}
+
+function layoutViews() {
+  if (!mainWindow || !leftView || !rightView) return;
+
+  const { width, height } = mainWindow.getContentBounds();
+  const contentHeight = height - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
+  const halfWidth = Math.floor(width / 2);
+
+  leftView.setBounds({
+    x: 0,
+    y: TOOLBAR_HEIGHT,
+    width: halfWidth,
+    height: contentHeight,
+  });
+  rightView.setBounds({
+    x: halfWidth,
+    y: TOOLBAR_HEIGHT,
+    width: width - halfWidth,
+    height: contentHeight,
+  });
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 800,
+    minHeight: 600,
+    title: 'Twin - Visual Regression Testing',
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  mainWindow.on('resize', () => {
+    layoutViews();
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    leftView = null;
+    rightView = null;
+  });
+
+  createViews();
+  registerIpcHandlers({ mainWindow, leftView, rightView });
+  registerShortcuts();
+
+  if (process.argv.includes('--dev')) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+}
+
+function registerShortcuts() {
+  // Cmd/Ctrl+R: Reload both views
+  globalShortcut.register('CommandOrControl+R', () => {
+    if (leftView) leftView.webContents.reload();
+    if (rightView) rightView.webContents.reload();
+  });
+
+  // Cmd/Ctrl+Shift+R: Reload active view only
+  globalShortcut.register('CommandOrControl+Shift+R', () => {
+    // Reload the focused view
+    if (leftView && leftView.webContents.isFocused()) {
+      leftView.webContents.reload();
+    } else if (rightView) {
+      rightView.webContents.reload();
+    }
+  });
+
+  // Cmd/Ctrl+Shift+S: Capture & compare
+  globalShortcut.register('CommandOrControl+Shift+S', () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('shortcut-capture');
+    }
+  });
+
+  // Cmd/Ctrl+Shift+O: Open latest report
+  globalShortcut.register('CommandOrControl+Shift+O', () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('shortcut-open-report');
+    }
+  });
+
+  // Cmd/Ctrl+1~5: Device presets
+  const presetKeys = ['1', '2', '3', '4', '5'];
+  presetKeys.forEach((key) => {
+    globalShortcut.register(`CommandOrControl+${key}`, () => {
+      if (mainWindow) {
+        mainWindow.webContents.send('shortcut-preset', { index: parseInt(key) - 1 });
+      }
+    });
+  });
+
+  // Cmd/Ctrl+,: Open settings
+  globalShortcut.register('CommandOrControl+,', () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('shortcut-settings');
+    }
+  });
+}
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  globalShortcut.unregisterAll();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
+module.exports = { createWindow, layoutViews };

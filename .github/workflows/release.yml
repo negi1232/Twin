@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  e2e-test:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: xvfb-run --auto-servernum npm run test:e2e
+
+  build:
+    name: Build
+    needs: e2e-test
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: npm run build:mac
+      - name: Build (Linux/Windows)
+        if: runner.os == 'Linux'
+        run: npx electron-builder --linux
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          path: dist/
