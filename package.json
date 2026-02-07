@@ -1,6 +1,6 @@
 {
   "name": "twin",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Visual Regression Testing Desktop App - Compare Git branches side by side",
   "main": "src/main/index.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "electron-store": "^11.0.2",
+    "electron-store": "^10.0.0",
     "reg-cli": "^0.18.0"
   },
   "devDependencies": {
