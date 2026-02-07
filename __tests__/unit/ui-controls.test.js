@@ -5,6 +5,7 @@ const { getPresetByIndex, PRESET_LIST } = require('../../src/renderer/scripts/de
 // ---------- helpers ----------
 function buildDOM() {
   document.body.innerHTML = `
+    <button id="toggle-sidebar"></button>
     <input type="text" id="left-url" />
     <input type="text" id="right-url" />
     <button id="reload-left"></button>
@@ -13,6 +14,10 @@ function buildDOM() {
     <button id="report-btn"></button>
     <button id="settings-btn"></button>
     <button id="toggle-sync"></button>
+    <div id="sidebar" class="sidebar collapsed">
+      <button id="sidebar-select-folder"></button>
+      <div id="sidebar-tree" class="sidebar-tree"></div>
+    </div>
     <div id="settings-modal" class="modal hidden">
       <input id="setting-matching-threshold" value="0" />
       <input id="setting-threshold-rate" value="0" />
@@ -59,6 +64,9 @@ function mockElectronAPI() {
     setSyncEnabled: jest.fn().mockResolvedValue(undefined),
     getSyncEnabled: jest.fn().mockResolvedValue({ enabled: true }),
     setViewsVisible: jest.fn().mockResolvedValue(undefined),
+    selectFolder: jest.fn().mockResolvedValue(null),
+    readDirectory: jest.fn().mockResolvedValue([]),
+    setSidebarWidth: jest.fn().mockResolvedValue(undefined),
     onCaptureResult: jest.fn(),
     onShortcutCapture: jest.fn(),
     onShortcutOpenReport: jest.fn(),
@@ -431,6 +439,107 @@ describe('ui-controls', () => {
       const cb = api.onShortcutSettings.mock.calls[0][0];
       cb();
       expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+    });
+  });
+
+  // ===== Sidebar =====
+  describe('Sidebar', () => {
+    test('clicking toggle-sidebar opens sidebar and sets width', async () => {
+      init();
+      await flush();
+      const sidebar = document.getElementById('sidebar');
+      expect(sidebar.classList.contains('collapsed')).toBe(true);
+      document.getElementById('toggle-sidebar').click();
+      expect(sidebar.classList.contains('collapsed')).toBe(false);
+      expect(api.setSidebarWidth).toHaveBeenCalledWith({ width: 250 });
+    });
+
+    test('clicking toggle-sidebar twice closes sidebar', async () => {
+      init();
+      await flush();
+      const sidebar = document.getElementById('sidebar');
+      document.getElementById('toggle-sidebar').click();
+      document.getElementById('toggle-sidebar').click();
+      expect(sidebar.classList.contains('collapsed')).toBe(true);
+      expect(api.setSidebarWidth).toHaveBeenLastCalledWith({ width: 0 });
+    });
+
+    test('selecting a folder renders tree entries', async () => {
+      api.selectFolder.mockResolvedValue('/test/folder');
+      api.readDirectory.mockResolvedValue([
+        { name: 'subdir', isDirectory: true, path: '/test/folder/subdir' },
+        { name: 'file.txt', isDirectory: false, path: '/test/folder/file.txt' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const tree = document.getElementById('sidebar-tree');
+      const items = tree.querySelectorAll('.tree-item');
+      expect(items.length).toBe(2);
+      expect(items[0].querySelector('.tree-name').textContent).toBe('subdir');
+      expect(items[1].querySelector('.tree-name').textContent).toBe('file.txt');
+    });
+
+    test('selecting null folder does not render tree', async () => {
+      api.selectFolder.mockResolvedValue(null);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const tree = document.getElementById('sidebar-tree');
+      expect(tree.children.length).toBe(0);
+    });
+
+    test('clicking a directory expands children', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]).mockResolvedValueOnce([
+        { name: 'child.txt', isDirectory: false, path: '/test/sub/child.txt' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const tree = document.getElementById('sidebar-tree');
+      const dirItem = tree.querySelector('.tree-item');
+      dirItem.click();
+      await flush();
+      const children = tree.querySelector('.tree-children');
+      expect(children.classList.contains('expanded')).toBe(true);
+      expect(children.querySelector('.tree-name').textContent).toBe('child.txt');
+    });
+
+    test('clicking an expanded directory collapses it', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([
+        { name: 'sub', isDirectory: true, path: '/test/sub' },
+      ]).mockResolvedValueOnce([
+        { name: 'child.txt', isDirectory: false, path: '/test/sub/child.txt' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      dirItem.click();
+      await flush();
+      dirItem.click();
+      await flush();
+      const children = document.getElementById('sidebar-tree').querySelector('.tree-children');
+      expect(children.classList.contains('expanded')).toBe(false);
+    });
+
+    test('readDirectory error is handled gracefully', async () => {
+      api.selectFolder.mockResolvedValue('/nonexistent');
+      api.readDirectory.mockRejectedValue(new Error('ENOENT'));
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const tree = document.getElementById('sidebar-tree');
+      expect(tree.children.length).toBe(0);
     });
   });
 

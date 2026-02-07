@@ -10,6 +10,9 @@
 <body>
   <!-- Toolbar -->
   <div id="toolbar">
+    <div class="toolbar-section toolbar-toggle">
+      <button id="toggle-sidebar" class="btn btn-icon" title="Toggle Sidebar">&#x2630;</button>
+    </div>
     <div class="toolbar-section toolbar-left">
       <label class="url-label">Expected</label>
       <input type="text" id="left-url" class="url-input" placeholder="http://localhost:3000" />
@@ -38,6 +41,14 @@
       <input type="text" id="right-url" class="url-input" placeholder="http://localhost:3001" />
       <button id="reload-right" class="btn btn-icon" title="Reload Right">&#x21bb;</button>
     </div>
+  </div>
+
+  <!-- Sidebar File Browser -->
+  <div id="sidebar" class="sidebar collapsed">
+    <div class="sidebar-header">
+      <button id="sidebar-select-folder" class="btn btn-sm">Open Folder</button>
+    </div>
+    <div id="sidebar-tree" class="sidebar-tree"></div>
   </div>
 
   <!-- BrowserViews are managed by the main process, this area is a placeholder -->

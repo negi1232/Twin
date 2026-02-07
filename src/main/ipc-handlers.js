@@ -1,11 +1,12 @@
-const { ipcMain, BrowserWindow } = require('electron');
+const { ipcMain, BrowserWindow, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { captureScreenshots } = require('./screenshot');
 const { runRegCli } = require('./reg-runner');
 const { getSettings, saveSettings, getStore } = require('./store');
 const { createSyncManager } = require('./sync-manager');
 
-function registerIpcHandlers({ mainWindow, leftView, rightView }) {
+function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }) {
   // --- Sync Manager ---
   const syncManager = createSyncManager(leftView, rightView);
   syncManager.start();
@@ -68,14 +69,15 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
   // Change BrowserView size (device preset)
   ipcMain.handle('set-device-preset', (_event, { width, height }) => {
     const TOOLBAR_HEIGHT = 52;
+    const sw = getSidebarWidth ? getSidebarWidth() : 0;
     if (leftView) {
-      leftView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width, height });
+      leftView.setBounds({ x: sw, y: TOOLBAR_HEIGHT, width, height });
     }
     if (rightView) {
-      rightView.setBounds({ x: width, y: TOOLBAR_HEIGHT, width, height });
+      rightView.setBounds({ x: sw + width, y: TOOLBAR_HEIGHT, width, height });
     }
     if (mainWindow) {
-      mainWindow.setContentSize(width * 2, height + TOOLBAR_HEIGHT + 28);
+      mainWindow.setContentSize(sw + width * 2, height + TOOLBAR_HEIGHT + 28);
     }
   });
 
@@ -135,6 +137,36 @@ function registerIpcHandlers({ mainWindow, leftView, rightView }) {
         savedRightBounds = null;
       }
     }
+  });
+
+  // Select folder via native dialog
+  ipcMain.handle('select-folder', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const folderPath = result.filePaths[0];
+    getStore().set('snapshotDir', folderPath);
+    return folderPath;
+  });
+
+  // Read directory contents (one level)
+  ipcMain.handle('read-directory', async (_event, { dirPath }) => {
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    return entries.map((entry) => ({
+      name: entry.name,
+      isDirectory: entry.isDirectory(),
+      path: path.join(dirPath, entry.name),
+    }));
+  });
+
+  // Set sidebar width and re-layout views
+  ipcMain.handle('set-sidebar-width', (_event, { width }) => {
+    if (setSidebarWidth) {
+      setSidebarWidth(width);
+    }
+    return { width };
   });
 
   // Navigation sync (left → right)
