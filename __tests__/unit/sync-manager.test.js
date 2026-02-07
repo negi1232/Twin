@@ -144,6 +144,45 @@ describe('SyncManager', () => {
     );
   });
 
+  // --- Input value sync ---
+  test('inputvalue message sets value on right view via executeJavaScript', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#search', value: 'こんにちは' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('#search');
+    expect(script).toContain('こんにちは');
+  });
+
+  test('inputvalue for contenteditable sets innerHTML', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '.editor', innerHTML: '<p>テスト</p>' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('innerHTML');
+    expect(script).toContain('テスト');
+  });
+
+  test('inputvalue escapes special characters in value', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#q', value: "it's a \"test\"\nline2" },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain("\\'");
+    expect(script).toContain('\\n');
+  });
+
   // --- Disabled ---
   test('does not replay when disabled', () => {
     manager.setEnabled(false);

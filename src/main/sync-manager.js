@@ -10,8 +10,31 @@ const INJECTION_SCRIPT = `
     console.log('${SYNC_PREFIX}' + JSON.stringify({ type, data }));
   }
 
-  // Scroll sync (throttled via rAF)
-  let scrollTicking = false;
+  // --- Element selector generator ---
+  function getSelector(el) {
+    if (el.id) return '#' + CSS.escape(el.id);
+    if (el.name) return el.tagName.toLowerCase() + '[name="' + CSS.escape(el.name) + '"]';
+    var tag = el.tagName.toLowerCase();
+    var parent = el.parentElement;
+    if (!parent) return tag;
+    var siblings = Array.from(parent.children).filter(function(c) {
+      return c.tagName === el.tagName;
+    });
+    if (siblings.length === 1) return getSelector(parent) + ' > ' + tag;
+    var index = siblings.indexOf(el) + 1;
+    return getSelector(parent) + ' > ' + tag + ':nth-of-type(' + index + ')';
+  }
+
+  function isFormElement(el) {
+    if (!el) return false;
+    var tag = el.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (el.isContentEditable) return true;
+    return false;
+  }
+
+  // --- Scroll sync (throttled via rAF) ---
+  var scrollTicking = false;
   window.addEventListener('scroll', function() {
     if (!scrollTicking) {
       requestAnimationFrame(function() {
@@ -22,7 +45,7 @@ const INJECTION_SCRIPT = `
     }
   }, { passive: true });
 
-  // Click sync
+  // --- Click sync ---
   window.addEventListener('click', function(e) {
     send('click', {
       x: e.clientX,
@@ -31,9 +54,22 @@ const INJECTION_SCRIPT = `
     });
   }, true);
 
-  // Key sync
+  // --- Input value sync (handles IME, paste, autocomplete) ---
+  window.addEventListener('input', function(e) {
+    var el = e.target;
+    if (!isFormElement(el)) return;
+    var selector = getSelector(el);
+    if (el.isContentEditable) {
+      send('inputvalue', { selector: selector, innerHTML: el.innerHTML });
+    } else {
+      send('inputvalue', { selector: selector, value: el.value });
+    }
+  }, true);
+
+  // --- Key sync (for non-form elements: shortcuts, navigation, etc.) ---
   window.addEventListener('keydown', function(e) {
     if (e.repeat) return;
+    if (isFormElement(e.target)) return;
     send('keydown', {
       key: e.key,
       code: e.code,
@@ -46,6 +82,7 @@ const INJECTION_SCRIPT = `
   }, true);
 
   window.addEventListener('keyup', function(e) {
+    if (isFormElement(e.target)) return;
     send('keyup', {
       key: e.key,
       code: e.code,
@@ -91,6 +128,9 @@ function createSyncManager(leftView, rightView) {
       case 'click':
         replayClick(data);
         break;
+      case 'inputvalue':
+        replayInputValue(data);
+        break;
       case 'keydown':
         replayKey('keyDown', data);
         break;
@@ -126,6 +166,40 @@ function createSyncManager(leftView, rightView) {
     });
   }
 
+  function replayInputValue({ selector, value, innerHTML }) {
+    // Escape for safe injection into JS string
+    const escaped = (innerHTML !== undefined ? innerHTML : value)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
+    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+    let script;
+    if (innerHTML !== undefined) {
+      script = `(function(){
+        var el = document.querySelector('${escapedSelector}');
+        if(el){ el.innerHTML='${escaped}'; el.dispatchEvent(new Event('input',{bubbles:true})); }
+      })()`;
+    } else {
+      script = `(function(){
+        var el = document.querySelector('${escapedSelector}');
+        if(el){
+          var nativeSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, 'value'
+          ) || Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype, 'value'
+          );
+          if(nativeSetter && nativeSetter.set){ nativeSetter.set.call(el,'${escaped}'); }
+          else { el.value='${escaped}'; }
+          el.dispatchEvent(new Event('input',{bubbles:true}));
+        }
+      })()`;
+    }
+
+    rightView.webContents.executeJavaScript(script).catch(() => {});
+  }
+
   function replayKey(type, { key, keyCode, shift, ctrl, alt, meta }) {
     const modifiers = [];
     if (shift) modifiers.push('shift');
@@ -141,7 +215,7 @@ function createSyncManager(leftView, rightView) {
       modifiers,
     });
 
-    // Send 'char' event on keyDown for printable characters to insert text into form fields
+    // Send 'char' event on keyDown for printable characters
     if (type === 'keyDown' && key && key.length === 1) {
       rightView.webContents.sendInputEvent({
         type: 'char',
@@ -182,6 +256,7 @@ function createSyncManager(leftView, rightView) {
     _handleMessage: handleMessage,
     _replayScroll: replayScroll,
     _replayClick: replayClick,
+    _replayInputValue: replayInputValue,
     _replayKey: replayKey,
   };
 }
