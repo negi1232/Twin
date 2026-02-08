@@ -179,6 +179,7 @@ function createSyncManager(leftView, rightView) {
   }
 
   function replayScroll({ scrollX, scrollY }) {
+    if (!Number.isFinite(scrollX) || !Number.isFinite(scrollY)) return;
     rightView.webContents.executeJavaScript(
       `window.scrollTo(${scrollX}, ${scrollY})`
     ).catch(() => {});
