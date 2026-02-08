@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, Menu } = require('electron');
+const { app, BrowserWindow, WebContentsView, Menu, session } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./ipc-handlers');
 const { getStore } = require('./store');
@@ -13,10 +13,11 @@ const STATUS_BAR_HEIGHT = 28;
 const preloadPath = path.join(__dirname, 'preload.js');
 
 function createViews() {
-  // BrowserViews load external sites — no preload/sandbox needed
+  // BrowserViews load external sites — sandbox isolates renderer processes
   const viewPreferences = {
     contextIsolation: true,
     nodeIntegration: false,
+    sandbox: true,
   };
 
   leftView = new WebContentsView({ webPreferences: viewPreferences });
@@ -266,7 +267,14 @@ function registerShortcuts() {
   Menu.setApplicationMenu(menu);
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Deny all permission requests from loaded pages (camera, microphone, geolocation, etc.)
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
