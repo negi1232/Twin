@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3730A3"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="14" flood-color="#1E1B4B" flood-opacity="0.3"/>
+    </filter>
+    <clipPath id="frontClip">
+      <rect x="434" y="286" width="430" height="590" rx="36"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+
+  <!-- Back page (the "original") -->
+  <g opacity="0.5" filter="url(#shadow)">
+    <rect x="160" y="148" width="430" height="590" rx="36" fill="white"/>
+    <!-- Content bars -->
+    <rect x="204" y="212" width="342" height="22" rx="6" fill="#A5B4FC"/>
+    <rect x="204" y="250" width="256" height="22" rx="6" fill="#A5B4FC"/>
+    <rect x="204" y="296" width="342" height="100" rx="10" fill="#C7D2FE"/>
+    <rect x="204" y="420" width="300" height="22" rx="6" fill="#A5B4FC"/>
+    <rect x="204" y="458" width="342" height="22" rx="6" fill="#A5B4FC"/>
+    <rect x="204" y="504" width="342" height="100" rx="10" fill="#C7D2FE"/>
+    <rect x="204" y="628" width="270" height="22" rx="6" fill="#A5B4FC"/>
+    <rect x="204" y="666" width="342" height="22" rx="6" fill="#A5B4FC"/>
+  </g>
+
+  <!-- Front page (the "comparison") -->
+  <g filter="url(#shadow)">
+    <rect x="434" y="286" width="430" height="590" rx="36" fill="white"/>
+  </g>
+
+  <!-- Diff highlight band on front page -->
+  <rect x="434" y="500" width="430" height="170" fill="#FFE4E6" clip-path="url(#frontClip)"/>
+  <!-- Diff accent border (left edge) -->
+  <rect x="434" y="500" width="8" height="170" fill="#F43F5E" clip-path="url(#frontClip)"/>
+
+  <!-- Front page content - top (normal) -->
+  <rect x="478" y="344" width="342" height="22" rx="6" fill="#C7D2FE"/>
+  <rect x="478" y="382" width="256" height="22" rx="6" fill="#C7D2FE"/>
+  <rect x="478" y="424" width="342" height="56" rx="10" fill="#E0E7FF"/>
+
+  <!-- Front page content - middle (diff detected!) -->
+  <rect x="478" y="518" width="342" height="22" rx="6" fill="#FDA4AF"/>
+  <rect x="478" y="556" width="290" height="22" rx="6" fill="#FDA4AF"/>
+  <rect x="478" y="594" width="342" height="56" rx="10" fill="#FECDD3"/>
+
+  <!-- Front page content - bottom (normal) -->
+  <rect x="478" y="698" width="300" height="22" rx="6" fill="#C7D2FE"/>
+  <rect x="478" y="736" width="342" height="22" rx="6" fill="#C7D2FE"/>
+  <rect x="478" y="780" width="342" height="52" rx="10" fill="#E0E7FF"/>
+</svg>
