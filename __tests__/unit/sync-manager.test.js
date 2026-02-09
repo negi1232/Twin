@@ -141,6 +141,68 @@ describe('SyncManager', () => {
     await new Promise((r) => setTimeout(r, 0));
   });
 
+  // --- Element scroll sync with form elements inside modals ---
+  test('elementscroll works for a modal container with form elements inside', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-dialog > .modal-body', scrollLeft: 0, scrollTop: 450 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('.modal-dialog > .modal-body');
+    expect(script).toContain('scrollTop=450');
+  });
+
+  test('elementscroll and inputvalue can work independently for same modal', () => {
+    // Scroll the modal body
+    const scrollMsg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-body', scrollLeft: 0, scrollTop: 200 },
+    });
+    manager._handleMessage(null, 0, scrollMsg);
+
+    // Input value in a form field inside the modal
+    const inputMsg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '.modal-body input#email', value: 'test@example.com' },
+    });
+    manager._handleMessage(null, 0, inputMsg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(2);
+    const scrollScript = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(scrollScript).toContain('scrollTop=200');
+    const inputScript = rightView.webContents.executeJavaScript.mock.calls[1][0];
+    expect(inputScript).toContain('test@example.com');
+  });
+
+  test('elementscroll works for form element used as scroll container', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: 'form.signup-form', scrollLeft: 0, scrollTop: 800 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('form.signup-form');
+    expect(script).toContain('scrollTop=800');
+  });
+
+  test('elementscroll for modal with both vertical and horizontal scroll', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-body', scrollLeft: 120, scrollTop: 350 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('scrollLeft=120');
+    expect(script).toContain('scrollTop=350');
+  });
+
   // --- Hover sync (element-based) ---
   test('hover message finds element on right view and sends mouseMove to its center', async () => {
     rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 150, y: 200 });
