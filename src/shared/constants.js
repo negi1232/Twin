@@ -6,6 +6,11 @@ const DEFAULT_LEFT_URL = 'http://localhost:3000';
 const DEFAULT_RIGHT_URL = 'http://localhost:3001';
 const DEFAULT_SNAPSHOT_DIR = './snapshots';
 
+const ZOOM_STEP = 0.1;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 3.0;
+const DEFAULT_ZOOM = 1.0;
+
 const IPC_CHANNELS = {
   CAPTURE_AND_COMPARE: 'capture-and-compare',
   CAPTURE_RESULT: 'capture-result',
@@ -19,6 +24,9 @@ const IPC_CHANNELS = {
   SELECT_FOLDER: 'select-folder',
   READ_DIRECTORY: 'read-directory',
   SET_SIDEBAR_WIDTH: 'set-sidebar-width',
+  SET_ZOOM: 'set-zoom',
+  GET_ZOOM: 'get-zoom',
+  ZOOM_CHANGED: 'zoom-changed',
 };
 
 module.exports = {
@@ -28,5 +36,9 @@ module.exports = {
   DEFAULT_LEFT_URL,
   DEFAULT_RIGHT_URL,
   DEFAULT_SNAPSHOT_DIR,
+  ZOOM_STEP,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  DEFAULT_ZOOM,
   IPC_CHANNELS,
 };

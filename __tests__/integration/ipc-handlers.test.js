@@ -118,6 +118,7 @@ jest.mock('../../src/main/store', () => ({
 
 let mockSyncEnabled = true;
 let mockSyncPaused = false;
+let mockNavSyncSuppressed = false;
 const mockSyncManager = {
   start: jest.fn(),
   stop: jest.fn(),
@@ -127,6 +128,8 @@ const mockSyncManager = {
   isPaused: jest.fn(() => mockSyncPaused),
   pause: jest.fn(() => { mockSyncPaused = true; }),
   resume: jest.fn(() => { mockSyncPaused = false; }),
+  isNavSyncSuppressed: jest.fn(() => mockNavSyncSuppressed),
+  suppressNavSync: jest.fn(() => { mockNavSyncSuppressed = true; }),
 };
 jest.mock('../../src/main/sync-manager', () => ({
   createSyncManager: jest.fn(() => mockSyncManager),
@@ -150,6 +153,7 @@ describe('ipc-handlers integration', () => {
     Object.keys(mockStoreData).forEach((k) => delete mockStoreData[k]);
     mockSyncEnabled = true;
     mockSyncPaused = false;
+    mockNavSyncSuppressed = false;
     mockSidebarWidth = 0;
 
     const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
@@ -186,7 +190,7 @@ describe('ipc-handlers integration', () => {
 
   // ===== Channel Registration =====
   describe('channel registration', () => {
-    test('registers all 16 expected IPC channels', () => {
+    test('registers all 18 expected IPC channels', () => {
       const expected = [
         'capture-and-compare',
         'open-report',
@@ -204,6 +208,8 @@ describe('ipc-handlers integration', () => {
         'read-file-data',
         'reinject-sync',
         'set-sidebar-width',
+        'set-zoom',
+        'get-zoom',
       ];
       expected.forEach((channel) => {
         expect(handlers[channel]).toBeDefined();
@@ -605,6 +611,61 @@ describe('ipc-handlers integration', () => {
     });
   });
 
+  // ===== set-zoom =====
+  describe('set-zoom', () => {
+    test('sets zoom factor on both views and sends zoom-changed', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      const result = handlers['set-zoom']({}, { zoom: 1.5 });
+      expect(mockLeftView.webContents.setZoomFactor).toHaveBeenCalledWith(1.5);
+      expect(mockRightView.webContents.setZoomFactor).toHaveBeenCalledWith(1.5);
+      expect(mockWebContents.send).toHaveBeenCalledWith('zoom-changed', { zoom: 1.5 });
+      expect(result).toEqual({ zoom: 1.5 });
+    });
+
+    test('clamps zoom to minimum 0.25', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      const result = handlers['set-zoom']({}, { zoom: 0.1 });
+      expect(result).toEqual({ zoom: 0.25 });
+      expect(mockLeftView.webContents.setZoomFactor).toHaveBeenCalledWith(0.25);
+    });
+
+    test('clamps zoom to maximum 3.0', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      const result = handlers['set-zoom']({}, { zoom: 5.0 });
+      expect(result).toEqual({ zoom: 3 });
+      expect(mockLeftView.webContents.setZoomFactor).toHaveBeenCalledWith(3);
+    });
+
+    test('handles destroyed webContents gracefully', () => {
+      mockLeftView.webContents.isDestroyed = jest.fn().mockReturnValue(true);
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      handlers['set-zoom']({}, { zoom: 1.2 });
+      expect(mockLeftView.webContents.setZoomFactor).not.toHaveBeenCalled();
+      expect(mockRightView.webContents.setZoomFactor).toHaveBeenCalledWith(1.2);
+      mockLeftView.webContents.isDestroyed.mockReturnValue(false);
+    });
+  });
+
+  // ===== get-zoom =====
+  describe('get-zoom', () => {
+    test('returns current zoom factor', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      handlers['set-zoom']({}, { zoom: 1.5 });
+      const result = handlers['get-zoom']({});
+      expect(result).toEqual({ zoom: 1.5 });
+    });
+
+    test('returns default zoom 1.0 when not changed', () => {
+      const result = handlers['get-zoom']({});
+      expect(result).toEqual({ zoom: 1 });
+    });
+  });
+
   // ===== did-navigate-in-page =====
   describe('did-navigate-in-page sync', () => {
     function getNavigateHandler() {
@@ -657,6 +718,35 @@ describe('ipc-handlers integration', () => {
       const handler = getNavigateHandler();
       handler({}, 'http://localhost:3000/path');
       await new Promise((r) => setTimeout(r, 0));
+    });
+
+    test('does not double-navigate right view when click sync already triggered navigation', () => {
+      // Simulate: click sync replays a search button click that navigates
+      // the right view to /search?q=hello. Then did-navigate-in-page fires
+      // on the left view. The right view should NOT be navigated again
+      // because nav sync is suppressed after click replay.
+      mockNavSyncSuppressed = true;
+
+      const handler = getNavigateHandler();
+      mockRightView.webContents.loadURL.mockClear();
+      handler({}, 'http://localhost:3000/search?q=hello');
+
+      expect(mockRightView.webContents.loadURL).not.toHaveBeenCalled();
+    });
+
+    test('allows navigation sync when no recent click was replayed', () => {
+      mockNavSyncSuppressed = false;
+      mockSyncManager.isPaused.mockReturnValue(false);
+      mockSyncManager.isEnabled.mockReturnValue(true);
+      mockRightView.webContents.getURL.mockReturnValue('http://localhost:3001/page');
+
+      const handler = getNavigateHandler();
+      mockRightView.webContents.loadURL.mockClear();
+      handler({}, 'http://localhost:3000/about');
+
+      expect(mockRightView.webContents.loadURL).toHaveBeenCalledWith(
+        'http://localhost:3001/about'
+      );
     });
   });
 

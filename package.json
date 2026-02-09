@@ -1,6 +1,6 @@
 {
   "name": "twin",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Visual Regression Testing Desktop App - Compare Git branches side by side",
   "main": "src/main/index.js",
   "scripts": {
@@ -36,5 +36,27 @@
   "bugs": {
     "url": "https://github.com/negi1232/Twin/issues"
   },
-  "homepage": "https://github.com/negi1232/Twin#readme"
+  "homepage": "https://github.com/negi1232/Twin#readme",
+  "overrides": {
+    "reg-cli": {
+      "del": "^6.1.1"
+    }
+  },
+  "build": {
+    "appId": "com.negi1232.twin",
+    "productName": "Twin",
+    "directories": {
+      "buildResources": "build"
+    },
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "icon": "build/icon.png"
+    }
+  }
 }

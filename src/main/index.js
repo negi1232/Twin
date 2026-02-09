@@ -106,6 +106,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: 'Twin - Visual Regression Testing',
+    icon: path.join(__dirname, '..', '..', 'build', 'icon.png'),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -213,6 +214,28 @@ function registerShortcuts() {
           },
         },
         { type: 'separator' },
+        {
+          label: 'Zoom In',
+          accelerator: 'CommandOrControl+=',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-zoom-in');
+          },
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CommandOrControl+-',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-zoom-out');
+          },
+        },
+        {
+          label: 'Reset Zoom',
+          accelerator: 'CommandOrControl+0',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-zoom-reset');
+          },
+        },
+        { type: 'separator' },
         ...['1', '2', '3', '4', '5'].map((key) => ({
           label: `Device Preset ${key}`,
           accelerator: `CommandOrControl+${key}`,
@@ -272,6 +295,12 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
   });
+
+  // Set Dock icon on macOS (needed for development mode)
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = path.join(__dirname, '..', '..', 'build', 'icon.png');
+    app.dock.setIcon(iconPath);
+  }
 
   createWindow();
 });
