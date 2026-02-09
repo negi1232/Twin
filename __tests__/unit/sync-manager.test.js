@@ -1,4 +1,4 @@
-const { createSyncManager, SYNC_PREFIX } = require('../../src/main/sync-manager');
+const { createSyncManager, SYNC_PREFIX, escapeForScript } = require('../../src/main/sync-manager');
 
 function createMockView() {
   const listeners = {};
@@ -16,6 +16,7 @@ function createMockView() {
       executeJavaScript: jest.fn().mockResolvedValue(undefined),
       sendInputEvent: jest.fn(),
       isDestroyed: jest.fn(() => false),
+      getZoomFactor: jest.fn(() => 1.0),
     },
     _listeners: listeners,
     _emit(event, ...args) {
@@ -70,6 +71,137 @@ describe('SyncManager', () => {
     expect(rightView.webContents.executeJavaScript).toHaveBeenCalledWith(
       'window.scrollTo(100, 200)'
     );
+  });
+
+  // --- Element scroll sync (modals, horizontal overflow) ---
+  test('elementscroll message replays scrollLeft and scrollTop on matching element', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-body', scrollLeft: 50, scrollTop: 300 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('.modal-body');
+    expect(script).toContain('scrollLeft=50');
+    expect(script).toContain('scrollTop=300');
+  });
+
+  test('elementscroll handles horizontal-only scroll', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.table-wrapper', scrollLeft: 200, scrollTop: 0 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('.table-wrapper');
+    expect(script).toContain('scrollLeft=200');
+  });
+
+  test('elementscroll ignores non-finite scrollLeft', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.box', scrollLeft: null, scrollTop: 0 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('elementscroll ignores non-finite scrollTop', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.box', scrollLeft: 0, scrollTop: 'abc' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('elementscroll escapes special characters in selector', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: "#it\\'s", scrollLeft: 0, scrollTop: 10 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+  });
+
+  test('elementscroll handles executeJavaScript rejection gracefully', async () => {
+    rightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('fail'));
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal', scrollLeft: 0, scrollTop: 100 },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  // --- Element scroll sync with form elements inside modals ---
+  test('elementscroll works for a modal container with form elements inside', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-dialog > .modal-body', scrollLeft: 0, scrollTop: 450 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('.modal-dialog > .modal-body');
+    expect(script).toContain('scrollTop=450');
+  });
+
+  test('elementscroll and inputvalue can work independently for same modal', () => {
+    // Scroll the modal body
+    const scrollMsg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-body', scrollLeft: 0, scrollTop: 200 },
+    });
+    manager._handleMessage(null, 0, scrollMsg);
+
+    // Input value in a form field inside the modal
+    const inputMsg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '.modal-body input#email', value: 'test@example.com' },
+    });
+    manager._handleMessage(null, 0, inputMsg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(2);
+    const scrollScript = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(scrollScript).toContain('scrollTop=200');
+    const inputScript = rightView.webContents.executeJavaScript.mock.calls[1][0];
+    expect(inputScript).toContain('test@example.com');
+  });
+
+  test('elementscroll works for form element used as scroll container', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: 'form.signup-form', scrollLeft: 0, scrollTop: 800 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('form.signup-form');
+    expect(script).toContain('scrollTop=800');
+  });
+
+  test('elementscroll for modal with both vertical and horizontal scroll', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-body', scrollLeft: 120, scrollTop: 350 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('scrollLeft=120');
+    expect(script).toContain('scrollTop=350');
   });
 
   // --- Hover sync (element-based) ---
@@ -139,6 +271,59 @@ describe('SyncManager', () => {
 
     await new Promise((r) => setTimeout(r, 0));
     expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  // --- Click sync with zoom ---
+  test('click at zoom 1.5x scales coordinates by zoom factor', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(1.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 100, y: 50 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', x: 150, y: 75, button: 'left' })
+    );
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseUp', x: 150, y: 75, button: 'left' })
+    );
+  });
+
+  test('click at zoom 0.5x scales coordinates down', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(0.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 200, y: 100 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#link', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', x: 100, y: 50 })
+    );
+  });
+
+  // --- Hover sync with zoom ---
+  test('hover at zoom 1.5x scales coordinates by zoom factor', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(1.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 100, y: 200 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#btn' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseMove', x: 150, y: 300 })
+    );
+  });
+
+  test('hover at zoom 0.5x scales coordinates down', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(0.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 200, y: 100 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#nav' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseMove', x: 100, y: 50 })
+    );
   });
 
   // --- Key sync ---
@@ -236,6 +421,118 @@ describe('SyncManager', () => {
     const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
     expect(script).toContain("\\'");
     expect(script).toContain('\\n');
+  });
+
+  // --- Paste with special characters (backticks, template expressions) ---
+  test('inputvalue escapes backticks in pasted value', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#code', value: 'const x = `hello`' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\`hello\\`');
+    expect(script).not.toMatch(/[^\\]`hello/);
+  });
+
+  test('inputvalue escapes template expressions in pasted value', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#code', value: 'price is ${amount}' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\${amount}');
+  });
+
+  test('inputvalue escapes mixed special characters from paste', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#editor', value: "line1\nconst tpl = `${name}'s value`" },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\n');
+    expect(script).toContain('\\`');
+    expect(script).toContain('\\$');
+    expect(script).toContain("\\'");
+  });
+
+  test('inputvalue for contenteditable escapes backticks in pasted HTML', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '.editor', textContent: 'code: `example` done' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\`example\\`');
+  });
+
+  // --- Textarea native setter ---
+  test('inputvalue uses HTMLTextAreaElement setter for textarea elements', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: 'textarea#comment', value: 'line1\nline2' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain("el.tagName === 'TEXTAREA'");
+    expect(script).toContain('HTMLTextAreaElement.prototype');
+    expect(script).toContain('HTMLInputElement.prototype');
+  });
+
+  test('inputvalue sets value on textarea with multiline pasted text', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: 'textarea.modal-textarea', value: 'first\nsecond\nthird' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('textarea.modal-textarea');
+    expect(script).toContain('first\\nsecond\\nthird');
+  });
+
+  // --- Navigation sync suppression ---
+  test('isNavSyncSuppressed returns false by default', () => {
+    expect(manager.isNavSyncSuppressed()).toBe(false);
+  });
+
+  test('click replay suppresses nav sync', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 10, y: 20 });
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'click',
+      data: { selector: '#search-btn', button: 'left' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(manager.isNavSyncSuppressed()).toBe(true);
+  });
+
+  test('nav sync suppression expires after timeout', () => {
+    jest.useFakeTimers();
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 10, y: 20 });
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'click',
+      data: { selector: '#btn', button: 'left' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(manager.isNavSyncSuppressed()).toBe(true);
+    jest.advanceTimersByTime(500);
+    expect(manager.isNavSyncSuppressed()).toBe(false);
+    jest.useRealTimers();
   });
 
   // --- Pause / Resume ---
@@ -409,5 +706,45 @@ describe('SyncManager', () => {
     manager.inject();
     expect(leftView.webContents.executeJavaScript).toHaveBeenCalled();
     await new Promise((r) => setTimeout(r, 0));
+  });
+});
+
+describe('escapeForScript', () => {
+  test('escapes backslashes', () => {
+    expect(escapeForScript('a\\b')).toBe("a\\\\b");
+  });
+
+  test('escapes single quotes', () => {
+    expect(escapeForScript("it's")).toBe("it\\'s");
+  });
+
+  test('escapes backticks', () => {
+    expect(escapeForScript('`hello`')).toBe('\\`hello\\`');
+  });
+
+  test('escapes dollar signs to prevent template interpolation', () => {
+    expect(escapeForScript('${name}')).toBe('\\${name}');
+  });
+
+  test('escapes newlines and carriage returns', () => {
+    expect(escapeForScript("a\nb\rc")).toBe('a\\nb\\rc');
+  });
+
+  test('escapes all special characters together', () => {
+    const input = "line1\nconst tpl = `${name}'s value`";
+    const result = escapeForScript(input);
+    expect(result).toContain('\\n');
+    expect(result).toContain('\\`');
+    expect(result).toContain('\\$');
+    expect(result).toContain("\\'");
+    expect(result).not.toContain('\n');
+  });
+
+  test('handles empty string', () => {
+    expect(escapeForScript('')).toBe('');
+  });
+
+  test('returns unchanged for safe strings', () => {
+    expect(escapeForScript('hello world 123')).toBe('hello world 123');
   });
 });

@@ -56,6 +56,11 @@ function buildDOM() {
       <button id="new-report-capture"></button>
       <button id="new-report-cancel"></button>
     </div>
+    <div class="zoom-controls">
+      <button id="zoom-out-btn" class="btn btn-icon">&#x2212;</button>
+      <button id="zoom-level-btn" class="btn btn-zoom-level">100%</button>
+      <button id="zoom-in-btn" class="btn btn-icon">&#x2b;</button>
+    </div>
     <span id="status-size">-- x --</span>
     <span id="status-zoom">Zoom: 100%</span>
     <span id="status-sync">Sync: ON</span>
@@ -107,11 +112,17 @@ function mockElectronAPI() {
     readFileData: jest.fn().mockResolvedValue({ dataUrl: 'data:image/png;base64,abc', mimeType: 'image/png', fileName: 'test.png' }),
     setSidebarWidth: jest.fn().mockResolvedValue(undefined),
     reinjectSync: jest.fn().mockResolvedValue({ success: true }),
+    setZoom: jest.fn().mockResolvedValue({ zoom: 1.0 }),
+    getZoom: jest.fn().mockResolvedValue({ zoom: 1.0 }),
+    onZoomChanged: jest.fn(),
     onCaptureResult: jest.fn(),
     onShortcutCapture: jest.fn(),
     onShortcutOpenReport: jest.fn(),
     onShortcutPreset: jest.fn(),
     onShortcutSettings: jest.fn(),
+    onShortcutZoomIn: jest.fn(),
+    onShortcutZoomOut: jest.fn(),
+    onShortcutZoomReset: jest.fn(),
   };
   window.electronAPI = api;
   return api;
@@ -425,6 +436,87 @@ describe('ui-controls', () => {
       document.querySelector('.btn-preset[data-preset="2"]').click();
       expect(document.querySelector('.btn-preset[data-preset="2"]').classList.contains('active')).toBe(true);
       expect(document.querySelector('.btn-preset[data-preset="1"]').classList.contains('active')).toBe(false);
+    });
+  });
+
+  // ===== Zoom Controls =====
+  describe('Zoom controls', () => {
+    test('zoom in button calls setZoom with increased value', async () => {
+      init();
+      await flush();
+      document.getElementById('zoom-in-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(1.1, 1) });
+    });
+
+    test('zoom out button calls setZoom with decreased value', async () => {
+      init();
+      await flush();
+      document.getElementById('zoom-out-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(0.9, 1) });
+    });
+
+    test('zoom level button resets zoom to 100%', async () => {
+      init();
+      await flush();
+      document.getElementById('zoom-level-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: 1.0 });
+    });
+
+    test('onZoomChanged updates zoom display and status bar', async () => {
+      init();
+      await flush();
+      const cb = api.onZoomChanged.mock.calls[0][0];
+      cb({ zoom: 1.5 });
+      expect(document.getElementById('zoom-level-btn').textContent).toBe('150%');
+      expect(document.getElementById('status-zoom').textContent).toBe('Zoom: 150%');
+    });
+
+    test('initial zoom is loaded from getZoom', async () => {
+      api.getZoom.mockResolvedValue({ zoom: 0.75 });
+      init();
+      await flush();
+      expect(document.getElementById('zoom-level-btn').textContent).toBe('75%');
+      expect(document.getElementById('status-zoom').textContent).toBe('Zoom: 75%');
+    });
+
+    test('zoom in does not exceed max zoom (3.0)', async () => {
+      api.getZoom.mockResolvedValue({ zoom: 3.0 });
+      init();
+      await flush();
+      document.getElementById('zoom-in-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: 3.0 });
+    });
+
+    test('zoom out does not go below min zoom (0.25)', async () => {
+      api.getZoom.mockResolvedValue({ zoom: 0.25 });
+      init();
+      await flush();
+      document.getElementById('zoom-out-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: 0.25 });
+    });
+
+    test('onShortcutZoomIn triggers zoom in', async () => {
+      init();
+      await flush();
+      const cb = api.onShortcutZoomIn.mock.calls[0][0];
+      cb();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(1.1, 1) });
+    });
+
+    test('onShortcutZoomOut triggers zoom out', async () => {
+      init();
+      await flush();
+      const cb = api.onShortcutZoomOut.mock.calls[0][0];
+      cb();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(0.9, 1) });
+    });
+
+    test('onShortcutZoomReset resets zoom to 100%', async () => {
+      init();
+      await flush();
+      const cb = api.onShortcutZoomReset.mock.calls[0][0];
+      cb();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: 1.0 });
     });
   });
 

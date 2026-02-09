@@ -1,5 +1,17 @@
 const SYNC_PREFIX = '__twin_sync__';
 
+// Escape a string for safe embedding inside a template-literal single-quoted JS string.
+// Handles: backslash, single quote, newlines, backtick, and ${.
+function escapeForScript(str) {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r');
+}
+
 // JavaScript injected into left BrowserView to capture user events
 const INJECTION_SCRIPT = `
 (function() {
@@ -34,6 +46,7 @@ const INJECTION_SCRIPT = `
   }
 
   // --- Scroll sync (throttled via rAF) ---
+  // Window-level scroll
   var scrollTicking = false;
   window.addEventListener('scroll', function() {
     if (!scrollTicking) {
@@ -44,6 +57,29 @@ const INJECTION_SCRIPT = `
       scrollTicking = true;
     }
   }, { passive: true });
+
+  // Element-level scroll (modals, horizontal overflow containers, etc.)
+  var elScrollTicking = false;
+  var elScrollTarget = null;
+  document.addEventListener('scroll', function(e) {
+    if (e.target === document || e.target === document.documentElement) return;
+    elScrollTarget = e.target;
+    if (!elScrollTicking) {
+      requestAnimationFrame(function() {
+        var el = elScrollTarget;
+        if (el && el.nodeType === 1) {
+          var selector = getSelector(el);
+          send('elementscroll', {
+            selector: selector,
+            scrollLeft: el.scrollLeft,
+            scrollTop: el.scrollTop
+          });
+        }
+        elScrollTicking = false;
+      });
+      elScrollTicking = true;
+    }
+  }, { capture: true, passive: true });
 
   // --- Hover sync (element-based, throttled via rAF) ---
   var hoverTicking = false;
@@ -121,6 +157,8 @@ const INJECTION_SCRIPT = `
 function createSyncManager(leftView, rightView) {
   let enabled = true;
   let paused = false;
+  let navSyncSuppressed = false;
+  let navSyncTimer = null;
 
   function isEnabled() {
     return enabled;
@@ -142,6 +180,19 @@ function createSyncManager(leftView, rightView) {
     paused = false;
   }
 
+  function suppressNavSync() {
+    navSyncSuppressed = true;
+    if (navSyncTimer) clearTimeout(navSyncTimer);
+    navSyncTimer = setTimeout(() => {
+      navSyncSuppressed = false;
+      navSyncTimer = null;
+    }, 500);
+  }
+
+  function isNavSyncSuppressed() {
+    return navSyncSuppressed;
+  }
+
   function handleMessage(_event, level, message) {
     if (!enabled || paused) return;
     if (!message.startsWith(SYNC_PREFIX)) return;
@@ -159,6 +210,9 @@ function createSyncManager(leftView, rightView) {
     switch (type) {
       case 'scroll':
         replayScroll(data);
+        break;
+      case 'elementscroll':
+        replayElementScroll(data);
         break;
       case 'hover':
         replayHover(data);
@@ -185,8 +239,18 @@ function createSyncManager(leftView, rightView) {
     ).catch(() => {});
   }
 
+  function replayElementScroll({ selector, scrollLeft, scrollTop }) {
+    if (!Number.isFinite(scrollLeft) || !Number.isFinite(scrollTop)) return;
+    const escapedSelector = escapeForScript(selector);
+    const script = `(function(){
+      var el = document.querySelector('${escapedSelector}');
+      if(el){ el.scrollLeft=${scrollLeft}; el.scrollTop=${scrollTop}; }
+    })()`;
+    rightView.webContents.executeJavaScript(script).catch(() => {});
+  }
+
   function replayHover({ selector }) {
-    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escapedSelector = escapeForScript(selector);
     const script = `(function(){
       var el = document.querySelector('${escapedSelector}');
       if (el) {
@@ -197,19 +261,21 @@ function createSyncManager(leftView, rightView) {
     })()`;
     rightView.webContents.executeJavaScript(script).then((coords) => {
       if (coords) {
+        const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
         rightView.webContents.sendInputEvent({
           type: 'mouseMove',
-          x: coords.x,
-          y: coords.y,
+          x: Math.round(coords.x * zoom),
+          y: Math.round(coords.y * zoom),
         });
       }
     }).catch(() => {});
   }
 
   function replayClick({ selector, button }) {
+    suppressNavSync();
     const buttonMap = { left: 'left', middle: 'middle', right: 'right' };
     const btn = buttonMap[button] || 'left';
-    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escapedSelector = escapeForScript(selector);
     const script = `(function(){
       var el = document.querySelector('${escapedSelector}');
       if (el) {
@@ -220,17 +286,20 @@ function createSyncManager(leftView, rightView) {
     })()`;
     rightView.webContents.executeJavaScript(script).then((coords) => {
       if (coords) {
+        const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
+        const x = Math.round(coords.x * zoom);
+        const y = Math.round(coords.y * zoom);
         rightView.webContents.sendInputEvent({
           type: 'mouseDown',
-          x: coords.x,
-          y: coords.y,
+          x,
+          y,
           button: btn,
           clickCount: 1,
         });
         rightView.webContents.sendInputEvent({
           type: 'mouseUp',
-          x: coords.x,
-          y: coords.y,
+          x,
+          y,
           button: btn,
           clickCount: 1,
         });
@@ -239,13 +308,8 @@ function createSyncManager(leftView, rightView) {
   }
 
   function replayInputValue({ selector, value, textContent }) {
-    // Escape for safe injection into JS string
-    const escaped = (textContent !== undefined ? textContent : value)
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'")
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r');
-    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escaped = escapeForScript(textContent !== undefined ? textContent : value);
+    const escapedSelector = escapeForScript(selector);
 
     let script;
     if (textContent !== undefined) {
@@ -257,11 +321,10 @@ function createSyncManager(leftView, rightView) {
       script = `(function(){
         var el = document.querySelector('${escapedSelector}');
         if(el){
-          var nativeSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLInputElement.prototype, 'value'
-          ) || Object.getOwnPropertyDescriptor(
-            window.HTMLTextAreaElement.prototype, 'value'
-          );
+          var proto = el.tagName === 'TEXTAREA'
+            ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+          var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value');
           if(nativeSetter && nativeSetter.set){ nativeSetter.set.call(el,'${escaped}'); }
           else { el.value='${escaped}'; }
           el.dispatchEvent(new Event('input',{bubbles:true}));
@@ -330,9 +393,12 @@ function createSyncManager(leftView, rightView) {
     isPaused,
     pause,
     resume,
+    suppressNavSync,
+    isNavSyncSuppressed,
     // Exposed for testing
     _handleMessage: handleMessage,
     _replayScroll: replayScroll,
+    _replayElementScroll: replayElementScroll,
     _replayHover: replayHover,
     _replayClick: replayClick,
     _replayInputValue: replayInputValue,
@@ -340,4 +406,4 @@ function createSyncManager(leftView, rightView) {
   };
 }
 
-module.exports = { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT };
+module.exports = { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, escapeForScript };
