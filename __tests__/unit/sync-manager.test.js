@@ -422,6 +422,34 @@ describe('SyncManager', () => {
     expect(script).toContain('\\`example\\`');
   });
 
+  // --- Textarea native setter ---
+  test('inputvalue uses HTMLTextAreaElement setter for textarea elements', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: 'textarea#comment', value: 'line1\nline2' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain("el.tagName === 'TEXTAREA'");
+    expect(script).toContain('HTMLTextAreaElement.prototype');
+    expect(script).toContain('HTMLInputElement.prototype');
+  });
+
+  test('inputvalue sets value on textarea with multiline pasted text', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: 'textarea.modal-textarea', value: 'first\nsecond\nthird' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('textarea.modal-textarea');
+    expect(script).toContain('first\\nsecond\\nthird');
+  });
+
   // --- Pause / Resume ---
   test('isPaused returns false by default', () => {
     expect(manager.isPaused()).toBe(false);

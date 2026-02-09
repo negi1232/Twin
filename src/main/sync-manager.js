@@ -301,11 +301,10 @@ function createSyncManager(leftView, rightView) {
       script = `(function(){
         var el = document.querySelector('${escapedSelector}');
         if(el){
-          var nativeSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLInputElement.prototype, 'value'
-          ) || Object.getOwnPropertyDescriptor(
-            window.HTMLTextAreaElement.prototype, 'value'
-          );
+          var proto = el.tagName === 'TEXTAREA'
+            ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+          var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value');
           if(nativeSetter && nativeSetter.set){ nativeSetter.set.call(el,'${escaped}'); }
           else { el.value='${escaped}'; }
           el.dispatchEvent(new Event('input',{bubbles:true}));
