@@ -213,6 +213,28 @@ function registerShortcuts() {
           },
         },
         { type: 'separator' },
+        {
+          label: 'Zoom In',
+          accelerator: 'CommandOrControl+=',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-zoom-in');
+          },
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CommandOrControl+-',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-zoom-out');
+          },
+        },
+        {
+          label: 'Reset Zoom',
+          accelerator: 'CommandOrControl+0',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-zoom-reset');
+          },
+        },
+        { type: 'separator' },
         ...['1', '2', '3', '4', '5'].map((key) => ({
           label: `Device Preset ${key}`,
           accelerator: `CommandOrControl+${key}`,

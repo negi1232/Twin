@@ -235,6 +235,21 @@ describe('index.js', () => {
       expect(mockLeftWebContents.reload).not.toHaveBeenCalled();
     });
 
+    test('Cmd+= fires zoom-in', () => {
+      menuItemsByAccelerator['CommandOrControl+=']();
+      expect(mockToolbarWebContents.send).toHaveBeenCalledWith('shortcut-zoom-in');
+    });
+
+    test('Cmd+- fires zoom-out', () => {
+      menuItemsByAccelerator['CommandOrControl+-']();
+      expect(mockToolbarWebContents.send).toHaveBeenCalledWith('shortcut-zoom-out');
+    });
+
+    test('Cmd+0 fires zoom-reset', () => {
+      menuItemsByAccelerator['CommandOrControl+0']();
+      expect(mockToolbarWebContents.send).toHaveBeenCalledWith('shortcut-zoom-reset');
+    });
+
     test('registers Menu via buildFromTemplate and setApplicationMenu', () => {
       expect(mockMenu.buildFromTemplate).toHaveBeenCalled();
       expect(mockMenu.setApplicationMenu).toHaveBeenCalled();

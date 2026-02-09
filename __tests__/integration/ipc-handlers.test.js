@@ -190,7 +190,7 @@ describe('ipc-handlers integration', () => {
 
   // ===== Channel Registration =====
   describe('channel registration', () => {
-    test('registers all 16 expected IPC channels', () => {
+    test('registers all 18 expected IPC channels', () => {
       const expected = [
         'capture-and-compare',
         'open-report',
@@ -208,6 +208,8 @@ describe('ipc-handlers integration', () => {
         'read-file-data',
         'reinject-sync',
         'set-sidebar-width',
+        'set-zoom',
+        'get-zoom',
       ];
       expected.forEach((channel) => {
         expect(handlers[channel]).toBeDefined();
@@ -606,6 +608,61 @@ describe('ipc-handlers integration', () => {
       });
       const result = handlers['set-sidebar-width']({}, { width: 250 });
       expect(result).toEqual({ width: 250 });
+    });
+  });
+
+  // ===== set-zoom =====
+  describe('set-zoom', () => {
+    test('sets zoom factor on both views and sends zoom-changed', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      const result = handlers['set-zoom']({}, { zoom: 1.5 });
+      expect(mockLeftView.webContents.setZoomFactor).toHaveBeenCalledWith(1.5);
+      expect(mockRightView.webContents.setZoomFactor).toHaveBeenCalledWith(1.5);
+      expect(mockWebContents.send).toHaveBeenCalledWith('zoom-changed', { zoom: 1.5 });
+      expect(result).toEqual({ zoom: 1.5 });
+    });
+
+    test('clamps zoom to minimum 0.25', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      const result = handlers['set-zoom']({}, { zoom: 0.1 });
+      expect(result).toEqual({ zoom: 0.25 });
+      expect(mockLeftView.webContents.setZoomFactor).toHaveBeenCalledWith(0.25);
+    });
+
+    test('clamps zoom to maximum 3.0', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      const result = handlers['set-zoom']({}, { zoom: 5.0 });
+      expect(result).toEqual({ zoom: 3 });
+      expect(mockLeftView.webContents.setZoomFactor).toHaveBeenCalledWith(3);
+    });
+
+    test('handles destroyed webContents gracefully', () => {
+      mockLeftView.webContents.isDestroyed = jest.fn().mockReturnValue(true);
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      handlers['set-zoom']({}, { zoom: 1.2 });
+      expect(mockLeftView.webContents.setZoomFactor).not.toHaveBeenCalled();
+      expect(mockRightView.webContents.setZoomFactor).toHaveBeenCalledWith(1.2);
+      mockLeftView.webContents.isDestroyed.mockReturnValue(false);
+    });
+  });
+
+  // ===== get-zoom =====
+  describe('get-zoom', () => {
+    test('returns current zoom factor', () => {
+      mockLeftView.webContents.setZoomFactor = jest.fn();
+      mockRightView.webContents.setZoomFactor = jest.fn();
+      handlers['set-zoom']({}, { zoom: 1.5 });
+      const result = handlers['get-zoom']({});
+      expect(result).toEqual({ zoom: 1.5 });
+    });
+
+    test('returns default zoom 1.0 when not changed', () => {
+      const result = handlers['get-zoom']({});
+      expect(result).toEqual({ zoom: 1 });
     });
   });
 

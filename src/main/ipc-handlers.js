@@ -5,6 +5,7 @@ const { captureScreenshots } = require('./screenshot');
 const { runRegCli } = require('./reg-runner');
 const { getSettings, saveSettings, getStore } = require('./store');
 const { createSyncManager } = require('./sync-manager');
+const { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM } = require('../shared/constants');
 
 const ALLOWED_URL_SCHEMES = ['http:', 'https:'];
 
@@ -253,6 +254,28 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
       setSidebarWidth(width);
     }
     return { width };
+  });
+
+  // Zoom management for BrowserViews
+  let currentZoom = DEFAULT_ZOOM;
+
+  ipcMain.handle('set-zoom', (_event, { zoom }) => {
+    const clamped = Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom)) * 100) / 100;
+    currentZoom = clamped;
+    if (leftView && !leftView.webContents.isDestroyed()) {
+      leftView.webContents.setZoomFactor(clamped);
+    }
+    if (rightView && !rightView.webContents.isDestroyed()) {
+      rightView.webContents.setZoomFactor(clamped);
+    }
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send('zoom-changed', { zoom: clamped });
+    }
+    return { zoom: clamped };
+  });
+
+  ipcMain.handle('get-zoom', () => {
+    return { zoom: currentZoom };
   });
 
   // Navigation sync (left → right)

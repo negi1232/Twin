@@ -22,4 +22,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onShortcutOpenReport: (cb) => ipcRenderer.on('shortcut-open-report', () => cb()),
   onShortcutPreset: (cb) => ipcRenderer.on('shortcut-preset', (_event, data) => cb(data)),
   onShortcutSettings: (cb) => ipcRenderer.on('shortcut-settings', () => cb()),
+  setZoom: (payload) => ipcRenderer.invoke('set-zoom', payload),
+  getZoom: () => ipcRenderer.invoke('get-zoom'),
+  onZoomChanged: (cb) => ipcRenderer.on('zoom-changed', (_event, data) => cb(data)),
+  onShortcutZoomIn: (cb) => ipcRenderer.on('shortcut-zoom-in', () => cb()),
+  onShortcutZoomOut: (cb) => ipcRenderer.on('shortcut-zoom-out', () => cb()),
+  onShortcutZoomReset: (cb) => ipcRenderer.on('shortcut-zoom-reset', () => cb()),
 });

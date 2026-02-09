@@ -36,11 +36,19 @@ function initUIControls() {
   const sidebarSortSelect = document.getElementById('sidebar-sort');
   const sidebarFilterRadios = document.querySelectorAll('input[name="sidebar-filter"]');
 
+  const zoomInBtn = document.getElementById('zoom-in-btn');
+  const zoomOutBtn = document.getElementById('zoom-out-btn');
+  const zoomLevelBtn = document.getElementById('zoom-level-btn');
+
   let lastReportPath = null;
   let sidebarOpen = false;
   let currentFolderPath = null;
   let currentEntries = [];
   let currentSnapshotDir = null;
+  let currentZoom = 1.0;
+  const ZOOM_STEP = 0.1;
+  const MIN_ZOOM = 0.25;
+  const MAX_ZOOM = 3.0;
   const expandedDirs = new Set();
   const SIDEBAR_WIDTH = 250;
 
@@ -191,6 +199,41 @@ function initUIControls() {
     document.getElementById('status-sync').textContent = `Sync: ${syncEnabled ? 'ON' : 'OFF'}`;
   });
 
+  // Zoom controls
+  function updateZoomDisplay(zoom) {
+    currentZoom = zoom;
+    const pct = Math.round(zoom * 100) + '%';
+    zoomLevelBtn.textContent = pct;
+    document.getElementById('status-zoom').textContent = 'Zoom: ' + pct;
+  }
+
+  function zoomIn() {
+    const newZoom = Math.min(MAX_ZOOM, currentZoom + ZOOM_STEP);
+    window.electronAPI.setZoom({ zoom: newZoom });
+  }
+
+  function zoomOut() {
+    const newZoom = Math.max(MIN_ZOOM, currentZoom - ZOOM_STEP);
+    window.electronAPI.setZoom({ zoom: newZoom });
+  }
+
+  function zoomReset() {
+    window.electronAPI.setZoom({ zoom: 1.0 });
+  }
+
+  zoomInBtn.addEventListener('click', zoomIn);
+  zoomOutBtn.addEventListener('click', zoomOut);
+  zoomLevelBtn.addEventListener('click', zoomReset);
+
+  window.electronAPI.onZoomChanged((data) => {
+    updateZoomDisplay(data.zoom);
+  });
+
+  // Load initial zoom
+  window.electronAPI.getZoom().then((data) => {
+    updateZoomDisplay(data.zoom);
+  });
+
   // Device presets
   document.querySelectorAll('.btn-preset').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -245,6 +288,9 @@ function initUIControls() {
   window.electronAPI.onShortcutCapture(() => performCapture('page'));
   window.electronAPI.onShortcutOpenReport(() => openLatestReport());
   window.electronAPI.onShortcutPreset((data) => applyPreset(data.index));
+  window.electronAPI.onShortcutZoomIn(() => zoomIn());
+  window.electronAPI.onShortcutZoomOut(() => zoomOut());
+  window.electronAPI.onShortcutZoomReset(() => zoomReset());
   window.electronAPI.onShortcutSettings(() => openSettings());
 
   function updateStatus(text) {
