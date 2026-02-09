@@ -106,6 +106,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: 'Twin - Visual Regression Testing',
+    icon: path.join(__dirname, '..', '..', 'build', 'icon.png'),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
