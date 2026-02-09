@@ -296,6 +296,12 @@ app.whenReady().then(() => {
     callback(false);
   });
 
+  // Set Dock icon on macOS (needed for development mode)
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = path.join(__dirname, '..', '..', 'build', 'icon.png');
+    app.dock.setIcon(iconPath);
+  }
+
   createWindow();
 });
 

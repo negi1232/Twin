@@ -100,6 +100,11 @@ let mockAppListeners = {};
 const mockBrowserWindowClass = jest.fn(() => mockMainWindow);
 mockBrowserWindowClass.getAllWindows = jest.fn(() => []);
 
+const mockDock = { setIcon: jest.fn() };
+const mockSession = {
+  defaultSession: { setPermissionRequestHandler: jest.fn() },
+};
+
 jest.mock('electron', () => ({
   app: {
     whenReady: jest.fn(() => new Promise(() => {})),
@@ -107,6 +112,7 @@ jest.mock('electron', () => ({
       if (!mockAppListeners[event]) mockAppListeners[event] = [];
       mockAppListeners[event].push(cb);
     }),
+    dock: mockDock,
   },
   BrowserWindow: mockBrowserWindowClass,
   WebContentsView: jest.fn(() => {
@@ -115,6 +121,7 @@ jest.mock('electron', () => ({
     return view;
   }),
   Menu: mockMenu,
+  session: mockSession,
 }));
 
 jest.mock('../../src/main/ipc-handlers', () => ({
@@ -460,6 +467,66 @@ describe('index.js', () => {
       mockBrowserWindowClass.mockClear();
       handler[0]();
       expect(mockBrowserWindowClass).not.toHaveBeenCalled();
+    });
+  });
+
+  // ===== app.whenReady =====
+  describe('app.whenReady', () => {
+    test('sets dock icon on darwin and creates window', async () => {
+      jest.resetModules();
+      mainWindowListeners = {};
+      mockToolbarListeners = {};
+      mockLeftListeners = {};
+      mockRightListeners = {};
+      mockAppListeners = {};
+      mockViewIndex = 0;
+
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+
+      const { app, session } = require('electron');
+      let readyCallback;
+      app.whenReady.mockImplementation(() => ({
+        then: (cb) => { readyCallback = cb; },
+      }));
+
+      require('../../src/main/index');
+      readyCallback();
+
+      expect(session.defaultSession.setPermissionRequestHandler).toHaveBeenCalled();
+      expect(mockDock.setIcon).toHaveBeenCalledWith(
+        expect.stringContaining('icon.png')
+      );
+
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    test('does not set dock icon on non-darwin', async () => {
+      jest.resetModules();
+      mainWindowListeners = {};
+      mockToolbarListeners = {};
+      mockLeftListeners = {};
+      mockRightListeners = {};
+      mockAppListeners = {};
+      mockViewIndex = 0;
+      mockDock.setIcon.mockClear();
+
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+
+      const { app, session } = require('electron');
+      let readyCallback;
+      app.whenReady.mockImplementation(() => ({
+        then: (cb) => { readyCallback = cb; },
+      }));
+
+      require('../../src/main/index');
+      readyCallback();
+
+      expect(session.defaultSession.setPermissionRequestHandler).toHaveBeenCalled();
+      expect(mockDock.setIcon).not.toHaveBeenCalled();
+
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
     });
   });
 
