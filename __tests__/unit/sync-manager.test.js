@@ -450,6 +450,37 @@ describe('SyncManager', () => {
     expect(script).toContain('first\\nsecond\\nthird');
   });
 
+  // --- Navigation sync suppression ---
+  test('isNavSyncSuppressed returns false by default', () => {
+    expect(manager.isNavSyncSuppressed()).toBe(false);
+  });
+
+  test('click replay suppresses nav sync', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 10, y: 20 });
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'click',
+      data: { selector: '#search-btn', button: 'left' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(manager.isNavSyncSuppressed()).toBe(true);
+  });
+
+  test('nav sync suppression expires after timeout', () => {
+    jest.useFakeTimers();
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 10, y: 20 });
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'click',
+      data: { selector: '#btn', button: 'left' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(manager.isNavSyncSuppressed()).toBe(true);
+    jest.advanceTimersByTime(500);
+    expect(manager.isNavSyncSuppressed()).toBe(false);
+    jest.useRealTimers();
+  });
+
   // --- Pause / Resume ---
   test('isPaused returns false by default', () => {
     expect(manager.isPaused()).toBe(false);

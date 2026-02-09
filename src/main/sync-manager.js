@@ -157,6 +157,8 @@ const INJECTION_SCRIPT = `
 function createSyncManager(leftView, rightView) {
   let enabled = true;
   let paused = false;
+  let navSyncSuppressed = false;
+  let navSyncTimer = null;
 
   function isEnabled() {
     return enabled;
@@ -176,6 +178,19 @@ function createSyncManager(leftView, rightView) {
 
   function resume() {
     paused = false;
+  }
+
+  function suppressNavSync() {
+    navSyncSuppressed = true;
+    if (navSyncTimer) clearTimeout(navSyncTimer);
+    navSyncTimer = setTimeout(() => {
+      navSyncSuppressed = false;
+      navSyncTimer = null;
+    }, 500);
+  }
+
+  function isNavSyncSuppressed() {
+    return navSyncSuppressed;
   }
 
   function handleMessage(_event, level, message) {
@@ -256,6 +271,7 @@ function createSyncManager(leftView, rightView) {
   }
 
   function replayClick({ selector, button }) {
+    suppressNavSync();
     const buttonMap = { left: 'left', middle: 'middle', right: 'right' };
     const btn = buttonMap[button] || 'left';
     const escapedSelector = escapeForScript(selector);
@@ -373,6 +389,8 @@ function createSyncManager(leftView, rightView) {
     isPaused,
     pause,
     resume,
+    suppressNavSync,
+    isNavSyncSuppressed,
     // Exposed for testing
     _handleMessage: handleMessage,
     _replayScroll: replayScroll,
