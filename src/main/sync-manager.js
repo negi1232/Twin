@@ -34,6 +34,7 @@ const INJECTION_SCRIPT = `
   }
 
   // --- Scroll sync (throttled via rAF) ---
+  // Window-level scroll
   var scrollTicking = false;
   window.addEventListener('scroll', function() {
     if (!scrollTicking) {
@@ -44,6 +45,29 @@ const INJECTION_SCRIPT = `
       scrollTicking = true;
     }
   }, { passive: true });
+
+  // Element-level scroll (modals, horizontal overflow containers, etc.)
+  var elScrollTicking = false;
+  var elScrollTarget = null;
+  document.addEventListener('scroll', function(e) {
+    if (e.target === document || e.target === document.documentElement) return;
+    elScrollTarget = e.target;
+    if (!elScrollTicking) {
+      requestAnimationFrame(function() {
+        var el = elScrollTarget;
+        if (el && el.nodeType === 1) {
+          var selector = getSelector(el);
+          send('elementscroll', {
+            selector: selector,
+            scrollLeft: el.scrollLeft,
+            scrollTop: el.scrollTop
+          });
+        }
+        elScrollTicking = false;
+      });
+      elScrollTicking = true;
+    }
+  }, { capture: true, passive: true });
 
   // --- Hover sync (element-based, throttled via rAF) ---
   var hoverTicking = false;
@@ -160,6 +184,9 @@ function createSyncManager(leftView, rightView) {
       case 'scroll':
         replayScroll(data);
         break;
+      case 'elementscroll':
+        replayElementScroll(data);
+        break;
       case 'hover':
         replayHover(data);
         break;
@@ -183,6 +210,16 @@ function createSyncManager(leftView, rightView) {
     rightView.webContents.executeJavaScript(
       `window.scrollTo(${scrollX}, ${scrollY})`
     ).catch(() => {});
+  }
+
+  function replayElementScroll({ selector, scrollLeft, scrollTop }) {
+    if (!Number.isFinite(scrollLeft) || !Number.isFinite(scrollTop)) return;
+    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const script = `(function(){
+      var el = document.querySelector('${escapedSelector}');
+      if(el){ el.scrollLeft=${scrollLeft}; el.scrollTop=${scrollTop}; }
+    })()`;
+    rightView.webContents.executeJavaScript(script).catch(() => {});
   }
 
   function replayHover({ selector }) {
@@ -333,6 +370,7 @@ function createSyncManager(leftView, rightView) {
     // Exposed for testing
     _handleMessage: handleMessage,
     _replayScroll: replayScroll,
+    _replayElementScroll: replayElementScroll,
     _replayHover: replayHover,
     _replayClick: replayClick,
     _replayInputValue: replayInputValue,

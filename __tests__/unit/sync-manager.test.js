@@ -72,6 +72,75 @@ describe('SyncManager', () => {
     );
   });
 
+  // --- Element scroll sync (modals, horizontal overflow) ---
+  test('elementscroll message replays scrollLeft and scrollTop on matching element', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal-body', scrollLeft: 50, scrollTop: 300 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('.modal-body');
+    expect(script).toContain('scrollLeft=50');
+    expect(script).toContain('scrollTop=300');
+  });
+
+  test('elementscroll handles horizontal-only scroll', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.table-wrapper', scrollLeft: 200, scrollTop: 0 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('.table-wrapper');
+    expect(script).toContain('scrollLeft=200');
+  });
+
+  test('elementscroll ignores non-finite scrollLeft', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.box', scrollLeft: null, scrollTop: 0 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('elementscroll ignores non-finite scrollTop', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.box', scrollLeft: 0, scrollTop: 'abc' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('elementscroll escapes special characters in selector', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: "#it\\'s", scrollLeft: 0, scrollTop: 10 },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+  });
+
+  test('elementscroll handles executeJavaScript rejection gracefully', async () => {
+    rightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('fail'));
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.modal', scrollLeft: 0, scrollTop: 100 },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
   // --- Hover sync (element-based) ---
   test('hover message finds element on right view and sends mouseMove to its center', async () => {
     rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 150, y: 200 });
