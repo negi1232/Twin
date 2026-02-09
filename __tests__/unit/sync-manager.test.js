@@ -1,4 +1,4 @@
-const { createSyncManager, SYNC_PREFIX } = require('../../src/main/sync-manager');
+const { createSyncManager, SYNC_PREFIX, escapeForScript } = require('../../src/main/sync-manager');
 
 function createMockView() {
   const listeners = {};
@@ -369,6 +369,59 @@ describe('SyncManager', () => {
     expect(script).toContain('\\n');
   });
 
+  // --- Paste with special characters (backticks, template expressions) ---
+  test('inputvalue escapes backticks in pasted value', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#code', value: 'const x = `hello`' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\`hello\\`');
+    expect(script).not.toMatch(/[^\\]`hello/);
+  });
+
+  test('inputvalue escapes template expressions in pasted value', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#code', value: 'price is ${amount}' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\${amount}');
+  });
+
+  test('inputvalue escapes mixed special characters from paste', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#editor', value: "line1\nconst tpl = `${name}'s value`" },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\n');
+    expect(script).toContain('\\`');
+    expect(script).toContain('\\$');
+    expect(script).toContain("\\'");
+  });
+
+  test('inputvalue for contenteditable escapes backticks in pasted HTML', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '.editor', textContent: 'code: `example` done' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('\\`example\\`');
+  });
+
   // --- Pause / Resume ---
   test('isPaused returns false by default', () => {
     expect(manager.isPaused()).toBe(false);
@@ -540,5 +593,45 @@ describe('SyncManager', () => {
     manager.inject();
     expect(leftView.webContents.executeJavaScript).toHaveBeenCalled();
     await new Promise((r) => setTimeout(r, 0));
+  });
+});
+
+describe('escapeForScript', () => {
+  test('escapes backslashes', () => {
+    expect(escapeForScript('a\\b')).toBe("a\\\\b");
+  });
+
+  test('escapes single quotes', () => {
+    expect(escapeForScript("it's")).toBe("it\\'s");
+  });
+
+  test('escapes backticks', () => {
+    expect(escapeForScript('`hello`')).toBe('\\`hello\\`');
+  });
+
+  test('escapes dollar signs to prevent template interpolation', () => {
+    expect(escapeForScript('${name}')).toBe('\\${name}');
+  });
+
+  test('escapes newlines and carriage returns', () => {
+    expect(escapeForScript("a\nb\rc")).toBe('a\\nb\\rc');
+  });
+
+  test('escapes all special characters together', () => {
+    const input = "line1\nconst tpl = `${name}'s value`";
+    const result = escapeForScript(input);
+    expect(result).toContain('\\n');
+    expect(result).toContain('\\`');
+    expect(result).toContain('\\$');
+    expect(result).toContain("\\'");
+    expect(result).not.toContain('\n');
+  });
+
+  test('handles empty string', () => {
+    expect(escapeForScript('')).toBe('');
+  });
+
+  test('returns unchanged for safe strings', () => {
+    expect(escapeForScript('hello world 123')).toBe('hello world 123');
   });
 });

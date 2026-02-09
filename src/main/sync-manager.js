@@ -1,5 +1,17 @@
 const SYNC_PREFIX = '__twin_sync__';
 
+// Escape a string for safe embedding inside a template-literal single-quoted JS string.
+// Handles: backslash, single quote, newlines, backtick, and ${.
+function escapeForScript(str) {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r');
+}
+
 // JavaScript injected into left BrowserView to capture user events
 const INJECTION_SCRIPT = `
 (function() {
@@ -214,7 +226,7 @@ function createSyncManager(leftView, rightView) {
 
   function replayElementScroll({ selector, scrollLeft, scrollTop }) {
     if (!Number.isFinite(scrollLeft) || !Number.isFinite(scrollTop)) return;
-    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escapedSelector = escapeForScript(selector);
     const script = `(function(){
       var el = document.querySelector('${escapedSelector}');
       if(el){ el.scrollLeft=${scrollLeft}; el.scrollTop=${scrollTop}; }
@@ -223,7 +235,7 @@ function createSyncManager(leftView, rightView) {
   }
 
   function replayHover({ selector }) {
-    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escapedSelector = escapeForScript(selector);
     const script = `(function(){
       var el = document.querySelector('${escapedSelector}');
       if (el) {
@@ -246,7 +258,7 @@ function createSyncManager(leftView, rightView) {
   function replayClick({ selector, button }) {
     const buttonMap = { left: 'left', middle: 'middle', right: 'right' };
     const btn = buttonMap[button] || 'left';
-    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escapedSelector = escapeForScript(selector);
     const script = `(function(){
       var el = document.querySelector('${escapedSelector}');
       if (el) {
@@ -276,13 +288,8 @@ function createSyncManager(leftView, rightView) {
   }
 
   function replayInputValue({ selector, value, textContent }) {
-    // Escape for safe injection into JS string
-    const escaped = (textContent !== undefined ? textContent : value)
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'")
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r');
-    const escapedSelector = selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escaped = escapeForScript(textContent !== undefined ? textContent : value);
+    const escapedSelector = escapeForScript(selector);
 
     let script;
     if (textContent !== undefined) {
@@ -378,4 +385,4 @@ function createSyncManager(leftView, rightView) {
   };
 }
 
-module.exports = { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT };
+module.exports = { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, escapeForScript };
