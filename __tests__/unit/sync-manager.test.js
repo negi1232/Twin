@@ -16,6 +16,7 @@ function createMockView() {
       executeJavaScript: jest.fn().mockResolvedValue(undefined),
       sendInputEvent: jest.fn(),
       isDestroyed: jest.fn(() => false),
+      getZoomFactor: jest.fn(() => 1.0),
     },
     _listeners: listeners,
     _emit(event, ...args) {
@@ -270,6 +271,59 @@ describe('SyncManager', () => {
 
     await new Promise((r) => setTimeout(r, 0));
     expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  // --- Click sync with zoom ---
+  test('click at zoom 1.5x scales coordinates by zoom factor', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(1.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 100, y: 50 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', x: 150, y: 75, button: 'left' })
+    );
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseUp', x: 150, y: 75, button: 'left' })
+    );
+  });
+
+  test('click at zoom 0.5x scales coordinates down', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(0.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 200, y: 100 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#link', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', x: 100, y: 50 })
+    );
+  });
+
+  // --- Hover sync with zoom ---
+  test('hover at zoom 1.5x scales coordinates by zoom factor', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(1.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 100, y: 200 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#btn' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseMove', x: 150, y: 300 })
+    );
+  });
+
+  test('hover at zoom 0.5x scales coordinates down', async () => {
+    rightView.webContents.getZoomFactor.mockReturnValue(0.5);
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 200, y: 100 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#nav' } });
+    manager._handleMessage(null, 0, msg);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseMove', x: 100, y: 50 })
+    );
   });
 
   // --- Key sync ---

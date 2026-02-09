@@ -261,10 +261,11 @@ function createSyncManager(leftView, rightView) {
     })()`;
     rightView.webContents.executeJavaScript(script).then((coords) => {
       if (coords) {
+        const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
         rightView.webContents.sendInputEvent({
           type: 'mouseMove',
-          x: coords.x,
-          y: coords.y,
+          x: Math.round(coords.x * zoom),
+          y: Math.round(coords.y * zoom),
         });
       }
     }).catch(() => {});
@@ -285,17 +286,20 @@ function createSyncManager(leftView, rightView) {
     })()`;
     rightView.webContents.executeJavaScript(script).then((coords) => {
       if (coords) {
+        const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
+        const x = Math.round(coords.x * zoom);
+        const y = Math.round(coords.y * zoom);
         rightView.webContents.sendInputEvent({
           type: 'mouseDown',
-          x: coords.x,
-          y: coords.y,
+          x,
+          y,
           button: btn,
           clickCount: 1,
         });
         rightView.webContents.sendInputEvent({
           type: 'mouseUp',
-          x: coords.x,
-          y: coords.y,
+          x,
+          y,
           button: btn,
           clickCount: 1,
         });
