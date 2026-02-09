@@ -118,6 +118,7 @@ jest.mock('../../src/main/store', () => ({
 
 let mockSyncEnabled = true;
 let mockSyncPaused = false;
+let mockNavSyncSuppressed = false;
 const mockSyncManager = {
   start: jest.fn(),
   stop: jest.fn(),
@@ -127,6 +128,8 @@ const mockSyncManager = {
   isPaused: jest.fn(() => mockSyncPaused),
   pause: jest.fn(() => { mockSyncPaused = true; }),
   resume: jest.fn(() => { mockSyncPaused = false; }),
+  isNavSyncSuppressed: jest.fn(() => mockNavSyncSuppressed),
+  suppressNavSync: jest.fn(() => { mockNavSyncSuppressed = true; }),
 };
 jest.mock('../../src/main/sync-manager', () => ({
   createSyncManager: jest.fn(() => mockSyncManager),
@@ -150,6 +153,7 @@ describe('ipc-handlers integration', () => {
     Object.keys(mockStoreData).forEach((k) => delete mockStoreData[k]);
     mockSyncEnabled = true;
     mockSyncPaused = false;
+    mockNavSyncSuppressed = false;
     mockSidebarWidth = 0;
 
     const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
@@ -657,6 +661,35 @@ describe('ipc-handlers integration', () => {
       const handler = getNavigateHandler();
       handler({}, 'http://localhost:3000/path');
       await new Promise((r) => setTimeout(r, 0));
+    });
+
+    test('does not double-navigate right view when click sync already triggered navigation', () => {
+      // Simulate: click sync replays a search button click that navigates
+      // the right view to /search?q=hello. Then did-navigate-in-page fires
+      // on the left view. The right view should NOT be navigated again
+      // because nav sync is suppressed after click replay.
+      mockNavSyncSuppressed = true;
+
+      const handler = getNavigateHandler();
+      mockRightView.webContents.loadURL.mockClear();
+      handler({}, 'http://localhost:3000/search?q=hello');
+
+      expect(mockRightView.webContents.loadURL).not.toHaveBeenCalled();
+    });
+
+    test('allows navigation sync when no recent click was replayed', () => {
+      mockNavSyncSuppressed = false;
+      mockSyncManager.isPaused.mockReturnValue(false);
+      mockSyncManager.isEnabled.mockReturnValue(true);
+      mockRightView.webContents.getURL.mockReturnValue('http://localhost:3001/page');
+
+      const handler = getNavigateHandler();
+      mockRightView.webContents.loadURL.mockClear();
+      handler({}, 'http://localhost:3000/about');
+
+      expect(mockRightView.webContents.loadURL).toHaveBeenCalledWith(
+        'http://localhost:3001/about'
+      );
     });
   });
 
