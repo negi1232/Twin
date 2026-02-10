@@ -178,6 +178,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     }
   });
 
+  // Restore allowedBasePath from store (persist across restarts)
+  let allowedBasePath = getStore().get('allowedBasePath') || null;
+
   // Select folder via native dialog
   ipcMain.handle('select-folder', async () => {
     if (!mainWindow) return null;
@@ -186,11 +189,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     allowedBasePath = result.filePaths[0];
+    getStore().set('allowedBasePath', allowedBasePath);
     return result.filePaths[0];
   });
-
-  // Validate that a path is under a user-selected folder
-  let allowedBasePath = null;
 
   // Read directory contents (one level)
   ipcMain.handle('read-directory', async (_event, { dirPath }) => {

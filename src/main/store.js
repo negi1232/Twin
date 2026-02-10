@@ -27,6 +27,10 @@ const schema = {
     maximum: 1,
     default: 0,
   },
+  allowedBasePath: {
+    type: ['string', 'null'],
+    default: null,
+  },
 };
 
 function getStore() {
