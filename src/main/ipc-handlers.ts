@@ -5,15 +5,15 @@
  * サイドバー操作（フォルダ選択・ディレクトリ読み取り・ファイルプレビュー）を提供する。
  */
 
-const { ipcMain, BrowserWindow, dialog } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const { captureScreenshots } = require('./screenshot');
-const { runRegCli } = require('./reg-runner');
-const { getSettings, saveSettings, getStore } = require('./store');
-const { createSyncManager } = require('./sync-manager');
-const { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM } = require('../shared/constants');
-const {
+import { ipcMain, BrowserWindow, dialog, IpcMainInvokeEvent } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
+import { captureScreenshots } from './screenshot';
+import { runRegCli } from './reg-runner';
+import { getSettings, saveSettings, getStore } from './store';
+import { createSyncManager, SyncManager } from './sync-manager';
+import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM } from '../shared/constants';
+import {
   runFullScan,
   generateScanReportHTML,
   buildGetElementStylesScript,
@@ -24,17 +24,32 @@ const {
   CSS_INSPECT_CLEANUP_SCRIPT,
   CSS_INSPECT_PREFIX,
   CLEAR_HIGHLIGHT_SCRIPT,
-} = require('./css-compare');
+  CssScanResult,
+} from './css-compare';
+import type { WebContentsView } from 'electron';
 
-/** @type {string[]} ナビゲーションで許可する URL スキーム */
-const ALLOWED_URL_SCHEMES = ['http:', 'https:'];
+/** ナビゲーションで許可する URL スキーム */
+const ALLOWED_URL_SCHEMES: string[] = ['http:', 'https:'];
+
+interface IpcHandlerOptions {
+  mainWindow: BrowserWindow;
+  leftView: WebContentsView;
+  rightView: WebContentsView;
+  setSidebarWidth: (w: number) => void;
+  getSidebarWidth: () => number;
+}
+
+interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 /**
  * URL が許可されたスキーム（http/https）かどうか検証する。
- * @param {string} url - 検証対象の URL
- * @returns {boolean}
  */
-function isAllowedUrl(url) {
+function isAllowedUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return ALLOWED_URL_SCHEMES.includes(parsed.protocol);
@@ -45,11 +60,8 @@ function isAllowedUrl(url) {
 
 /**
  * targetPath が basePath 配下にあるか（パストラバーサル防止）を検証する。
- * @param {string} targetPath - 検証対象のパス
- * @param {string} basePath - 許可されたベースディレクトリ
- * @returns {boolean}
  */
-function isPathUnderBase(targetPath, basePath) {
+function isPathUnderBase(targetPath: string, basePath: string): boolean {
   try {
     const resolved = fs.realpathSync(targetPath);
     const resolvedBase = fs.realpathSync(basePath);
@@ -61,34 +73,27 @@ function isPathUnderBase(targetPath, basePath) {
 
 /**
  * すべての IPC ハンドラを登録し、SyncManager を初期化して返す。
- * @param {Object} options
- * @param {Electron.BrowserWindow} options.mainWindow - メインウィンドウ
- * @param {Electron.WebContentsView} options.leftView - 左側ビュー（Expected）
- * @param {Electron.WebContentsView} options.rightView - 右側ビュー（Actual）
- * @param {(w: number) => void} options.setSidebarWidth - サイドバー幅設定関数
- * @param {() => number} options.getSidebarWidth - サイドバー幅取得関数
- * @returns {{ syncManager: SyncManager }}
  */
-function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }) {
+function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }: IpcHandlerOptions): { syncManager: SyncManager } {
   // --- Sync Manager ---
   const syncManager = createSyncManager(leftView, rightView);
   syncManager.start();
 
   // Capture screenshots and run reg-cli comparison
-  ipcMain.handle('capture-and-compare', async (_event, { pageName }) => {
+  ipcMain.handle('capture-and-compare', async (_event: IpcMainInvokeEvent, { pageName }: { pageName: string }) => {
     if (!leftView || !rightView) throw new Error('Views not ready');
     if (!pageName || !/^[a-zA-Z0-9_-]{1,100}$/.test(pageName)) {
       throw new Error('Invalid page name: only alphanumeric, underscore, and hyphen allowed (max 100 chars)');
     }
 
     const store = getStore();
-    const snapshotDir = path.resolve(store.get('snapshotDir'));
+    const snapshotDir = path.resolve(store.get('snapshotDir') as string);
 
     const fileName = await captureScreenshots(leftView, rightView, snapshotDir, pageName);
 
     const options = {
-      matchingThreshold: store.get('matchingThreshold'),
-      thresholdRate: store.get('thresholdRate'),
+      matchingThreshold: store.get('matchingThreshold') as number,
+      thresholdRate: store.get('thresholdRate') as number,
     };
 
     try {
@@ -104,7 +109,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     } catch (error) {
       if (mainWindow && !mainWindow.webContents.isDestroyed()) {
         mainWindow.webContents.send('capture-result', {
-          error: error.message,
+          error: (error as Error).message,
           fileName,
         });
       }
@@ -113,9 +118,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Open reg-cli HTML report in new window
-  ipcMain.handle('open-report', (_event, { reportPath }) => {
+  ipcMain.handle('open-report', (_event: IpcMainInvokeEvent, { reportPath }: { reportPath: string }) => {
     const resolved = path.resolve(reportPath);
-    const snapshotBase = path.resolve(getStore().get('snapshotDir'));
+    const snapshotBase = path.resolve(getStore().get('snapshotDir') as string);
     if (!isPathUnderBase(resolved, snapshotBase)) {
       throw new Error('Report path must be within the snapshot directory');
     }
@@ -133,7 +138,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Reload browser views
-  ipcMain.handle('reload-views', (_event, { target }) => {
+  ipcMain.handle('reload-views', (_event: IpcMainInvokeEvent, { target }: { target: string }) => {
     if ((target === 'left' || target === 'both') && leftView) {
       leftView.webContents.reload();
     }
@@ -143,7 +148,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Change BrowserView size (device preset)
-  ipcMain.handle('set-device-preset', (_event, { width, height }) => {
+  ipcMain.handle('set-device-preset', (_event: IpcMainInvokeEvent, { width, height }: { width: number; height: number }) => {
     const TOOLBAR_HEIGHT = 52;
     const STATUS_BAR_HEIGHT = 28;
     const sw = getSidebarWidth ? getSidebarWidth() : 0;
@@ -159,7 +164,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Navigate to URL
-  ipcMain.handle('navigate', (_event, { url, target }) => {
+  ipcMain.handle('navigate', (_event: IpcMainInvokeEvent, { url, target }: { url: string; target: string }) => {
     if (!isAllowedUrl(url)) {
       throw new Error('Only http: and https: URLs are allowed');
     }
@@ -178,13 +183,13 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Save settings
-  ipcMain.handle('save-settings', (_event, { settings }) => {
+  ipcMain.handle('save-settings', (_event: IpcMainInvokeEvent, { settings }: { settings: Partial<AppSettings> }) => {
     saveSettings(settings);
     return { success: true };
   });
 
   // Sync toggle
-  ipcMain.handle('set-sync-enabled', (_event, { enabled }) => {
+  ipcMain.handle('set-sync-enabled', (_event: IpcMainInvokeEvent, { enabled }: { enabled: boolean }) => {
     syncManager.setEnabled(enabled);
     return { enabled: syncManager.isEnabled() };
   });
@@ -194,10 +199,10 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Hide/show BrowserViews when modal is open
-  let savedLeftBounds = null;
-  let savedRightBounds = null;
+  let savedLeftBounds: Bounds | null = null;
+  let savedRightBounds: Bounds | null = null;
 
-  ipcMain.handle('set-views-visible', (_event, { visible }) => {
+  ipcMain.handle('set-views-visible', (_event: IpcMainInvokeEvent, { visible }: { visible: boolean }) => {
     if (!visible) {
       if (leftView) {
         savedLeftBounds = leftView.getBounds();
@@ -231,10 +236,10 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Validate that a path is under a user-selected folder
-  let allowedBasePath = null;
+  let allowedBasePath: string | null = null;
 
   // Read directory contents (one level)
-  ipcMain.handle('read-directory', async (_event, { dirPath }) => {
+  ipcMain.handle('read-directory', async (_event: IpcMainInvokeEvent, { dirPath }: { dirPath: string }) => {
     const resolved = path.resolve(dirPath);
     if (!allowedBasePath || !isPathUnderBase(resolved, allowedBasePath)) {
       throw new Error('Access denied: please select a folder first');
@@ -248,7 +253,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Create a new directory
-  ipcMain.handle('create-directory', async (_event, { dirPath }) => {
+  ipcMain.handle('create-directory', async (_event: IpcMainInvokeEvent, { dirPath }: { dirPath: string }) => {
     const resolved = path.resolve(dirPath);
     if (!allowedBasePath || !isPathUnderBase(resolved, allowedBasePath)) {
       throw new Error('Access denied: please select a folder first');
@@ -258,13 +263,13 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Read file data as base64 data URL (for image preview)
-  ipcMain.handle('read-file-data', async (_event, { filePath }) => {
+  ipcMain.handle('read-file-data', async (_event: IpcMainInvokeEvent, { filePath }: { filePath: string }) => {
     const resolved = path.resolve(filePath);
     if (!allowedBasePath || !isPathUnderBase(resolved, allowedBasePath)) {
       throw new Error('Access denied: please select a folder first');
     }
     const ext = path.extname(resolved).toLowerCase();
-    const mimeMap = {
+    const mimeMap: Record<string, string> = {
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
@@ -290,7 +295,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Set sidebar width and re-layout views
-  ipcMain.handle('set-sidebar-width', (_event, { width }) => {
+  ipcMain.handle('set-sidebar-width', (_event: IpcMainInvokeEvent, { width }: { width: number }) => {
     if (setSidebarWidth) {
       setSidebarWidth(width);
     }
@@ -298,9 +303,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Zoom management for BrowserViews
-  let currentZoom = DEFAULT_ZOOM;
+  let currentZoom: number = DEFAULT_ZOOM;
 
-  ipcMain.handle('set-zoom', (_event, { zoom }) => {
+  ipcMain.handle('set-zoom', (_event: IpcMainInvokeEvent, { zoom }: { zoom: number }) => {
     const clamped = Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom)) * 100) / 100;
     currentZoom = clamped;
     if (leftView && !leftView.webContents.isDestroyed()) {
@@ -321,7 +326,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
 
   // --- CSS Comparison ---
   let cssInspectActive = false;
-  let lastScanResult = null;
+  let lastScanResult: CssScanResult | null = null;
 
   // CSS Full Scan: collect styles from both views, compare, open result window
   ipcMain.handle('css-full-scan', async () => {
@@ -346,7 +351,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // CSS Inspect Toggle: start/stop inspect mode on left view
-  ipcMain.handle('css-inspect-toggle', async (_event, { enabled }) => {
+  ipcMain.handle('css-inspect-toggle', async (_event: IpcMainInvokeEvent, { enabled }: { enabled: boolean }) => {
     cssInspectActive = !!enabled;
 
     if (cssInspectActive) {
@@ -384,11 +389,11 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Handle CSS inspect messages from left view console.log
-  function handleCssInspectMessage(_event, _level, message) {
+  function handleCssInspectMessage(_event: unknown, _level: number, message: string): void {
     if (!cssInspectActive) return;
     if (!message.startsWith(CSS_INSPECT_PREFIX)) return;
 
-    let parsed;
+    let parsed: { type: string; data: CssInspectElementData };
     try {
       parsed = JSON.parse(message.slice(CSS_INSPECT_PREFIX.length));
     } catch {
@@ -400,7 +405,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     }
   }
 
-  async function handleInspectClick(leftData) {
+  async function handleInspectClick(leftData: CssInspectElementData): Promise<void> {
     if (!rightView || rightView.webContents.isDestroyed()) {
       if (mainWindow && !mainWindow.webContents.isDestroyed()) {
         mainWindow.webContents.send('css-inspect-result', {
@@ -431,7 +436,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     }
 
     // Get right element styles
-    const rightData = await rightView.webContents.executeJavaScript(
+    const rightData: { tag: string; styles: Record<string, string> } | null = await rightView.webContents.executeJavaScript(
       buildGetElementStylesScript(leftData.key, leftData.method)
     ).catch(() => null);
 
@@ -488,7 +493,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
 
   // Navigation sync (left → right)
   if (leftView) {
-    leftView.webContents.on('did-navigate-in-page', (_event, url) => {
+    leftView.webContents.on('did-navigate-in-page', (_event: unknown, url: string) => {
       if (!syncManager.isEnabled() || syncManager.isPaused()) return;
       if (syncManager.isNavSyncSuppressed()) return;
       try {
@@ -505,4 +510,4 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   return { syncManager };
 }
 
-module.exports = { registerIpcHandlers };
+export { registerIpcHandlers };

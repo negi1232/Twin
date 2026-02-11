@@ -8,16 +8,77 @@
  * フォーム入力（IME 対応）、キーボード入力、ページ内ナビゲーション。
  */
 
-/** @type {string} 同期メッセージの識別プレフィックス */
-const SYNC_PREFIX = '__twin_sync__';
+import { WebContentsView } from 'electron';
+
+/** 同期メッセージの識別プレフィックス */
+const SYNC_PREFIX: string = '__twin_sync__';
+
+interface ScrollData {
+  scrollX: number;
+  scrollY: number;
+}
+
+interface ElementScrollData {
+  selector: string;
+  scrollLeft: number;
+  scrollTop: number;
+}
+
+interface HoverData {
+  selector: string;
+}
+
+interface ClickData {
+  selector: string;
+  button: string;
+}
+
+interface InputValueData {
+  selector: string;
+  value?: string;
+  textContent?: string;
+}
+
+interface KeyData {
+  key: string;
+  code: string;
+  keyCode: number;
+  shift: boolean;
+  ctrl: boolean;
+  alt: boolean;
+  meta: boolean;
+}
+
+interface SyncMessage {
+  type: string;
+  data: ScrollData | ElementScrollData | HoverData | ClickData | InputValueData | KeyData;
+}
+
+export interface SyncManager {
+  start(): void;
+  stop(): void;
+  inject(): void;
+  isEnabled(): boolean;
+  setEnabled(value: boolean): void;
+  isPaused(): boolean;
+  pause(): void;
+  resume(): void;
+  suppressNavSync(): void;
+  isNavSyncSuppressed(): boolean;
+  _handleMessage(event: unknown, level: number, message: string): void;
+  _replayScroll(data: ScrollData): void;
+  _replayElementScroll(data: ElementScrollData): void;
+  _replayHover(data: HoverData): void;
+  _replayClick(data: ClickData): void;
+  _replayInputValue(data: InputValueData): void;
+  _replayKey(type: string, data: KeyData): void;
+}
 
 /**
  * 文字列を JS テンプレートリテラル内に安全に埋め込むためにエスケープする。
  * バックスラッシュ、シングルクォート、バッククォート、$、改行を処理する。
- * @param {string} str - エスケープ対象の文字列
- * @returns {string} エスケープ済み文字列
  */
-function escapeForScript(str) {
+function escapeForScript(str: string): string {
   return str
     .replace(/\\/g, '\\\\')
     .replace(/'/g, "\\'")
@@ -31,9 +92,8 @@ function escapeForScript(str) {
  * 左ビューにインジェクトされる JavaScript。
  * スクロール・ホバー・クリック・入力・キー操作を検知し、
  * console.log 経由で SYNC_PREFIX 付きの JSON メッセージとして送信する。
- * @type {string}
  */
-const INJECTION_SCRIPT = `
+const INJECTION_SCRIPT: string = `
 (function() {
   if (window.__twinSyncInjected) return;
   window.__twinSyncInjected = true;
@@ -176,37 +236,34 @@ const INJECTION_SCRIPT = `
 
 /**
  * SyncManager を生成する。左ビューの操作イベントを右ビューに同期する。
- * @param {Electron.WebContentsView} leftView - Expected 側ビュー
- * @param {Electron.WebContentsView} rightView - Actual 側ビュー
- * @returns {SyncManager} 同期制御オブジェクト
  */
-function createSyncManager(leftView, rightView) {
+function createSyncManager(leftView: WebContentsView, rightView: WebContentsView): SyncManager {
   let enabled = true;
   let paused = false;
   let navSyncSuppressed = false;
-  let navSyncTimer = null;
+  let navSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function isEnabled() {
+  function isEnabled(): boolean {
     return enabled;
   }
 
-  function setEnabled(value) {
+  function setEnabled(value: boolean): void {
     enabled = !!value;
   }
 
-  function isPaused() {
+  function isPaused(): boolean {
     return paused;
   }
 
-  function pause() {
+  function pause(): void {
     paused = true;
   }
 
-  function resume() {
+  function resume(): void {
     paused = false;
   }
 
-  function suppressNavSync() {
+  function suppressNavSync(): void {
     navSyncSuppressed = true;
     if (navSyncTimer) clearTimeout(navSyncTimer);
     navSyncTimer = setTimeout(() => {
@@ -215,15 +272,15 @@ function createSyncManager(leftView, rightView) {
     }, 500);
   }
 
-  function isNavSyncSuppressed() {
+  function isNavSyncSuppressed(): boolean {
     return navSyncSuppressed;
   }
 
-  function handleMessage(_event, level, message) {
+  function handleMessage(_event: unknown, level: number, message: string): void {
     if (!enabled || paused) return;
     if (!message.startsWith(SYNC_PREFIX)) return;
 
-    let parsed;
+    let parsed: SyncMessage;
     try {
       parsed = JSON.parse(message.slice(SYNC_PREFIX.length));
     } catch {
@@ -235,37 +292,37 @@ function createSyncManager(leftView, rightView) {
 
     switch (type) {
       case 'scroll':
-        replayScroll(data);
+        replayScroll(data as ScrollData);
         break;
       case 'elementscroll':
-        replayElementScroll(data);
+        replayElementScroll(data as ElementScrollData);
         break;
       case 'hover':
-        replayHover(data);
+        replayHover(data as HoverData);
         break;
       case 'click':
-        replayClick(data);
+        replayClick(data as ClickData);
         break;
       case 'inputvalue':
-        replayInputValue(data);
+        replayInputValue(data as InputValueData);
         break;
       case 'keydown':
-        replayKey('keyDown', data);
+        replayKey('keyDown', data as KeyData);
         break;
       case 'keyup':
-        replayKey('keyUp', data);
+        replayKey('keyUp', data as KeyData);
         break;
     }
   }
 
-  function replayScroll({ scrollX, scrollY }) {
+  function replayScroll({ scrollX, scrollY }: ScrollData): void {
     if (!Number.isFinite(scrollX) || !Number.isFinite(scrollY)) return;
     rightView.webContents.executeJavaScript(
       `window.scrollTo(${scrollX}, ${scrollY})`
     ).catch(() => {});
   }
 
-  function replayElementScroll({ selector, scrollLeft, scrollTop }) {
+  function replayElementScroll({ selector, scrollLeft, scrollTop }: ElementScrollData): void {
     if (!Number.isFinite(scrollLeft) || !Number.isFinite(scrollTop)) return;
     const escapedSelector = escapeForScript(selector);
     const script = `(function(){
@@ -275,7 +332,7 @@ function createSyncManager(leftView, rightView) {
     rightView.webContents.executeJavaScript(script).catch(() => {});
   }
 
-  function replayHover({ selector }) {
+  function replayHover({ selector }: HoverData): void {
     const escapedSelector = escapeForScript(selector);
     const script = `(function(){
       var el = document.querySelector('${escapedSelector}');
@@ -285,7 +342,7 @@ function createSyncManager(leftView, rightView) {
       }
       return null;
     })()`;
-    rightView.webContents.executeJavaScript(script).then((coords) => {
+    rightView.webContents.executeJavaScript(script).then((coords: { x: number; y: number } | null) => {
       if (coords) {
         const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
         rightView.webContents.sendInputEvent({
@@ -297,9 +354,9 @@ function createSyncManager(leftView, rightView) {
     }).catch(() => {});
   }
 
-  function replayClick({ selector, button }) {
+  function replayClick({ selector, button }: ClickData): void {
     suppressNavSync();
-    const buttonMap = { left: 'left', middle: 'middle', right: 'right' };
+    const buttonMap: Record<string, 'left' | 'middle' | 'right'> = { left: 'left', middle: 'middle', right: 'right' };
     const btn = buttonMap[button] || 'left';
     const escapedSelector = escapeForScript(selector);
     const script = `(function(){
@@ -310,7 +367,7 @@ function createSyncManager(leftView, rightView) {
       }
       return null;
     })()`;
-    rightView.webContents.executeJavaScript(script).then((coords) => {
+    rightView.webContents.executeJavaScript(script).then((coords: { x: number; y: number } | null) => {
       if (coords) {
         const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
         const x = Math.round(coords.x * zoom);
@@ -333,11 +390,11 @@ function createSyncManager(leftView, rightView) {
     }).catch(() => {});
   }
 
-  function replayInputValue({ selector, value, textContent }) {
-    const escaped = escapeForScript(textContent !== undefined ? textContent : value);
+  function replayInputValue({ selector, value, textContent }: InputValueData): void {
+    const escaped = escapeForScript(textContent !== undefined ? textContent : value!);
     const escapedSelector = escapeForScript(selector);
 
-    let script;
+    let script: string;
     if (textContent !== undefined) {
       script = `(function(){
         var el = document.querySelector('${escapedSelector}');
@@ -361,8 +418,8 @@ function createSyncManager(leftView, rightView) {
     rightView.webContents.executeJavaScript(script).catch(() => {});
   }
 
-  function replayKey(type, { key, keyCode, shift, ctrl, alt, meta }) {
-    const modifiers = [];
+  function replayKey(type: string, { key, keyCode, shift, ctrl, alt, meta }: KeyData): void {
+    const modifiers: string[] = [];
     if (shift) modifiers.push('shift');
     if (ctrl) modifiers.push('control');
     if (alt) modifiers.push('alt');
@@ -371,9 +428,9 @@ function createSyncManager(leftView, rightView) {
     const keyChar = String.fromCharCode(keyCode);
 
     rightView.webContents.sendInputEvent({
-      type,
+      type: type as 'keyDown' | 'keyUp',
       keyCode: keyChar,
-      modifiers,
+      modifiers: modifiers as Array<'shift' | 'control' | 'alt' | 'meta'>,
     });
 
     // Send 'char' event on keyDown for printable characters
@@ -381,17 +438,17 @@ function createSyncManager(leftView, rightView) {
       rightView.webContents.sendInputEvent({
         type: 'char',
         keyCode: key,
-        modifiers,
+        modifiers: modifiers as Array<'shift' | 'control' | 'alt' | 'meta'>,
       });
     }
   }
 
-  function inject() {
+  function inject(): void {
     if (!leftView || leftView.webContents.isDestroyed()) return;
     leftView.webContents.executeJavaScript(INJECTION_SCRIPT).catch(() => {});
   }
 
-  function start() {
+  function start(): void {
     if (!leftView) return;
 
     // Inject on every page load
@@ -404,7 +461,7 @@ function createSyncManager(leftView, rightView) {
     inject();
   }
 
-  function stop() {
+  function stop(): void {
     if (!leftView || leftView.webContents.isDestroyed()) return;
     leftView.webContents.removeListener('did-finish-load', inject);
     leftView.webContents.removeListener('console-message', handleMessage);
@@ -432,4 +489,4 @@ function createSyncManager(leftView, rightView) {
   };
 }
 
-module.exports = { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, escapeForScript };
+export { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, escapeForScript };

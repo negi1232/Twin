@@ -1,9 +1,11 @@
 appId: com.twin.vrt
 productName: Twin
 directories:
-  output: dist
+  output: dist-release
 files:
-  - src/**/*
+  - dist/**/*
+  - src/renderer/index.html
+  - src/renderer/styles/**/*
   - package.json
 mac:
   category: public.app-category.developer-tools

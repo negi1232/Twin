@@ -2,33 +2,33 @@
  * CSS Comparison UI logic for the renderer process.
  * Handles CSS scan button, inspect mode toggle, and inspect drawer.
  */
-function initCssCompare() {
-  const cssScanBtn = document.getElementById('css-scan-btn');
-  const cssInspectBtn = document.getElementById('css-inspect-btn');
-  const inspectDrawer = document.getElementById('css-inspect-drawer');
-  const inspectDrawerClose = document.getElementById('css-inspect-drawer-close');
-  const inspectDrawerHandle = document.getElementById('css-inspect-drawer-handle');
-  const inspectDrawerBody = document.getElementById('css-inspect-drawer-body');
-  const inspectFilterDiff = document.getElementById('css-inspect-filter-diff');
-  const inspectFilterAll = document.getElementById('css-inspect-filter-all');
-  const inspectCategoryBtns = document.querySelectorAll('.css-inspect-cat-btn');
-  const inspectHeader = document.getElementById('css-inspect-header-info');
+function initCssCompare(): void {
+  const cssScanBtn = document.getElementById('css-scan-btn') as HTMLButtonElement;
+  const cssInspectBtn = document.getElementById('css-inspect-btn') as HTMLButtonElement;
+  const inspectDrawer = document.getElementById('css-inspect-drawer') as HTMLElement;
+  const inspectDrawerClose = document.getElementById('css-inspect-drawer-close') as HTMLButtonElement;
+  const inspectDrawerHandle = document.getElementById('css-inspect-drawer-handle') as HTMLElement;
+  const inspectDrawerBody = document.getElementById('css-inspect-drawer-body') as HTMLElement;
+  const inspectFilterDiff = document.getElementById('css-inspect-filter-diff') as HTMLButtonElement;
+  const inspectFilterAll = document.getElementById('css-inspect-filter-all') as HTMLButtonElement;
+  const inspectCategoryBtns = document.querySelectorAll('.css-inspect-cat-btn') as NodeListOf<HTMLButtonElement>;
+  const inspectHeader = document.getElementById('css-inspect-header-info') as HTMLElement;
 
-  let inspectActive = false;
-  let currentInspectData = null;
-  let inspectShowDiffOnly = true;
-  let inspectCategoryFilter = 'all';
+  let inspectActive: boolean = false;
+  let currentInspectData: CssInspectResultData | null = null;
+  let inspectShowDiffOnly: boolean = true;
+  let inspectCategoryFilter: string = 'all';
 
   // --- CSS Full Scan ---
   cssScanBtn.addEventListener('click', startCssScan);
 
-  async function startCssScan() {
+  async function startCssScan(): Promise<void> {
     cssScanBtn.disabled = true;
     cssScanBtn.innerHTML = '<span class="css-spinner"></span> Scanning...';
     try {
       await window.electronAPI.cssFullScan();
     } catch (err) {
-      showCssToast('CSS Scan failed: ' + err.message, 'error');
+      showCssToast('CSS Scan failed: ' + (err as Error).message, 'error');
     } finally {
       cssScanBtn.disabled = false;
       cssScanBtn.textContent = '\u{1F3A8} CSS Scan';
@@ -38,7 +38,7 @@ function initCssCompare() {
   // --- CSS Inspect Mode ---
   cssInspectBtn.addEventListener('click', toggleInspectMode);
 
-  async function toggleInspectMode() {
+  async function toggleInspectMode(): Promise<void> {
     inspectActive = !inspectActive;
     try {
       await window.electronAPI.cssInspectToggle({ enabled: inspectActive });
@@ -51,12 +51,12 @@ function initCssCompare() {
     }
   }
 
-  function updateInspectButtonState() {
+  function updateInspectButtonState(): void {
     cssInspectBtn.classList.toggle('css-inspect-active', inspectActive);
     cssInspectBtn.textContent = inspectActive ? '\u{1F50D} Inspect ON' : '\u{1F50D} Inspect';
   }
 
-  function disableInspectMode() {
+  function disableInspectMode(): void {
     if (!inspectActive) return;
     inspectActive = false;
     window.electronAPI.cssInspectToggle({ enabled: false }).catch(() => {});
@@ -65,18 +65,18 @@ function initCssCompare() {
   }
 
   // Escape key disables inspect mode
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Escape' && inspectActive) {
       disableInspectMode();
     }
   });
 
   // --- Inspect Drawer ---
-  function showInspectDrawer() {
+  function showInspectDrawer(): void {
     inspectDrawer.classList.remove('hidden');
   }
 
-  function hideInspectDrawer() {
+  function hideInspectDrawer(): void {
     inspectDrawer.classList.add('hidden');
     currentInspectData = null;
   }
@@ -86,11 +86,11 @@ function initCssCompare() {
   });
 
   // Drawer resize via drag handle
-  let dragging = false;
-  let startY = 0;
-  let startHeight = 0;
+  let dragging: boolean = false;
+  let startY: number = 0;
+  let startHeight: number = 0;
 
-  inspectDrawerHandle.addEventListener('mousedown', (e) => {
+  inspectDrawerHandle.addEventListener('mousedown', (e: MouseEvent) => {
     dragging = true;
     startY = e.clientY;
     startHeight = inspectDrawer.offsetHeight;
@@ -99,7 +99,7 @@ function initCssCompare() {
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', (e) => {
+  document.addEventListener('mousemove', (e: MouseEvent) => {
     if (!dragging) return;
     const delta = startY - e.clientY;
     const newHeight = Math.min(400, Math.max(100, startHeight + delta));
@@ -131,7 +131,7 @@ function initCssCompare() {
 
   inspectCategoryBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
-      inspectCategoryFilter = btn.dataset.cat;
+      inspectCategoryFilter = btn.dataset.cat || 'all';
       inspectCategoryBtns.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       renderInspectDiffs();
@@ -139,7 +139,7 @@ function initCssCompare() {
   });
 
   // --- Inspect Result Handler ---
-  window.electronAPI.onCssInspectResult((data) => {
+  window.electronAPI.onCssInspectResult((data: CssInspectResultData) => {
     if (data.modeDisabled) {
       disableInspectMode();
       return;
@@ -150,7 +150,7 @@ function initCssCompare() {
     renderInspectDiffs();
   });
 
-  function renderInspectHeader(data) {
+  function renderInspectHeader(data: CssInspectResultData): void {
     if (data.error) {
       inspectHeader.innerHTML =
         '<span class="css-inspect-tag">&lt;' + escapeHtml(data.left ? data.left.tag : '?') + '&gt;</span> ' +
@@ -160,28 +160,28 @@ function initCssCompare() {
     }
     const diffCount = data.diffs ? data.diffs.filter((d) => d.type === 'changed' || d.type === 'added' || d.type === 'deleted').length : 0;
     inspectHeader.innerHTML =
-      '<span class="css-inspect-tag">&lt;' + escapeHtml(data.left.tag) + '&gt;</span> ' +
-      '<span class="css-inspect-key">' + escapeHtml(data.left.key) + '</span> ' +
-      '<span class="css-inspect-method">' + escapeHtml(data.left.method) + '</span> ' +
+      '<span class="css-inspect-tag">&lt;' + escapeHtml(data.left!.tag) + '&gt;</span> ' +
+      '<span class="css-inspect-key">' + escapeHtml(data.left!.key) + '</span> ' +
+      '<span class="css-inspect-method">' + escapeHtml(data.left!.method) + '</span> ' +
       '<span class="css-inspect-diff-count">' + diffCount + ' differences</span>';
   }
 
-  function renderInspectDiffs() {
+  function renderInspectDiffs(): void {
     if (!currentInspectData || currentInspectData.error) {
       inspectDrawerBody.innerHTML = currentInspectData && currentInspectData.error
         ? '<div class="css-inspect-empty">' + escapeHtml(currentInspectData.error) + '</div>'
-        : '<div class="css-inspect-empty"><div class="css-inspect-guide-title">CSS Inspect Mode</div><div class="css-inspect-guide-text">左パネルの要素をクリックすると、右パネルの対応する要素との CSS プロパティの差分を表示します。</div><div class="css-inspect-guide-steps"><span>1. 左パネルで要素をホバー（青枠表示）</span><span>2. クリックして選択</span><span>3. 右パネルの対応要素（オレンジ枠）と比較</span><span>4. Esc キーで終了</span></div></div>';
+        : '<div class="css-inspect-empty"><div class="css-inspect-guide-title">CSS Inspect Mode</div><div class="css-inspect-guide-text">\u5DE6\u30D1\u30CD\u30EB\u306E\u8981\u7D20\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u53F3\u30D1\u30CD\u30EB\u306E\u5BFE\u5FDC\u3059\u308B\u8981\u7D20\u3068\u306E CSS \u30D7\u30ED\u30D1\u30C6\u30A3\u306E\u5DEE\u5206\u3092\u8868\u793A\u3057\u307E\u3059\u3002</div><div class="css-inspect-guide-steps"><span>1. \u5DE6\u30D1\u30CD\u30EB\u3067\u8981\u7D20\u3092\u30DB\u30D0\u30FC\uFF08\u9752\u679A\u8868\u793A\uFF09</span><span>2. \u30AF\u30EA\u30C3\u30AF\u3057\u3066\u9078\u629E</span><span>3. \u53F3\u30D1\u30CD\u30EB\u306E\u5BFE\u5FDC\u8981\u7D20\uFF08\u30AA\u30EC\u30F3\u30B8\u679A\uFF09\u3068\u6BD4\u8F03</span><span>4. Esc \u30AD\u30FC\u3067\u7D42\u4E86</span></div></div>';
       return;
     }
 
     const data = currentInspectData;
-    let rows = [];
+    let rows: CssInspectDiff[] = [];
 
     if (inspectShowDiffOnly) {
       rows = data.diffs || [];
     } else {
       // Show all properties
-      const allProps = new Set();
+      const allProps = new Set<string>();
       if (data.left && data.left.styles) Object.keys(data.left.styles).forEach((p) => allProps.add(p));
       if (data.right && data.right.styles) Object.keys(data.right.styles).forEach((p) => allProps.add(p));
       const diffs = data.diffs || [];
@@ -235,13 +235,13 @@ function initCssCompare() {
   window.electronAPI.onShortcutCssInspect(() => toggleInspectMode());
 
   // --- Helpers ---
-  function escapeHtml(str) {
+  function escapeHtml(str: string | null | undefined): string {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  function showCssToast(message, type) {
-    const toast = document.getElementById('toast');
+  function showCssToast(message: string, type: string): void {
+    const toast = document.getElementById('toast') as HTMLElement;
     toast.textContent = message;
     toast.className = 'toast toast-' + type;
     void toast.offsetWidth;
@@ -253,7 +253,7 @@ function initCssCompare() {
   }
 
   // Simple category classification (client-side)
-  const LAYOUT_SET = new Set([
+  const LAYOUT_SET: Set<string> = new Set([
     'display', 'position', 'top', 'right', 'bottom', 'left',
     'float', 'clear', 'z-index', 'overflow', 'overflow-x', 'overflow-y',
     'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
@@ -265,13 +265,13 @@ function initCssCompare() {
     'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
     'gap', 'row-gap', 'column-gap', 'box-sizing', 'vertical-align',
   ]);
-  const TEXT_SET = new Set([
+  const TEXT_SET: Set<string> = new Set([
     'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
     'line-height', 'letter-spacing', 'word-spacing', 'text-align', 'text-decoration',
     'text-transform', 'text-indent', 'text-shadow', 'white-space', 'word-break',
     'word-wrap', 'overflow-wrap', 'color', 'direction', 'unicode-bidi', 'writing-mode',
   ]);
-  const VISUAL_SET = new Set([
+  const VISUAL_SET: Set<string> = new Set([
     'background', 'background-color', 'background-image', 'background-position',
     'background-size', 'background-repeat',
     'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
@@ -283,7 +283,7 @@ function initCssCompare() {
     'transform', 'transition', 'animation', 'cursor', 'filter', 'backdrop-filter',
   ]);
 
-  function getCategoryForProp(prop) {
+  function getCategoryForProp(prop: string): string {
     if (LAYOUT_SET.has(prop)) return 'layout';
     if (TEXT_SET.has(prop)) return 'text';
     if (VISUAL_SET.has(prop)) return 'visual';

@@ -1,5 +1,5 @@
 // CSS property category sets
-const LAYOUT_PROPS = new Set([
+const LAYOUT_PROPS: Set<string> = new Set([
   'display', 'position', 'top', 'right', 'bottom', 'left',
   'float', 'clear', 'z-index', 'overflow', 'overflow-x', 'overflow-y',
   'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
@@ -13,7 +13,7 @@ const LAYOUT_PROPS = new Set([
   'box-sizing', 'vertical-align',
 ]);
 
-const TEXT_PROPS = new Set([
+const TEXT_PROPS: Set<string> = new Set([
   'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
   'line-height', 'letter-spacing', 'word-spacing', 'text-align', 'text-decoration',
   'text-transform', 'text-indent', 'text-shadow', 'white-space', 'word-break',
@@ -21,7 +21,7 @@ const TEXT_PROPS = new Set([
   'writing-mode',
 ]);
 
-const VISUAL_PROPS = new Set([
+const VISUAL_PROPS: Set<string> = new Set([
   'background', 'background-color', 'background-image', 'background-position',
   'background-size', 'background-repeat',
   'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
@@ -34,10 +34,59 @@ const VISUAL_PROPS = new Set([
   'cursor', 'filter', 'backdrop-filter',
 ]);
 
+export interface CssElement {
+  tag: string;
+  key: string;
+  method: string;
+  styles: Record<string, string>;
+}
+
+export interface CssDiff {
+  property: string;
+  expected: string;
+  actual: string;
+  category: string;
+  type: string;
+}
+
+interface CssChangedElement {
+  tag: string;
+  key: string;
+  method: string;
+  type: string;
+  diffCount: number;
+  diffs: CssDiff[];
+}
+
+interface CssElementInfo {
+  tag: string;
+  key: string;
+  method: string;
+  type: string;
+}
+
+interface MatchResult {
+  matched: Array<{ left: CssElement; right: CssElement }>;
+  added: CssElement[];
+  deleted: CssElement[];
+}
+
+export interface CssScanResult {
+  scannedElements: number;
+  leftCount: number;
+  rightCount: number;
+  changed: CssChangedElement[];
+  added: CssElementInfo[];
+  deleted: CssElementInfo[];
+  summary: ScanSummary;
+}
+
+import { WebContentsView } from 'electron';
+
 /**
  * Classify a CSS property into a category.
  */
-function classifyProperty(prop) {
+function classifyProperty(prop: string): string {
   if (LAYOUT_PROPS.has(prop)) return 'layout';
   if (TEXT_PROPS.has(prop)) return 'text';
   if (VISUAL_PROPS.has(prop)) return 'visual';
@@ -48,7 +97,7 @@ function classifyProperty(prop) {
  * JavaScript to inject into BrowserViews to collect computed styles of all visible elements.
  * Returns an array of { tag, key, method, styles }.
  */
-const CSS_COLLECTION_SCRIPT = `(function() {
+const CSS_COLLECTION_SCRIPT: string = `(function() {
   var META_TAGS = ['SCRIPT', 'STYLE', 'META', 'LINK', 'TITLE', 'HEAD', 'BR', 'HR', 'NOSCRIPT', 'BASE'];
 
   function getDomPath(el) {
@@ -107,7 +156,7 @@ const CSS_COLLECTION_SCRIPT = `(function() {
  * JavaScript to inject into left BrowserView for inspect mode.
  * Adds hover highlights and click interception.
  */
-const CSS_INSPECT_SCRIPT = `(function() {
+const CSS_INSPECT_SCRIPT: string = `(function() {
   if (window.__twinCssInspectActive) return;
   window.__twinCssInspectActive = true;
 
@@ -220,7 +269,7 @@ const CSS_INSPECT_SCRIPT = `(function() {
   };
 })()`;
 
-const CSS_INSPECT_CLEANUP_SCRIPT = `(function() {
+const CSS_INSPECT_CLEANUP_SCRIPT: string = `(function() {
   if (typeof window.__twinCssInspectCleanup === 'function') {
     window.__twinCssInspectCleanup();
   }
@@ -229,7 +278,7 @@ const CSS_INSPECT_CLEANUP_SCRIPT = `(function() {
 /**
  * Build a script to get computed styles for a single element by its match key.
  */
-function buildGetElementStylesScript(key, method) {
+function buildGetElementStylesScript(key: string, method: string): string {
   const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   return `(function() {
     var el;
@@ -255,7 +304,7 @@ function buildGetElementStylesScript(key, method) {
 /**
  * Build a script to highlight an element in the right view with an orange border.
  */
-function buildHighlightScript(key) {
+function buildHighlightScript(key: string): string {
   const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   return `(function() {
     // Remove previous highlight
@@ -279,25 +328,25 @@ function buildHighlightScript(key) {
   })()`;
 }
 
-const CLEAR_HIGHLIGHT_SCRIPT = `(function() {
+const CLEAR_HIGHLIGHT_SCRIPT: string = `(function() {
   var prev = document.getElementById('__twin_right_highlight');
   if (prev) prev.parentNode.removeChild(prev);
 })()`;
 
-const CSS_INSPECT_PREFIX = '__twin_css__';
+const CSS_INSPECT_PREFIX: string = '__twin_css__';
 
 /**
  * Match elements between left and right by their keys.
  */
-function matchElements(leftElements, rightElements) {
-  const rightByKey = new Map();
+function matchElements(leftElements: CssElement[], rightElements: CssElement[]): MatchResult {
+  const rightByKey = new Map<string, CssElement>();
   for (const el of rightElements) {
     rightByKey.set(el.key, el);
   }
 
-  const matched = [];
-  const deleted = [];
-  const rightMatched = new Set();
+  const matched: Array<{ left: CssElement; right: CssElement }> = [];
+  const deleted: CssElement[] = [];
+  const rightMatched = new Set<string>();
 
   for (const leftEl of leftElements) {
     const rightEl = rightByKey.get(leftEl.key);
@@ -309,7 +358,7 @@ function matchElements(leftElements, rightElements) {
     }
   }
 
-  const added = [];
+  const added: CssElement[] = [];
   for (const rightEl of rightElements) {
     if (!rightMatched.has(rightEl.key)) {
       added.push(rightEl);
@@ -322,15 +371,15 @@ function matchElements(leftElements, rightElements) {
 /**
  * Compare computed styles and return only the differences.
  */
-function compareStyles(leftStyles, rightStyles) {
-  const diffs = [];
+function compareStyles(leftStyles: Record<string, string>, rightStyles: Record<string, string>): CssDiff[] {
+  const diffs: CssDiff[] = [];
   const allProps = new Set([...Object.keys(leftStyles), ...Object.keys(rightStyles)]);
 
   for (const prop of allProps) {
     const leftVal = leftStyles[prop];
     const rightVal = rightStyles[prop];
     if (leftVal !== rightVal) {
-      let type;
+      let type: string;
       if (leftVal === undefined) {
         type = 'added';
       } else if (rightVal === undefined) {
@@ -354,7 +403,7 @@ function compareStyles(leftStyles, rightStyles) {
 /**
  * Run full scan: collect styles from both views, match elements, compare styles.
  */
-async function runFullScan(leftView, rightView) {
+async function runFullScan(leftView: WebContentsView, rightView: WebContentsView): Promise<CssScanResult> {
   if (!leftView || leftView.webContents.isDestroyed()) {
     throw new Error('Left view is not available');
   }
@@ -362,14 +411,14 @@ async function runFullScan(leftView, rightView) {
     throw new Error('Right view is not available');
   }
 
-  const [leftElements, rightElements] = await Promise.all([
+  const [leftElements, rightElements]: [CssElement[], CssElement[]] = await Promise.all([
     leftView.webContents.executeJavaScript(CSS_COLLECTION_SCRIPT),
     rightView.webContents.executeJavaScript(CSS_COLLECTION_SCRIPT),
   ]);
 
   const { matched, added, deleted } = matchElements(leftElements, rightElements);
 
-  const results = [];
+  const results: CssChangedElement[] = [];
   for (const pair of matched) {
     const diffs = compareStyles(pair.left.styles, pair.right.styles);
     if (diffs.length > 0) {
@@ -406,7 +455,7 @@ async function runFullScan(leftView, rightView) {
 /**
  * Generate self-contained HTML for the scan results window.
  */
-function generateScanReportHTML(scanResult) {
+function generateScanReportHTML(scanResult: CssScanResult): string {
   const dataJson = JSON.stringify(scanResult).replace(/<\//g, '<\\/');
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -710,7 +759,7 @@ init();
 </html>`;
 }
 
-module.exports = {
+export {
   classifyProperty,
   matchElements,
   compareStyles,

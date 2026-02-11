@@ -1,6 +1,6 @@
 module.exports = [
   {
-    files: ['src/**/*.js'],
+    files: ['src/**/*.ts'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',

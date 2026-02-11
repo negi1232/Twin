@@ -3,30 +3,27 @@
  * @description Renderer 側の同期状態管理とスクロール同期スクリプトのビルダー。
  */
 
-let syncEnabled = true;
+let syncEnabled: boolean = true;
 
 /**
  * 同期が有効かどうかを返す。
- * @returns {boolean}
  */
-function isSyncEnabled() {
+function isSyncEnabled(): boolean {
   return syncEnabled;
 }
 
 /**
  * 同期の有効/無効を切り替える。
- * @returns {boolean} 切り替え後の状態
  */
-function toggleSync() {
+function toggleSync(): boolean {
   syncEnabled = !syncEnabled;
   return syncEnabled;
 }
 
 /**
  * スクロールイベントを electronAPI.syncScroll に送信する JS スクリプトを生成する。
- * @returns {string} インジェクション用の JavaScript コード
  */
-function buildScrollSyncScript() {
+function buildScrollSyncScript(): string {
   return `
     (function() {
       let ticking = false;
@@ -48,20 +45,15 @@ function buildScrollSyncScript() {
 
 /**
  * 指定座標にスクロールする JS スクリプトを生成する。
- * @param {number} scrollX - 水平スクロール位置
- * @param {number} scrollY - 垂直スクロール位置
- * @returns {string}
  */
-function buildScrollToScript(scrollX, scrollY) {
+function buildScrollToScript(scrollX: number, scrollY: number): string {
   return `window.scrollTo(${scrollX}, ${scrollY})`;
 }
 
 /**
  * URL からパス部分を抽出する。パース失敗時は "/" を返す。
- * @param {string} url - 対象の URL
- * @returns {string} パス部分
  */
-function extractPathFromUrl(url) {
+function extractPathFromUrl(url: string): string {
   try {
     return new URL(url).pathname;
   } catch {

@@ -5,10 +5,15 @@ module.exports = {
     '**/__tests__/unit/**/*.test.js',
     '**/__tests__/integration/**/*.test.js',
   ],
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  transform: {
+    '^.+\\.ts$': 'ts-jest',
+  },
   collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/main/preload.js',
+    'src/**/*.ts',
+    '!src/main/preload.ts',
     '!src/renderer/**',
+    '!src/types/**',
   ],
   coverageThreshold: {
     global: {

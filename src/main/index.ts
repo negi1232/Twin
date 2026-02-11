@@ -5,31 +5,28 @@
  * アプリケーションメニュー（キーボードショートカット）の登録を行う。
  */
 
-const { app, BrowserWindow, WebContentsView, Menu, session } = require('electron');
-const path = require('path');
-const { registerIpcHandlers } = require('./ipc-handlers');
-const { getStore } = require('./store');
+import { app, BrowserWindow, WebContentsView, Menu, session } from 'electron';
+import * as path from 'path';
+import { registerIpcHandlers } from './ipc-handlers';
+import { getStore } from './store';
+import type { SyncManager } from './sync-manager';
 
-/** @type {Electron.BrowserWindow | null} */
-let mainWindow = null;
-/** @type {Electron.WebContentsView | null} */
-let leftView = null;
-/** @type {Electron.WebContentsView | null} */
-let rightView = null;
-/** @type {number} */
-let sidebarWidth = 0;
+let mainWindow: BrowserWindow | null = null;
+let leftView: WebContentsView | null = null;
+let rightView: WebContentsView | null = null;
+let sidebarWidth: number = 0;
 
-const TOOLBAR_HEIGHT = 52;
-const STATUS_BAR_HEIGHT = 28;
-const preloadPath = path.join(__dirname, 'preload.js');
+const TOOLBAR_HEIGHT: number = 52;
+const STATUS_BAR_HEIGHT: number = 28;
+const preloadPath: string = path.join(__dirname, 'preload.js');
 
 /**
  * 左右の WebContentsView を生成し mainWindow に追加する。
  * 保存済み URL またはデフォルト URL をロードする。
  */
-function createViews() {
+function createViews(): void {
   // BrowserViews load external sites — sandbox isolates renderer processes
-  const viewPreferences = {
+  const viewPreferences: Electron.WebPreferences = {
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: true,
@@ -38,15 +35,15 @@ function createViews() {
   leftView = new WebContentsView({ webPreferences: viewPreferences });
   rightView = new WebContentsView({ webPreferences: viewPreferences });
 
-  mainWindow.contentView.addChildView(leftView);
-  mainWindow.contentView.addChildView(rightView);
+  mainWindow!.contentView.addChildView(leftView);
+  mainWindow!.contentView.addChildView(rightView);
 
   layoutViews();
 
   // Load saved URLs or defaults
   const store = getStore();
-  const leftUrl = store.get('leftUrl', 'http://localhost:3000');
-  const rightUrl = store.get('rightUrl', 'http://localhost:3001');
+  const leftUrl = store.get('leftUrl', 'http://localhost:3000') as string;
+  const rightUrl = store.get('rightUrl', 'http://localhost:3001') as string;
 
   // Reset zoom on BrowserViews to clear any cached values
   leftView.webContents.setZoomFactor(1.0);
@@ -74,7 +71,7 @@ function createViews() {
  * ウィンドウサイズに合わせて左右ビューの位置・サイズを再計算する。
  * ツールバー・ステータスバー・サイドバーの幅を考慮して配置する。
  */
-function layoutViews() {
+function layoutViews(): void {
   if (!mainWindow || !leftView || !rightView) return;
 
   const { width, height } = mainWindow.getContentBounds();
@@ -101,26 +98,23 @@ function layoutViews() {
 
 /**
  * サイドバーの幅を設定し、ビューを再レイアウトする。
- * @param {number} w - サイドバーの幅（px）
  */
-function setSidebarWidth(w) {
+function setSidebarWidth(w: number): void {
   sidebarWidth = w;
   layoutViews();
 }
 
 /**
  * 現在のサイドバー幅を返す。
- * @returns {number}
  */
-function getSidebarWidth() {
+function getSidebarWidth(): number {
   return sidebarWidth;
 }
 
 /**
  * メインウィンドウまたはいずれかのビューがフォーカスを持っているか判定する。
- * @returns {boolean}
  */
-function isAppFocused() {
+function isAppFocused(): boolean {
   if (!mainWindow) return false;
   if (mainWindow.isFocused()) return true;
   if (leftView && !leftView.webContents.isDestroyed() && leftView.webContents.isFocused()) return true;
@@ -128,13 +122,13 @@ function isAppFocused() {
   return false;
 }
 
-let blurTimeout = null;
+let blurTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * メインウィンドウを生成し、IPC ハンドラ・ショートカット・同期マネージャを初期化する。
  * フォーカス喪失時に同期を一時停止し、復帰時に再開する。
  */
-function createWindow() {
+function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -154,8 +148,8 @@ function createWindow() {
 
   // Force zoom to 1.0 — clear any cached zoom from previous sessions
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.setZoomFactor(1.0);
-    mainWindow.webContents.setZoomLevel(0);
+    mainWindow!.webContents.setZoomFactor(1.0);
+    mainWindow!.webContents.setZoomLevel(0);
   });
 
   mainWindow.on('resize', () => {
@@ -173,7 +167,7 @@ function createWindow() {
   });
 
   createViews();
-  const { syncManager } = registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth });
+  const { syncManager } = registerIpcHandlers({ mainWindow, leftView: leftView!, rightView: rightView!, setSidebarWidth, getSidebarWidth });
   registerShortcuts();
 
   // Re-inject sync script and resume sync when app regains focus
@@ -208,8 +202,8 @@ function createWindow() {
  * アプリケーションメニューを構築し、キーボードショートカットを登録する。
  * ビューのリロード、ズーム、デバイスプリセット切替、キャプチャ等に対応。
  */
-function registerShortcuts() {
-  const template = [
+function registerShortcuts(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: 'Twin',
       submenu: [
@@ -275,7 +269,7 @@ function registerShortcuts() {
           },
         },
         { type: 'separator' },
-        ...['1', '2', '3', '4', '5'].map((key) => ({
+        ...(['1', '2', '3', '4', '5'] as const).map((key) => ({
           label: `Device Preset ${key}`,
           accelerator: `CommandOrControl+${key}`,
           click: () => {
@@ -371,4 +365,4 @@ app.on('activate', () => {
   }
 });
 
-module.exports = { createWindow, layoutViews, setSidebarWidth, getSidebarWidth, isAppFocused };
+export { createWindow, layoutViews, setSidebarWidth, getSidebarWidth, isAppFocused };

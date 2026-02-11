@@ -4,33 +4,39 @@
  * URL、スナップショット保存先、比較閾値などをスキーマ付きで保存する。
  */
 
+// electron-store の require パターンを維持（ESM / CJS 両対応）
 const Store = require('electron-store').default || require('electron-store');
 
-/** @type {import('electron-store') | null} */
-let store = null;
+export interface StoreInstance {
+  get(key: string, defaultValue?: unknown): unknown;
+  set(key: string, value: unknown): void;
+}
 
-/** @type {Object} electron-store のスキーマ定義 */
+/** electron-store のインスタンス */
+let store: StoreInstance | null = null;
+
+/** electron-store のスキーマ定義 */
 const schema = {
   leftUrl: {
-    type: 'string',
+    type: 'string' as const,
     default: 'http://localhost:3000',
   },
   rightUrl: {
-    type: 'string',
+    type: 'string' as const,
     default: 'http://localhost:3001',
   },
   snapshotDir: {
-    type: 'string',
+    type: 'string' as const,
     default: './snapshots',
   },
   matchingThreshold: {
-    type: 'number',
+    type: 'number' as const,
     minimum: 0,
     maximum: 1,
     default: 0,
   },
   thresholdRate: {
-    type: 'number',
+    type: 'number' as const,
     minimum: 0,
     maximum: 1,
     default: 0,
@@ -39,41 +45,38 @@ const schema = {
 
 /**
  * Store のシングルトンインスタンスを取得する。
- * @returns {import('electron-store')}
  */
-function getStore() {
+function getStore(): StoreInstance {
   if (!store) {
-    store = new Store({ schema });
+    store = new Store({ schema }) as StoreInstance;
   }
   return store;
 }
 
 /**
  * 現在の設定をすべて取得する。
- * @returns {{leftUrl: string, rightUrl: string, snapshotDir: string, matchingThreshold: number, thresholdRate: number}}
  */
-function getSettings() {
+function getSettings(): AppSettings {
   const s = getStore();
   return {
-    leftUrl: s.get('leftUrl'),
-    rightUrl: s.get('rightUrl'),
-    snapshotDir: s.get('snapshotDir'),
-    matchingThreshold: s.get('matchingThreshold'),
-    thresholdRate: s.get('thresholdRate'),
+    leftUrl: s.get('leftUrl') as string,
+    rightUrl: s.get('rightUrl') as string,
+    snapshotDir: s.get('snapshotDir') as string,
+    matchingThreshold: s.get('matchingThreshold') as number,
+    thresholdRate: s.get('thresholdRate') as number,
   };
 }
 
 /**
  * 設定を保存する。スキーマに定義されたキーのみが保存される。
- * @param {Object} settings - 保存する設定のキーと値
  */
-function saveSettings(settings) {
+function saveSettings(settings: Partial<AppSettings>): void {
   const s = getStore();
   for (const [key, value] of Object.entries(settings)) {
-    if (schema[key] !== undefined) {
+    if (schema[key as keyof typeof schema] !== undefined) {
       s.set(key, value);
     }
   }
 }
 
-module.exports = { getStore, getSettings, saveSettings };
+export { getStore, getSettings, saveSettings };
