@@ -257,6 +257,16 @@ describe('index.js', () => {
       expect(mockToolbarWebContents.send).toHaveBeenCalledWith('shortcut-zoom-reset');
     });
 
+    test('Cmd+Shift+C fires css-scan', () => {
+      menuItemsByAccelerator['CommandOrControl+Shift+C']();
+      expect(mockToolbarWebContents.send).toHaveBeenCalledWith('shortcut-css-scan');
+    });
+
+    test('Cmd+I fires css-inspect', () => {
+      menuItemsByAccelerator['CommandOrControl+I']();
+      expect(mockToolbarWebContents.send).toHaveBeenCalledWith('shortcut-css-inspect');
+    });
+
     test('registers Menu via buildFromTemplate and setApplicationMenu', () => {
       expect(mockMenu.buildFromTemplate).toHaveBeenCalled();
       expect(mockMenu.setApplicationMenu).toHaveBeenCalled();
@@ -549,4 +559,38 @@ describe('index.js', () => {
       process.argv = originalArgv;
     });
   });
+
+  // ===== setPermissionRequestHandler callback =====
+  describe('setPermissionRequestHandler', () => {
+    test('permission request callback denies all permissions', () => {
+      jest.resetModules();
+      mainWindowListeners = {};
+      mockToolbarListeners = {};
+      mockLeftListeners = {};
+      mockRightListeners = {};
+      mockAppListeners = {};
+      mockViewIndex = 0;
+
+      const { session } = require('electron');
+      const { app } = require('electron');
+      let readyCallback;
+      app.whenReady.mockImplementation(() => ({
+        then: (cb) => { readyCallback = cb; },
+      }));
+
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+
+      require('../../src/main/index');
+      readyCallback();
+
+      const handler = session.defaultSession.setPermissionRequestHandler.mock.calls[0][0];
+      const callback = jest.fn();
+      handler(null, 'camera', callback);
+      expect(callback).toHaveBeenCalledWith(false);
+
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+  });
+
 });

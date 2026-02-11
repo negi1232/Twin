@@ -12,7 +12,7 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/main/preload.ts',
-    '!src/renderer/**',
+    '!src/renderer/scripts/app.ts',
     '!src/types/**',
   ],
   coverageThreshold: {

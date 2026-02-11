@@ -1314,6 +1314,106 @@ describe('ipc-handlers integration', () => {
     });
   });
 
+  // ===== isPathUnderBase catch path =====
+  describe('isPathUnderBase catch (realpathSync throws)', () => {
+    test('read-file-data rejects when realpathSync throws for the target path', async () => {
+      // Select folder first to set allowedBasePath
+      mockDialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/selected/folder'] });
+      await handlers['select-folder']({});
+
+      const fs = require('fs');
+      // Make realpathSync throw for a specific path (simulates non-existent path)
+      fs.realpathSync.mockImplementation((p) => {
+        if (p === '/selected/folder/nonexistent/file.png') {
+          throw new Error('ENOENT: no such file or directory');
+        }
+        return p;
+      });
+
+      await expect(
+        handlers['read-file-data']({}, { filePath: '/selected/folder/nonexistent/file.png' }),
+      ).rejects.toThrow('Access denied');
+
+      // Restore
+      fs.realpathSync.mockImplementation((p) => p);
+    });
+  });
+
+  // ===== read-file-data access denied =====
+  describe('read-file-data access denied', () => {
+    test('rejects when no folder is selected (no allowedBasePath)', async () => {
+      // Reset handlers to start fresh without allowedBasePath
+      jest.resetModules();
+      Object.keys(handlers).forEach((k) => delete handlers[k]);
+      const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
+      registerIpcHandlers({
+        mainWindow: mockMainWindow,
+        leftView: mockLeftView,
+        rightView: mockRightView,
+        setSidebarWidth: mockSetSidebarWidth,
+        getSidebarWidth: mockGetSidebarWidth,
+      });
+
+      await expect(
+        handlers['read-file-data']({}, { filePath: '/some/file.png' }),
+      ).rejects.toThrow('Access denied');
+    });
+  });
+
+  // ===== CSS inspect executeJavaScript rejection paths =====
+  describe('css-inspect executeJavaScript rejections', () => {
+    function getConsoleMessageHandler() {
+      const calls = mockLeftView.webContents.on.mock.calls.filter(
+        (call) => call[0] === 'console-message',
+      );
+      return calls.length > 1 ? calls[1][1] : calls[0][1];
+    }
+
+    test('sends error when highlight script rejects (catch → false)', async () => {
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+
+      // Make executeJavaScript reject (hits .catch(() => false) on line 433)
+      mockRightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('script error'));
+
+      mockWebContents.send.mockClear();
+      const leftData = { key: '#test', tag: 'div', method: 'id', styles: {} };
+      handler({}, 0, '__twin_css__' + JSON.stringify({ type: 'inspect-click', data: leftData }));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockWebContents.send).toHaveBeenCalledWith(
+        'css-inspect-result',
+        expect.objectContaining({
+          error: 'Matching element not found in right panel',
+        }),
+      );
+    });
+
+    test('sends error when getElementStyles script rejects (catch → null)', async () => {
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+
+      // First call: highlight succeeds. Second call: getElementStyles rejects
+      mockRightView.webContents.executeJavaScript
+        .mockResolvedValueOnce(true) // highlight succeeds
+        .mockRejectedValueOnce(new Error('script error')); // getElementStyles fails (hits .catch(() => null) on line 450)
+
+      mockWebContents.send.mockClear();
+      const leftData = { key: '#test', tag: 'div', method: 'id', styles: {} };
+      handler({}, 0, '__twin_css__' + JSON.stringify({ type: 'inspect-click', data: leftData }));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockWebContents.send).toHaveBeenCalledWith(
+        'css-inspect-result',
+        expect.objectContaining({
+          error: 'Could not retrieve styles from right panel',
+        }),
+      );
+    });
+  });
+
   // ===== css-full-scan additional edge cases =====
   describe('css-full-scan additional edge cases', () => {
     test('returns scan summary', async () => {
