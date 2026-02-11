@@ -10,11 +10,13 @@
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
     "build:mac": "npm run build:ts && electron-builder --mac",
     "build:win": "npm run build:ts && electron-builder --win",
+    "build:linux": "npm run build:ts && electron-builder --linux",
     "prepare": "husky"
   },
   "dependencies": {
