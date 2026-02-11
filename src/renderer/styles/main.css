@@ -1201,11 +1201,11 @@ body.sidebar-open .css-inspect-drawer {
 }
 
 .css-diff-row {
-  background: rgba(248, 81, 73, 0.04);
+  background: rgba(248, 81, 73, 0.10);
 }
 
 .css-diff-row:hover {
-  background: rgba(248, 81, 73, 0.08);
+  background: rgba(248, 81, 73, 0.16);
 }
 
 .css-cat-badge {
@@ -1235,4 +1235,24 @@ body.sidebar-open .css-inspect-drawer {
 .css-cat-other {
   background: rgba(139, 148, 158, 0.15);
   color: var(--text-secondary);
+}
+
+.css-inspect-guide-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.css-inspect-guide-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.css-inspect-guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary, #8b949e);
 }

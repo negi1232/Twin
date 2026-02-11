@@ -165,19 +165,28 @@
         Click an element to inspect
       </div>
       <div class="css-inspect-drawer-filters">
-        <button id="css-inspect-filter-diff" class="css-inspect-filter-btn active">Diff Only</button>
-        <button id="css-inspect-filter-all" class="css-inspect-filter-btn">All Props</button>
+        <button id="css-inspect-filter-diff" class="css-inspect-filter-btn active" title="差分があるプロパティのみ表示">Diff Only</button>
+        <button id="css-inspect-filter-all" class="css-inspect-filter-btn" title="すべてのプロパティを表示">All Props</button>
         <span class="css-inspect-filter-sep">|</span>
-        <button class="css-inspect-cat-btn active" data-cat="all">All</button>
-        <button class="css-inspect-cat-btn" data-cat="layout">Layout</button>
-        <button class="css-inspect-cat-btn" data-cat="text">Text</button>
-        <button class="css-inspect-cat-btn" data-cat="visual">Visual</button>
-        <button class="css-inspect-cat-btn" data-cat="other">Other</button>
+        <button class="css-inspect-cat-btn active" data-cat="all" title="すべてのカテゴリ">All</button>
+        <button class="css-inspect-cat-btn" data-cat="layout" title="レイアウト系 (display, position, flex, margin等)">Layout</button>
+        <button class="css-inspect-cat-btn" data-cat="text" title="テキスト系 (font, color, text-align等)">Text</button>
+        <button class="css-inspect-cat-btn" data-cat="visual" title="装飾系 (background, shadow, border-color等)">Visual</button>
+        <button class="css-inspect-cat-btn" data-cat="other" title="その他のプロパティ">Other</button>
       </div>
       <button id="css-inspect-drawer-close" class="btn btn-icon css-inspect-close">&times;</button>
     </div>
     <div id="css-inspect-drawer-body" class="css-inspect-drawer-body">
-      <div class="css-inspect-empty">Click an element to inspect</div>
+      <div class="css-inspect-empty">
+        <div class="css-inspect-guide-title">CSS Inspect Mode</div>
+        <div class="css-inspect-guide-text">左パネルの要素をクリックすると、右パネルの対応する要素との CSS プロパティの差分を表示します。</div>
+        <div class="css-inspect-guide-steps">
+          <span>1. 左パネルで要素をホバー（青枠表示）</span>
+          <span>2. クリックして選択</span>
+          <span>3. 右パネルの対応要素（オレンジ枠）と比較</span>
+          <span>4. Esc キーで終了</span>
+        </div>
+      </div>
     </div>
   </div>
 

@@ -36,6 +36,8 @@ localhost の開発サーバーでもリモート URL でも使えるため、�
 | **File Browser** | サイドバーでフォルダをツリー表示。ソート・フィルタ・キーボード操作対応 |
 | **IME Support** | 日本語入力（変換確定）を値ベースで正確に同期 |
 | **Persistent Settings** | URL・閾値・スナップショット保存先を自動保存 |
+| **CSS Full Scan** | 左右ページの全要素の CSS プロパティを自動比較し、インタラクティブなレポートを生成 |
+| **CSS Inspect Mode** | 要素を個別にクリックして CSS 差分をリアルタイムに確認 |
 
 ## Screenshots
 
@@ -137,6 +139,26 @@ npm run dev        # DevTools 付きで起動
 | フォーム入力（IME 対応） |
 | ページ遷移 |
 
+## CSS Comparison / CSS 比較
+
+### CSS Full Scan
+
+1. 左右のビューにページを表示した状態で **CSS Scan** ボタンをクリック（または `Cmd/Ctrl + Shift + C`）
+2. 全要素の computed style を自動収集・比較
+3. レポートウィンドウが開き、差分を確認:
+   - **フィルタ**: Changed / Added / Deleted で絞り込み
+   - **カテゴリ**: Layout / Text / Visual / Other でプロパティを分類
+   - **検索**: 要素名やプロパティ名で検索
+   - **エクスポート**: JSON エクスポートやクリップボードコピー
+
+### CSS Inspect Mode
+
+1. **Inspect** ボタンをクリック（または `Cmd/Ctrl + I`）
+2. 左パネルで要素をホバーすると青枠でハイライト
+3. クリックすると右パネルの対応要素（オレンジ枠）と CSS を比較
+4. 画面下部のドロワーに差分テーブルを表示
+5. `Esc` キーで終了
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -149,6 +171,8 @@ npm run dev        # DevTools 付きで起動
 | `Cmd/Ctrl + +` | ズームイン |
 | `Cmd/Ctrl + -` | ズームアウト |
 | `Cmd/Ctrl + 0` | ズームリセット (100%) |
+| `Cmd/Ctrl + Shift + C` | CSS Full Scan |
+| `Cmd/Ctrl + I` | CSS Inspect Mode ON/OFF |
 | `Cmd/Ctrl + ,` | 設定モーダルを開く |
 
 ## Settings
