@@ -1,3 +1,9 @@
+/**
+ * @module renderer/device-presets
+ * @description デバイスプリセットの定義。ビューのサイズを主要デバイスに合わせて切り替える。
+ */
+
+/** @type {Object<string, {width: number, height: number}>} デバイス名 → サイズのマップ */
 const PRESETS = {
   'iPhone SE': { width: 375, height: 667 },
   'iPhone 14 Pro': { width: 393, height: 852 },
@@ -11,6 +17,11 @@ const PRESET_LIST = Object.entries(PRESETS).map(([name, size]) => ({
   ...size,
 }));
 
+/**
+ * インデックスからプリセットを取得する。
+ * @param {number} index - プリセットのインデックス (0〜4)
+ * @returns {{name: string, width: number, height: number} | null}
+ */
 function getPresetByIndex(index) {
   if (index < 0 || index >= PRESET_LIST.length) {
     return null;

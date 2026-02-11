@@ -1,7 +1,15 @@
+/**
+ * @module main/store
+ * @description electron-store を使ったアプリ設定の永続化管理。
+ * URL、スナップショット保存先、比較閾値などをスキーマ付きで保存する。
+ */
+
 const Store = require('electron-store').default || require('electron-store');
 
+/** @type {import('electron-store') | null} */
 let store = null;
 
+/** @type {Object} electron-store のスキーマ定義 */
 const schema = {
   leftUrl: {
     type: 'string',
@@ -29,6 +37,10 @@ const schema = {
   },
 };
 
+/**
+ * Store のシングルトンインスタンスを取得する。
+ * @returns {import('electron-store')}
+ */
 function getStore() {
   if (!store) {
     store = new Store({ schema });
@@ -36,6 +48,10 @@ function getStore() {
   return store;
 }
 
+/**
+ * 現在の設定をすべて取得する。
+ * @returns {{leftUrl: string, rightUrl: string, snapshotDir: string, matchingThreshold: number, thresholdRate: number}}
+ */
 function getSettings() {
   const s = getStore();
   return {
@@ -47,6 +63,10 @@ function getSettings() {
   };
 }
 
+/**
+ * 設定を保存する。スキーマに定義されたキーのみが保存される。
+ * @param {Object} settings - 保存する設定のキーと値
+ */
 function saveSettings(settings) {
   const s = getStore();
   for (const [key, value] of Object.entries(settings)) {

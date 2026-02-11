@@ -1,3 +1,10 @@
+/**
+ * @module main/ipc-handlers
+ * @description Renderer プロセスからの IPC メッセージを処理するハンドラ群。
+ * キャプチャ・比較、レポート表示、ナビゲーション、設定、同期、ズーム、
+ * サイドバー操作（フォルダ選択・ディレクトリ読み取り・ファイルプレビュー）を提供する。
+ */
+
 const { ipcMain, BrowserWindow, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -7,8 +14,14 @@ const { getSettings, saveSettings, getStore } = require('./store');
 const { createSyncManager } = require('./sync-manager');
 const { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM } = require('../shared/constants');
 
+/** @type {string[]} ナビゲーションで許可する URL スキーム */
 const ALLOWED_URL_SCHEMES = ['http:', 'https:'];
 
+/**
+ * URL が許可されたスキーム（http/https）かどうか検証する。
+ * @param {string} url - 検証対象の URL
+ * @returns {boolean}
+ */
 function isAllowedUrl(url) {
   try {
     const parsed = new URL(url);
@@ -18,6 +31,12 @@ function isAllowedUrl(url) {
   }
 }
 
+/**
+ * targetPath が basePath 配下にあるか（パストラバーサル防止）を検証する。
+ * @param {string} targetPath - 検証対象のパス
+ * @param {string} basePath - 許可されたベースディレクトリ
+ * @returns {boolean}
+ */
 function isPathUnderBase(targetPath, basePath) {
   try {
     const resolved = fs.realpathSync(targetPath);
@@ -28,6 +47,16 @@ function isPathUnderBase(targetPath, basePath) {
   }
 }
 
+/**
+ * すべての IPC ハンドラを登録し、SyncManager を初期化して返す。
+ * @param {Object} options
+ * @param {Electron.BrowserWindow} options.mainWindow - メインウィンドウ
+ * @param {Electron.WebContentsView} options.leftView - 左側ビュー（Expected）
+ * @param {Electron.WebContentsView} options.rightView - 右側ビュー（Actual）
+ * @param {(w: number) => void} options.setSidebarWidth - サイドバー幅設定関数
+ * @param {() => number} options.getSidebarWidth - サイドバー幅取得関数
+ * @returns {{ syncManager: SyncManager }}
+ */
 function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }) {
   // --- Sync Manager ---
   const syncManager = createSyncManager(leftView, rightView);

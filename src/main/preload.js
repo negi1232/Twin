@@ -1,3 +1,12 @@
+/**
+ * @module main/preload
+ * @description Renderer プロセスに公開する IPC API を contextBridge 経由で定義する。
+ * nodeIntegration: false 環境で安全に Main プロセスと通信するための唯一のインタフェース。
+ *
+ * 公開 API は window.electronAPI として Renderer からアクセスされる。
+ * invoke 系メソッド（リクエスト/レスポンス）と on 系メソッド（Main → Renderer 通知）で構成。
+ */
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {

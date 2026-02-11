@@ -1,17 +1,32 @@
+/**
+ * @module main/index
+ * @description Electron メインプロセスのエントリーポイント。
+ * BrowserWindow の生成、左右 WebContentsView のレイアウト管理、
+ * アプリケーションメニュー（キーボードショートカット）の登録を行う。
+ */
+
 const { app, BrowserWindow, WebContentsView, Menu, session } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./ipc-handlers');
 const { getStore } = require('./store');
 
+/** @type {Electron.BrowserWindow | null} */
 let mainWindow = null;
+/** @type {Electron.WebContentsView | null} */
 let leftView = null;
+/** @type {Electron.WebContentsView | null} */
 let rightView = null;
+/** @type {number} */
 let sidebarWidth = 0;
 
 const TOOLBAR_HEIGHT = 52;
 const STATUS_BAR_HEIGHT = 28;
 const preloadPath = path.join(__dirname, 'preload.js');
 
+/**
+ * 左右の WebContentsView を生成し mainWindow に追加する。
+ * 保存済み URL またはデフォルト URL をロードする。
+ */
 function createViews() {
   // BrowserViews load external sites — sandbox isolates renderer processes
   const viewPreferences = {
@@ -55,6 +70,10 @@ function createViews() {
   });
 }
 
+/**
+ * ウィンドウサイズに合わせて左右ビューの位置・サイズを再計算する。
+ * ツールバー・ステータスバー・サイドバーの幅を考慮して配置する。
+ */
 function layoutViews() {
   if (!mainWindow || !leftView || !rightView) return;
 
@@ -80,15 +99,27 @@ function layoutViews() {
   });
 }
 
+/**
+ * サイドバーの幅を設定し、ビューを再レイアウトする。
+ * @param {number} w - サイドバーの幅（px）
+ */
 function setSidebarWidth(w) {
   sidebarWidth = w;
   layoutViews();
 }
 
+/**
+ * 現在のサイドバー幅を返す。
+ * @returns {number}
+ */
 function getSidebarWidth() {
   return sidebarWidth;
 }
 
+/**
+ * メインウィンドウまたはいずれかのビューがフォーカスを持っているか判定する。
+ * @returns {boolean}
+ */
 function isAppFocused() {
   if (!mainWindow) return false;
   if (mainWindow.isFocused()) return true;
@@ -99,6 +130,10 @@ function isAppFocused() {
 
 let blurTimeout = null;
 
+/**
+ * メインウィンドウを生成し、IPC ハンドラ・ショートカット・同期マネージャを初期化する。
+ * フォーカス喪失時に同期を一時停止し、復帰時に再開する。
+ */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -169,6 +204,10 @@ function createWindow() {
   }
 }
 
+/**
+ * アプリケーションメニューを構築し、キーボードショートカットを登録する。
+ * ビューのリロード、ズーム、デバイスプリセット切替、キャプチャ等に対応。
+ */
 function registerShortcuts() {
   const template = [
     {
