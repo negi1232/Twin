@@ -230,7 +230,7 @@ const CSS_INSPECT_CLEANUP_SCRIPT = `(function() {
  * Build a script to get computed styles for a single element by its match key.
  */
 function buildGetElementStylesScript(key, method) {
-  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   return `(function() {
     var el;
     try {
@@ -256,7 +256,7 @@ function buildGetElementStylesScript(key, method) {
  * Build a script to highlight an element in the right view with an orange border.
  */
 function buildHighlightScript(key) {
-  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   return `(function() {
     // Remove previous highlight
     var prev = document.getElementById('__twin_right_highlight');
@@ -407,7 +407,7 @@ async function runFullScan(leftView, rightView) {
  * Generate self-contained HTML for the scan results window.
  */
 function generateScanReportHTML(scanResult) {
-  const dataJson = JSON.stringify(scanResult);
+  const dataJson = JSON.stringify(scanResult).replace(/<\//g, '<\\/');
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
