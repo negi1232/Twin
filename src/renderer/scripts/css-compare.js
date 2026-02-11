@@ -170,7 +170,7 @@ function initCssCompare() {
     if (!currentInspectData || currentInspectData.error) {
       inspectDrawerBody.innerHTML = currentInspectData && currentInspectData.error
         ? '<div class="css-inspect-empty">' + escapeHtml(currentInspectData.error) + '</div>'
-        : '<div class="css-inspect-empty">Click an element to inspect</div>';
+        : '<div class="css-inspect-empty"><div class="css-inspect-guide-title">CSS Inspect Mode</div><div class="css-inspect-guide-text">左パネルの要素をクリックすると、右パネルの対応する要素との CSS プロパティの差分を表示します。</div><div class="css-inspect-guide-steps"><span>1. 左パネルで要素をホバー（青枠表示）</span><span>2. クリックして選択</span><span>3. 右パネルの対応要素（オレンジ枠）と比較</span><span>4. Esc キーで終了</span></div></div>';
       return;
     }
 
@@ -211,7 +211,7 @@ function initCssCompare() {
     }
 
     let html = '<table class="css-inspect-table"><thead><tr>' +
-      '<th>Property</th><th>Category</th><th>Expected</th><th>Actual</th><th></th>' +
+      '<th>Property</th><th>Category</th><th>Left (Expected)</th><th>Right (Actual)</th><th></th>' +
       '</tr></thead><tbody>';
 
     for (const row of rows) {

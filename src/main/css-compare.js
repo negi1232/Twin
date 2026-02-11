@@ -522,11 +522,21 @@ td.actual { color: var(--status-failed); }
 .cat-text { background: rgba(63,185,80,0.15); color: var(--status-passed); }
 .cat-visual { background: rgba(210,153,34,0.15); color: var(--status-new); }
 .cat-other { background: rgba(139,148,158,0.15); color: var(--text-secondary); }
+.diff-row { background: rgba(248,81,73,0.10); }
+.diff-value { font-weight: 700; }
 .empty-state { text-align: center; padding: 40px; color: var(--text-secondary); font-size: 14px; }
+.description { margin-bottom: 16px; padding: 12px 16px; background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.description p { margin-bottom: 6px; }
+.description .legend { font-size: 12px; }
+.description .legend span { margin-right: 12px; }
+.description .legend .changed-label { color: var(--status-failed); }
+.description .legend .added-label { color: var(--status-new); }
+.description .legend .deleted-label { color: var(--status-deleted); }
 </style>
 </head>
 <body>
 <h1>CSS Scan Report</h1>
+<div class="description"><p>\u5DE6\u53F3\u306E\u30D6\u30E9\u30A6\u30B6\u30D3\u30E5\u30FC\u306B\u8868\u793A\u3057\u305F\u30DA\u30FC\u30B8\u306E CSS \u30D7\u30ED\u30D1\u30C6\u30A3\u3092\u6BD4\u8F03\u3057\u305F\u7D50\u679C\u3067\u3059\u3002</p><p class="legend"><span class="changed-label">Changed</span> = \u30B9\u30BF\u30A4\u30EB\u304C\u7570\u306A\u308B\u8981\u7D20\u3000<span class="added-label">Added</span> = \u53F3\u30D3\u30E5\u30FC\u306E\u307F\u306E\u8981\u7D20\u3000<span class="deleted-label">Deleted</span> = \u5DE6\u30D3\u30E5\u30FC\u306E\u307F\u306E\u8981\u7D20</p></div>
 <div id="summary" class="summary"></div>
 <div id="filters" class="filters"></div>
 <div id="results"></div>
@@ -557,18 +567,18 @@ function renderFilters() {
   document.getElementById('filters').innerHTML =
     '<div class="filter-group">' +
       '<span class="filter-label">Type</span>' +
-      '<button class="filter-btn' + (activeTypeFilter === 'all' ? ' active' : '') + '" data-type="all">All</button>' +
-      '<button class="filter-btn' + (activeTypeFilter === 'changed' ? ' active' : '') + '" data-type="changed">Changed</button>' +
-      '<button class="filter-btn' + (activeTypeFilter === 'added' ? ' active' : '') + '" data-type="added">Added</button>' +
-      '<button class="filter-btn' + (activeTypeFilter === 'deleted' ? ' active' : '') + '" data-type="deleted">Deleted</button>' +
+      '<button class="filter-btn' + (activeTypeFilter === 'all' ? ' active' : '') + '" data-type="all" title="\u3059\u3079\u3066\u306E\u8981\u7D20\u3092\u8868\u793A">All</button>' +
+      '<button class="filter-btn' + (activeTypeFilter === 'changed' ? ' active' : '') + '" data-type="changed" title="\u30B9\u30BF\u30A4\u30EB\u304C\u7570\u306A\u308B\u8981\u7D20\u306E\u307F">Changed</button>' +
+      '<button class="filter-btn' + (activeTypeFilter === 'added' ? ' active' : '') + '" data-type="added" title="\u53F3\u30D3\u30E5\u30FC\u306E\u307F\u306E\u8981\u7D20">Added</button>' +
+      '<button class="filter-btn' + (activeTypeFilter === 'deleted' ? ' active' : '') + '" data-type="deleted" title="\u5DE6\u30D3\u30E5\u30FC\u306E\u307F\u306E\u8981\u7D20">Deleted</button>' +
     '</div>' +
     '<div class="filter-group">' +
       '<span class="filter-label">Category</span>' +
-      '<button class="filter-btn' + (activeCategoryFilter === 'all' ? ' active' : '') + '" data-cat="all">All</button>' +
-      '<button class="filter-btn' + (activeCategoryFilter === 'layout' ? ' active' : '') + '" data-cat="layout">Layout</button>' +
-      '<button class="filter-btn' + (activeCategoryFilter === 'text' ? ' active' : '') + '" data-cat="text">Text</button>' +
-      '<button class="filter-btn' + (activeCategoryFilter === 'visual' ? ' active' : '') + '" data-cat="visual">Visual</button>' +
-      '<button class="filter-btn' + (activeCategoryFilter === 'other' ? ' active' : '') + '" data-cat="other">Other</button>' +
+      '<button class="filter-btn' + (activeCategoryFilter === 'all' ? ' active' : '') + '" data-cat="all" title="\u3059\u3079\u3066\u306E\u30D7\u30ED\u30D1\u30C6\u30A3">All</button>' +
+      '<button class="filter-btn' + (activeCategoryFilter === 'layout' ? ' active' : '') + '" data-cat="layout" title="\u30EC\u30A4\u30A2\u30A6\u30C8\u7CFB (display, position, flex\u7B49)">Layout</button>' +
+      '<button class="filter-btn' + (activeCategoryFilter === 'text' ? ' active' : '') + '" data-cat="text" title="\u30C6\u30AD\u30B9\u30C8\u7CFB (font, color\u7B49)">Text</button>' +
+      '<button class="filter-btn' + (activeCategoryFilter === 'visual' ? ' active' : '') + '" data-cat="visual" title="\u88C5\u98FE\u7CFB (background, shadow\u7B49)">Visual</button>' +
+      '<button class="filter-btn' + (activeCategoryFilter === 'other' ? ' active' : '') + '" data-cat="other" title="\u305D\u306E\u4ED6">Other</button>' +
     '</div>' +
     '<input class="search-input" id="search" placeholder="Search element or property..." value="' + escapeHtml(searchQuery) + '" />' +
     '<div class="actions">' +
@@ -622,7 +632,12 @@ function renderResults() {
   }
 
   if (items.length === 0) {
-    container.innerHTML = '<div class="empty-state">No differences found</div>';
+    var totalDiffs = data.changed.length + data.added.length + data.deleted.length;
+    if (totalDiffs === 0) {
+      container.innerHTML = '<div class="empty-state">\u5DEE\u5206\u306F\u3042\u308A\u307E\u305B\u3093 \u2014 \u4E21\u30DA\u30FC\u30B8\u306E CSS \u306F\u4E00\u81F4\u3057\u3066\u3044\u307E\u3059 \uD83C\uDF89</div>';
+    } else {
+      container.innerHTML = '<div class="empty-state">No differences found for the current filters</div>';
+    }
     return;
   }
 
@@ -643,13 +658,13 @@ function renderResults() {
 
     if (item.type === 'changed' && diffs.length > 0) {
       html += '<div class="card-body" id="body-' + idx + '">';
-      html += '<table><thead><tr><th>Property</th><th>Category</th><th>Expected</th><th>Actual</th></tr></thead><tbody>';
+      html += '<table><thead><tr><th>Property</th><th>Category</th><th>Left (Expected)</th><th>Right (Actual)</th></tr></thead><tbody>';
       diffs.forEach(function(d) {
-        html += '<tr>';
+        html += '<tr class="diff-row">';
         html += '<td class="prop">' + escapeHtml(d.property) + '</td>';
         html += '<td><span class="cat-badge cat-' + d.category + '">' + d.category + '</span></td>';
-        html += '<td class="expected">' + escapeHtml(d.expected) + '</td>';
-        html += '<td class="actual">' + escapeHtml(d.actual) + '</td>';
+        html += '<td class="expected diff-value">' + escapeHtml(d.expected) + '</td>';
+        html += '<td class="actual diff-value">' + escapeHtml(d.actual) + '</td>';
         html += '</tr>';
       });
       html += '</tbody></table></div>';
