@@ -74,11 +74,11 @@ async function navigateToDemoServers(page) {
 // ── テスト ──
 
 test.describe('アプリ起動', () => {
-  test('ウィンドウタイトルが「Twin - Visual Regression Testing」で表示される', async () => {
+  test('ウィンドウタイトルが「Twin - CSS Comparison Tool」で表示される', async () => {
     const { app, page } = await launchApp();
     try {
       const title = await page.title();
-      expect(title).toBe('Twin - Visual Regression Testing');
+      expect(title).toBe('Twin - CSS Comparison Tool');
     } finally {
       await app.close();
     }

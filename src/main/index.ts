@@ -133,7 +133,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: 'Twin - Visual Regression Testing',
+    title: 'Twin - CSS Comparison Tool',
     icon: path.join(__dirname, '..', '..', 'build', 'icon.png'),
     webPreferences: {
       preload: preloadPath,
