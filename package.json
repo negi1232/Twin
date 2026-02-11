@@ -1,7 +1,7 @@
 {
   "name": "twin",
   "version": "1.12.0",
-  "description": "Visual Regression Testing Desktop App - Compare Git branches side by side",
+  "description": "CSS Comparison Tool - Compare Computed Styles across two localhost views in real time",
   "main": "dist/main/index.js",
   "scripts": {
     "build:ts": "tsc && cp src/renderer/index.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/",
