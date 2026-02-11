@@ -1,3 +1,12 @@
+/**
+ * @module main/preload
+ * @description Renderer プロセスに公開する IPC API を contextBridge 経由で定義する。
+ * nodeIntegration: false 環境で安全に Main プロセスと通信するための唯一のインタフェース。
+ *
+ * 公開 API は window.electronAPI として Renderer からアクセスされる。
+ * invoke 系メソッド（リクエスト/レスポンス）と on 系メソッド（Main → Renderer 通知）で構成。
+ */
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -28,4 +37,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onShortcutZoomIn: (cb) => ipcRenderer.on('shortcut-zoom-in', () => cb()),
   onShortcutZoomOut: (cb) => ipcRenderer.on('shortcut-zoom-out', () => cb()),
   onShortcutZoomReset: (cb) => ipcRenderer.on('shortcut-zoom-reset', () => cb()),
+  // CSS comparison
+  cssFullScan: () => ipcRenderer.invoke('css-full-scan'),
+  cssInspectToggle: (payload) => ipcRenderer.invoke('css-inspect-toggle', payload),
+  cssExportJson: (payload) => ipcRenderer.invoke('css-export-json', payload),
+  onCssInspectResult: (cb) => ipcRenderer.on('css-inspect-result', (_event, data) => cb(data)),
+  onShortcutCssScan: (cb) => ipcRenderer.on('shortcut-css-scan', () => cb()),
+  onShortcutCssInspect: (cb) => ipcRenderer.on('shortcut-css-inspect', () => cb()),
 });

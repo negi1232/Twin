@@ -1,7 +1,22 @@
+/**
+ * @module main/reg-runner
+ * @description reg-cli を子プロセスとして実行し、画像差分の比較結果を取得する。
+ * actual / expected ディレクトリのスクリーンショットを比較し、
+ * HTML レポートと JSON サマリを生成する。
+ */
+
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs/promises');
 
+/**
+ * reg-cli を実行して画像比較を行い、結果を返す。
+ * @param {string} snapshotDir - actual / expected / diff を含むベースディレクトリ
+ * @param {Object} [options={}] - 比較オプション
+ * @param {number} [options.matchingThreshold] - ピクセル差分の感度 (0〜1)
+ * @param {number} [options.thresholdRate] - 変更検知率のしきい値 (0〜1)
+ * @returns {Promise<{summary: {passed: number, failed: number, new: number, deleted: number}, reportPath: string, jsonPath: string, raw: Object}>}
+ */
 function runRegCli(snapshotDir, options = {}) {
   return new Promise((resolve, reject) => {
     const actualDir = path.join(snapshotDir, 'actual');

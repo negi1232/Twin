@@ -1,3 +1,10 @@
+/**
+ * @module main/ipc-handlers
+ * @description Renderer プロセスからの IPC メッセージを処理するハンドラ群。
+ * キャプチャ・比較、レポート表示、ナビゲーション、設定、同期、ズーム、
+ * サイドバー操作（フォルダ選択・ディレクトリ読み取り・ファイルプレビュー）を提供する。
+ */
+
 const { ipcMain, BrowserWindow, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -6,9 +13,27 @@ const { runRegCli } = require('./reg-runner');
 const { getSettings, saveSettings, getStore } = require('./store');
 const { createSyncManager } = require('./sync-manager');
 const { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM } = require('../shared/constants');
+const {
+  runFullScan,
+  generateScanReportHTML,
+  buildGetElementStylesScript,
+  buildHighlightScript,
+  compareStyles,
+  classifyProperty,
+  CSS_INSPECT_SCRIPT,
+  CSS_INSPECT_CLEANUP_SCRIPT,
+  CSS_INSPECT_PREFIX,
+  CLEAR_HIGHLIGHT_SCRIPT,
+} = require('./css-compare');
 
+/** @type {string[]} ナビゲーションで許可する URL スキーム */
 const ALLOWED_URL_SCHEMES = ['http:', 'https:'];
 
+/**
+ * URL が許可されたスキーム（http/https）かどうか検証する。
+ * @param {string} url - 検証対象の URL
+ * @returns {boolean}
+ */
 function isAllowedUrl(url) {
   try {
     const parsed = new URL(url);
@@ -18,6 +43,12 @@ function isAllowedUrl(url) {
   }
 }
 
+/**
+ * targetPath が basePath 配下にあるか（パストラバーサル防止）を検証する。
+ * @param {string} targetPath - 検証対象のパス
+ * @param {string} basePath - 許可されたベースディレクトリ
+ * @returns {boolean}
+ */
 function isPathUnderBase(targetPath, basePath) {
   try {
     const resolved = fs.realpathSync(targetPath);
@@ -28,6 +59,16 @@ function isPathUnderBase(targetPath, basePath) {
   }
 }
 
+/**
+ * すべての IPC ハンドラを登録し、SyncManager を初期化して返す。
+ * @param {Object} options
+ * @param {Electron.BrowserWindow} options.mainWindow - メインウィンドウ
+ * @param {Electron.WebContentsView} options.leftView - 左側ビュー（Expected）
+ * @param {Electron.WebContentsView} options.rightView - 右側ビュー（Actual）
+ * @param {(w: number) => void} options.setSidebarWidth - サイドバー幅設定関数
+ * @param {() => number} options.getSidebarWidth - サイドバー幅取得関数
+ * @returns {{ syncManager: SyncManager }}
+ */
 function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }) {
   // --- Sync Manager ---
   const syncManager = createSyncManager(leftView, rightView);
@@ -277,6 +318,173 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   ipcMain.handle('get-zoom', () => {
     return { zoom: currentZoom };
   });
+
+  // --- CSS Comparison ---
+  let cssInspectActive = false;
+  let lastScanResult = null;
+
+  // CSS Full Scan: collect styles from both views, compare, open result window
+  ipcMain.handle('css-full-scan', async () => {
+    const scanResult = await runFullScan(leftView, rightView);
+    lastScanResult = scanResult;
+
+    // Open result in a new window
+    const html = generateScanReportHTML(scanResult);
+    const reportWindow = new BrowserWindow({
+      width: 1000,
+      height: 700,
+      title: 'Twin - CSS Scan Report',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    reportWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+
+    return scanResult.summary;
+  });
+
+  // CSS Inspect Toggle: start/stop inspect mode on left view
+  ipcMain.handle('css-inspect-toggle', async (_event, { enabled }) => {
+    cssInspectActive = !!enabled;
+
+    if (cssInspectActive) {
+      // Inject inspect script into left view
+      if (leftView && !leftView.webContents.isDestroyed()) {
+        await leftView.webContents.executeJavaScript(CSS_INSPECT_SCRIPT).catch(() => {});
+      }
+    } else {
+      // Cleanup inspect mode from left view
+      if (leftView && !leftView.webContents.isDestroyed()) {
+        await leftView.webContents.executeJavaScript(CSS_INSPECT_CLEANUP_SCRIPT).catch(() => {});
+      }
+      // Clear right view highlight
+      if (rightView && !rightView.webContents.isDestroyed()) {
+        await rightView.webContents.executeJavaScript(CLEAR_HIGHLIGHT_SCRIPT).catch(() => {});
+      }
+    }
+
+    return { enabled: cssInspectActive };
+  });
+
+  // CSS Export JSON: export last scan result
+  ipcMain.handle('css-export-json', async () => {
+    if (!lastScanResult) {
+      throw new Error('No scan result to export. Run a CSS scan first.');
+    }
+    if (!mainWindow) return null;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: 'css-scan-report.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    await fs.promises.writeFile(result.filePath, JSON.stringify(lastScanResult, null, 2), 'utf-8');
+    return { filePath: result.filePath };
+  });
+
+  // Handle CSS inspect messages from left view console.log
+  function handleCssInspectMessage(_event, _level, message) {
+    if (!cssInspectActive) return;
+    if (!message.startsWith(CSS_INSPECT_PREFIX)) return;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(message.slice(CSS_INSPECT_PREFIX.length));
+    } catch {
+      return;
+    }
+
+    if (parsed.type === 'inspect-click') {
+      handleInspectClick(parsed.data);
+    }
+  }
+
+  async function handleInspectClick(leftData) {
+    if (!rightView || rightView.webContents.isDestroyed()) {
+      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('css-inspect-result', {
+          left: leftData,
+          right: null,
+          diffs: [],
+          error: 'Right view is not available',
+        });
+      }
+      return;
+    }
+
+    // Highlight matching element in right view
+    const highlighted = await rightView.webContents.executeJavaScript(
+      buildHighlightScript(leftData.key)
+    ).catch(() => false);
+
+    if (!highlighted) {
+      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('css-inspect-result', {
+          left: leftData,
+          right: null,
+          diffs: [],
+          error: 'Matching element not found in right panel',
+        });
+      }
+      return;
+    }
+
+    // Get right element styles
+    const rightData = await rightView.webContents.executeJavaScript(
+      buildGetElementStylesScript(leftData.key, leftData.method)
+    ).catch(() => null);
+
+    if (!rightData) {
+      if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('css-inspect-result', {
+          left: leftData,
+          right: null,
+          diffs: [],
+          error: 'Could not retrieve styles from right panel',
+        });
+      }
+      return;
+    }
+
+    const diffs = compareStyles(leftData.styles, rightData.styles);
+    // Add category to each diff
+    const diffsWithCategory = diffs.map((d) => ({
+      ...d,
+      category: d.category || classifyProperty(d.property),
+    }));
+
+    if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send('css-inspect-result', {
+        left: leftData,
+        right: { tag: rightData.tag, key: leftData.key, method: leftData.method, styles: rightData.styles },
+        diffs: diffsWithCategory,
+        error: null,
+      });
+    }
+  }
+
+  if (leftView && !leftView.webContents.isDestroyed()) {
+    leftView.webContents.on('console-message', handleCssInspectMessage);
+  }
+
+  // Auto-disable inspect mode on left view navigation
+  if (leftView && !leftView.webContents.isDestroyed()) {
+    leftView.webContents.on('did-navigate', () => {
+      if (cssInspectActive) {
+        cssInspectActive = false;
+        if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+          mainWindow.webContents.send('css-inspect-result', {
+            left: null,
+            right: null,
+            diffs: [],
+            error: null,
+            modeDisabled: true,
+          });
+        }
+      }
+    });
+  }
 
   // Navigation sync (left → right)
   if (leftView) {

@@ -1,3 +1,14 @@
+/**
+ * @module renderer/ui-controls
+ * @description ツールバー、モーダル、サイドバー、ズームなどの UI イベントハンドラ。
+ * electronAPI を通じて Main プロセスと通信し、キャプチャ・レポート表示・
+ * デバイスプリセット切替・設定管理・ファイルブラウザ・プレビューを提供する。
+ */
+
+/**
+ * すべての UI コントロールのイベントリスナーを初期化する。
+ * DOMContentLoaded 後に呼ばれることを想定。
+ */
 function initUIControls() {
   const leftUrlInput = document.getElementById('left-url');
   const rightUrlInput = document.getElementById('right-url');

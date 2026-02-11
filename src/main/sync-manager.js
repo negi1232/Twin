@@ -1,7 +1,22 @@
+/**
+ * @module main/sync-manager
+ * @description 左ビュー（Expected）のユーザー操作を右ビュー（Actual）にリアルタイム同期する。
+ * 左ビューにインジェクションスクリプトを挿入し、console-message 経由でイベントを受信、
+ * 右ビューに executeJavaScript / sendInputEvent で再現する。
+ *
+ * 同期対象: スクロール、要素レベルスクロール、ホバー、クリック、
+ * フォーム入力（IME 対応）、キーボード入力、ページ内ナビゲーション。
+ */
+
+/** @type {string} 同期メッセージの識別プレフィックス */
 const SYNC_PREFIX = '__twin_sync__';
 
-// Escape a string for safe embedding inside a template-literal single-quoted JS string.
-// Handles: backslash, single quote, newlines, backtick, and ${.
+/**
+ * 文字列を JS テンプレートリテラル内に安全に埋め込むためにエスケープする。
+ * バックスラッシュ、シングルクォート、バッククォート、$、改行を処理する。
+ * @param {string} str - エスケープ対象の文字列
+ * @returns {string} エスケープ済み文字列
+ */
 function escapeForScript(str) {
   return str
     .replace(/\\/g, '\\\\')
@@ -12,7 +27,12 @@ function escapeForScript(str) {
     .replace(/\r/g, '\\r');
 }
 
-// JavaScript injected into left BrowserView to capture user events
+/**
+ * 左ビューにインジェクトされる JavaScript。
+ * スクロール・ホバー・クリック・入力・キー操作を検知し、
+ * console.log 経由で SYNC_PREFIX 付きの JSON メッセージとして送信する。
+ * @type {string}
+ */
 const INJECTION_SCRIPT = `
 (function() {
   if (window.__twinSyncInjected) return;
@@ -154,6 +174,12 @@ const INJECTION_SCRIPT = `
 })();
 `;
 
+/**
+ * SyncManager を生成する。左ビューの操作イベントを右ビューに同期する。
+ * @param {Electron.WebContentsView} leftView - Expected 側ビュー
+ * @param {Electron.WebContentsView} rightView - Actual 側ビュー
+ * @returns {SyncManager} 同期制御オブジェクト
+ */
 function createSyncManager(leftView, rightView) {
   let enabled = true;
   let paused = false;

@@ -1363,4 +1363,482 @@ describe('ui-controls', () => {
       expect(document.getElementById('status-result').textContent).toBe('Error: Network error');
     });
   });
+
+  // ===== Modal Interaction Combinations (組み合わせテスト) =====
+  describe('Modal interaction combinations', () => {
+    test('opening settings modal then closing restores views before opening new report modal', async () => {
+      init();
+      await flush();
+      document.getElementById('settings-btn').click();
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
+      document.getElementById('settings-cancel').click();
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+      api.setViewsVisible.mockClear();
+      document.getElementById('new-report-btn').click();
+      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
+    });
+
+    test('settings save then open new report maintains correct view visibility', async () => {
+      init();
+      await flush();
+      document.getElementById('settings-btn').click();
+      document.getElementById('settings-save').click();
+      api.setViewsVisible.mockClear();
+      document.getElementById('new-report-btn').click();
+      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
+      document.getElementById('new-report-cancel').click();
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
+    test('preview modal + Escape key closes preview only', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue([
+        { name: 'img.png', isDirectory: false, path: '/test/img.png' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      document.querySelector('.tree-item').click();
+      await flush();
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
+    });
+
+    test('new report modal + sidebar open maintains view state correctly', async () => {
+      init();
+      await flush();
+      document.getElementById('toggle-sidebar').click();
+      expect(document.body.classList.contains('sidebar-open')).toBe(true);
+      document.getElementById('new-report-btn').click();
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
+      api.setViewsVisible.mockClear();
+      document.getElementById('new-report-cancel').click();
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+      expect(document.body.classList.contains('sidebar-open')).toBe(true);
+    });
+
+    test('capture during new report modal flow closes modal and performs capture', async () => {
+      init();
+      await flush();
+      document.getElementById('new-report-btn').click();
+      document.getElementById('report-test-name').value = 'my-test';
+      document.getElementById('new-report-capture').click();
+      await flush();
+      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(true);
+      expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'my-test' });
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
+    test('settings modal loads and displays current settings values', async () => {
+      api.getSettings.mockResolvedValue({
+        leftUrl: 'http://test.com',
+        rightUrl: 'http://test2.com',
+        matchingThreshold: 0.3,
+        thresholdRate: 0.2,
+        snapshotDir: '/custom/path',
+      });
+      init();
+      await flush();
+      document.getElementById('settings-btn').click();
+      await flush();
+      expect(document.getElementById('setting-matching-threshold').value).toBe('0.3');
+      expect(document.getElementById('setting-threshold-rate').value).toBe('0.2');
+      expect(document.getElementById('setting-snapshot-dir').value).toBe('/custom/path');
+    });
+
+    test('rapid open/close of settings modal maintains consistent state', async () => {
+      init();
+      await flush();
+      document.getElementById('settings-btn').click();
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('settings-cancel').click();
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
+      document.getElementById('settings-btn').click();
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('settings-cancel').click();
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
+    });
+
+    test('capture result updates sidebar tree when folder is open', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue([
+        { name: 'file.png', isDirectory: false, path: '/test/file.png' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      expect(document.querySelectorAll('.tree-item').length).toBe(1);
+      api.readDirectory.mockResolvedValue([
+        { name: 'file.png', isDirectory: false, path: '/test/file.png' },
+        { name: 'new.png', isDirectory: false, path: '/test/new.png' },
+      ]);
+      const cb = api.onCaptureResult.mock.calls[0][0];
+      cb({ summary: { passed: 1, failed: 0, new: 1, deleted: 0 }, reportPath: '/tmp/report.html' });
+      await flush();
+      expect(document.querySelectorAll('.tree-item').length).toBe(2);
+    });
+
+    test('shortcut-settings opens settings even after other shortcuts', async () => {
+      init();
+      await flush();
+      const captureCb = api.onShortcutCapture.mock.calls[0][0];
+      captureCb();
+      expect(api.captureAndCompare).toHaveBeenCalled();
+      const settingsCb = api.onShortcutSettings.mock.calls[0][0];
+      settingsCb();
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+    });
+  });
+
+  // ===== State Transition Tests =====
+  describe('State transitions', () => {
+    test('sidebar toggle updates width correctly across multiple toggles', async () => {
+      init();
+      await flush();
+      document.getElementById('toggle-sidebar').click();
+      expect(api.setSidebarWidth).toHaveBeenCalledWith({ width: 250 });
+      document.getElementById('toggle-sidebar').click();
+      expect(api.setSidebarWidth).toHaveBeenCalledWith({ width: 0 });
+      document.getElementById('toggle-sidebar').click();
+      expect(api.setSidebarWidth).toHaveBeenLastCalledWith({ width: 250 });
+    });
+
+    test('sync toggle cycles through ON/OFF/ON correctly', async () => {
+      init();
+      await flush();
+      const btn = document.getElementById('toggle-sync');
+      expect(btn.classList.contains('sync-on')).toBe(true);
+      btn.click();
+      expect(api.setSyncEnabled).toHaveBeenCalledWith({ enabled: false });
+      btn.click();
+      expect(api.setSyncEnabled).toHaveBeenCalledWith({ enabled: true });
+      btn.click();
+      expect(api.setSyncEnabled).toHaveBeenCalledWith({ enabled: false });
+    });
+
+    test('zoom changes persist across preset changes', async () => {
+      init();
+      await flush();
+      document.getElementById('zoom-in-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(1.1, 1) });
+      document.querySelector('.btn-preset[data-preset="0"]').click();
+      const preset = PRESET_LIST[0];
+      expect(api.setDevicePreset).toHaveBeenCalledWith({ width: preset.width, height: preset.height });
+      document.getElementById('zoom-in-btn').click();
+      expect(api.setZoom).toHaveBeenCalledTimes(2);
+    });
+
+    test('multiple preset clicks only keep the last one active', async () => {
+      init();
+      await flush();
+      for (let i = 0; i < 5; i++) {
+        document.querySelector(`.btn-preset[data-preset="${i}"]`).click();
+      }
+      const presetBtns = document.querySelectorAll('.btn-preset');
+      presetBtns.forEach((btn, idx) => {
+        if (idx === 4) {
+          expect(btn.classList.contains('active')).toBe(true);
+        } else {
+          expect(btn.classList.contains('active')).toBe(false);
+        }
+      });
+    });
+
+    test('capture result with report path enables report button', async () => {
+      init();
+      await flush();
+      document.getElementById('report-btn').click();
+      expect(api.openReport).not.toHaveBeenCalled();
+      const cb = api.onCaptureResult.mock.calls[0][0];
+      cb({ summary: { passed: 1, failed: 0, new: 0, deleted: 0 }, reportPath: '/path/report.html' });
+      document.getElementById('report-btn').click();
+      expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/path/report.html' });
+    });
+
+    test('capture error result does not set report path', async () => {
+      init();
+      await flush();
+      const cb = api.onCaptureResult.mock.calls[0][0];
+      cb({ error: 'Capture failed' });
+      document.getElementById('report-btn').click();
+      expect(api.openReport).not.toHaveBeenCalled();
+    });
+
+    test('multiple capture results update report path to latest', async () => {
+      init();
+      await flush();
+      const cb = api.onCaptureResult.mock.calls[0][0];
+      cb({ summary: { passed: 1, failed: 0, new: 0, deleted: 0 }, reportPath: '/first/report.html' });
+      cb({ summary: { passed: 1, failed: 0, new: 0, deleted: 0 }, reportPath: '/second/report.html' });
+      document.getElementById('report-btn').click();
+      expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/second/report.html' });
+    });
+  });
+
+  // ===== Zoom Edge Cases =====
+  describe('Zoom edge cases', () => {
+    test('zoom near max does not exceed 3.0', async () => {
+      api.getZoom.mockResolvedValue({ zoom: 2.9 });
+      init();
+      await flush();
+      document.getElementById('zoom-in-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: 3.0 });
+    });
+
+    test('zoom near min does not go below 0.25', async () => {
+      api.getZoom.mockResolvedValue({ zoom: 0.35 });
+      init();
+      await flush();
+      document.getElementById('zoom-out-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(0.25, 1) });
+    });
+
+    test('zoom reset always returns to 1.0', async () => {
+      api.getZoom.mockResolvedValue({ zoom: 2.5 });
+      init();
+      await flush();
+      document.getElementById('zoom-level-btn').click();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: 1.0 });
+    });
+
+    test('zoom changed callback updates display for various levels', async () => {
+      init();
+      await flush();
+      const cb = api.onZoomChanged.mock.calls[0][0];
+      cb({ zoom: 0.5 });
+      expect(document.getElementById('zoom-level-btn').textContent).toBe('50%');
+      expect(document.getElementById('status-zoom').textContent).toBe('Zoom: 50%');
+      cb({ zoom: 2.0 });
+      expect(document.getElementById('zoom-level-btn').textContent).toBe('200%');
+    });
+  });
+
+  // ===== Sidebar Advanced Interactions =====
+  describe('Sidebar advanced interactions', () => {
+    test('sort and filter combination: type sort + files filter', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue([
+        { name: 'beta.txt', isDirectory: false, path: '/test/beta.txt' },
+        { name: 'alpha', isDirectory: true, path: '/test/alpha' },
+        { name: 'gamma.js', isDirectory: false, path: '/test/gamma.js' },
+        { name: 'delta', isDirectory: true, path: '/test/delta' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const filesRadio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      filesRadio.checked = true;
+      filesRadio.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      const names = Array.from(document.querySelectorAll('.tree-name')).map(el => el.textContent);
+      expect(names).toEqual(['beta.txt', 'gamma.js']);
+    });
+
+    test('new folder creation refreshes tree and sets output dir', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { name: 'new-folder', isDirectory: true, path: '/test/new-folder' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      document.getElementById('sidebar-new-folder').click();
+      document.getElementById('sidebar-new-folder-name').value = 'new-folder';
+      document.getElementById('sidebar-new-folder-ok').click();
+      await flush();
+      expect(api.createDirectory).toHaveBeenCalledWith({ dirPath: '/test/new-folder' });
+      expect(api.saveSettings).toHaveBeenCalledWith({ settings: { snapshotDir: '/test/new-folder' } });
+      const output = document.getElementById('sidebar-output-dir');
+      expect(output.textContent).toBe('new-folder');
+    });
+
+    test('Space key on image file opens preview', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue([
+        { name: 'img.png', isDirectory: false, path: '/test/img.png' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const item = document.querySelector('.tree-item');
+      item.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      await flush();
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+    });
+
+    test('Space key on HTML file opens report', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue([
+        { name: 'report.html', isDirectory: false, path: '/test/report.html' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      const item = document.querySelector('.tree-item');
+      item.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      await flush();
+      expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/test/report.html' });
+    });
+
+    test('WEBP file opens in preview modal', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue([
+        { name: 'photo.webp', isDirectory: false, path: '/test/photo.webp' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      document.querySelector('.tree-item').click();
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      await flush();
+      expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/photo.webp' });
+    });
+
+    test('SVG file opens in preview modal', async () => {
+      api.selectFolder.mockResolvedValue('/test');
+      api.readDirectory.mockResolvedValue([
+        { name: 'icon.svg', isDirectory: false, path: '/test/icon.svg' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      document.querySelector('.tree-item').click();
+      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      await flush();
+      expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/icon.svg' });
+    });
+  });
+
+  // ===== Capture Result Display Variants =====
+  describe('Capture result display variants', () => {
+    test('capture result with new items shows correct count', async () => {
+      init();
+      await flush();
+      const cb = api.onCaptureResult.mock.calls[0][0];
+      cb({ summary: { passed: 2, failed: 0, new: 3, deleted: 1 }, reportPath: '/tmp/r.html' });
+      const statusResult = document.getElementById('status-result');
+      expect(statusResult.innerHTML).toContain('Passed: 2');
+      expect(statusResult.innerHTML).toContain('New: 3');
+      expect(statusResult.innerHTML).toContain('Deleted: 1');
+    });
+
+    test('toast shows when differences found (failed > 0)', async () => {
+      init();
+      await flush();
+      const cb = api.onCaptureResult.mock.calls[0][0];
+      cb({ summary: { passed: 1, failed: 3, new: 0, deleted: 0 }, reportPath: '/tmp/r.html' });
+      const toast = document.getElementById('toast');
+      expect(toast.textContent).toBe('Captured! 3 difference(s) found');
+    });
+  });
+
+  // ===== New Report with Folder Integration =====
+  describe('New Report with folder integration', () => {
+    test('new report with folder displays folder path', async () => {
+      api.selectFolder.mockResolvedValue('/vrt');
+      api.readDirectory.mockResolvedValue([
+        { name: 'test-dir', isDirectory: true, path: '/vrt/test-dir' },
+      ]);
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      document.getElementById('new-report-btn').click();
+      const folderInfo = document.getElementById('new-report-folder-info');
+      expect(folderInfo.classList.contains('hidden')).toBe(false);
+    });
+
+    test('new report capture proceeds even if createDirectory fails', async () => {
+      api.selectFolder.mockResolvedValue('/vrt');
+      api.readDirectory.mockResolvedValue([]);
+      api.createDirectory.mockRejectedValue(new Error('EEXIST'));
+      init();
+      await flush();
+      document.getElementById('sidebar-select-folder').click();
+      await flush();
+      document.getElementById('new-report-btn').click();
+      document.getElementById('report-test-name').value = 'existing-dir';
+      document.getElementById('new-report-capture').click();
+      await flush();
+      expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'existing-dir' });
+    });
+  });
+
+  // ===== URL Input Edge Cases =====
+  describe('URL input edge cases', () => {
+    test('empty URL input triggers navigate with empty string on Enter', async () => {
+      init();
+      await flush();
+      const leftInput = document.getElementById('left-url');
+      leftInput.value = '';
+      leftInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await flush();
+      expect(api.navigate).toHaveBeenCalledWith({ url: '', target: 'left' });
+    });
+
+    test('right URL Enter key triggers navigation for right target', async () => {
+      init();
+      await flush();
+      const rightInput = document.getElementById('right-url');
+      rightInput.value = 'http://example.com';
+      rightInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await flush();
+      expect(api.navigate).toHaveBeenCalledWith({ url: 'http://example.com', target: 'right' });
+    });
+  });
+
+  // ===== Keyboard Shortcuts During Modal =====
+  describe('Keyboard shortcuts during modal states', () => {
+    test('new report modal opens when button is clicked', async () => {
+      init();
+      await flush();
+      document.getElementById('new-report-btn').click();
+      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
+    });
+
+    test('settings modal opens when button is clicked', async () => {
+      init();
+      await flush();
+      document.getElementById('settings-btn').click();
+      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+    });
+
+    test('preset shortcut applies correct device', async () => {
+      init();
+      await flush();
+      const cb = api.onShortcutPreset.mock.calls[0][0];
+      cb({ index: 2 });
+      const preset = PRESET_LIST[2];
+      expect(api.setDevicePreset).toHaveBeenCalledWith({ width: preset.width, height: preset.height });
+    });
+
+    test('zoom shortcuts work in sequence', async () => {
+      init();
+      await flush();
+      const zoomInCb = api.onShortcutZoomIn.mock.calls[0][0];
+      const zoomOutCb = api.onShortcutZoomOut.mock.calls[0][0];
+      const zoomResetCb = api.onShortcutZoomReset.mock.calls[0][0];
+      zoomInCb();
+      expect(api.setZoom).toHaveBeenCalled();
+      api.setZoom.mockClear();
+      zoomOutCb();
+      expect(api.setZoom).toHaveBeenCalled();
+      api.setZoom.mockClear();
+      zoomResetCb();
+      expect(api.setZoom).toHaveBeenCalledWith({ zoom: 1.0 });
+    });
+  });
 });

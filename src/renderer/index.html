@@ -38,6 +38,8 @@
         <button id="new-report-btn" class="btn btn-primary" title="New Report">&#x2795; New</button>
         <button id="capture-btn" class="btn" title="Capture & Compare (Cmd+Shift+S)">&#x1F4F7; Capture</button>
         <button id="report-btn" class="btn" title="Open Report (Cmd+Shift+O)">&#x1F4CB; Report</button>
+        <button id="css-scan-btn" class="btn" title="CSS Full Scan (Cmd+Shift+C)">&#x1F3A8; CSS Scan</button>
+        <button id="css-inspect-btn" class="btn" title="CSS Inspect Mode (Cmd+I)">&#x1F50D; Inspect</button>
         <button id="settings-btn" class="btn btn-icon" title="Settings (Cmd+,)">&#x2699;</button>
       </div>
     </div>
@@ -155,11 +157,36 @@
     </div>
   </div>
 
+  <!-- CSS Inspect Drawer -->
+  <div id="css-inspect-drawer" class="css-inspect-drawer hidden">
+    <div id="css-inspect-drawer-handle" class="css-inspect-drawer-handle"></div>
+    <div class="css-inspect-drawer-header">
+      <div id="css-inspect-header-info" class="css-inspect-header-info">
+        Click an element to inspect
+      </div>
+      <div class="css-inspect-drawer-filters">
+        <button id="css-inspect-filter-diff" class="css-inspect-filter-btn active">Diff Only</button>
+        <button id="css-inspect-filter-all" class="css-inspect-filter-btn">All Props</button>
+        <span class="css-inspect-filter-sep">|</span>
+        <button class="css-inspect-cat-btn active" data-cat="all">All</button>
+        <button class="css-inspect-cat-btn" data-cat="layout">Layout</button>
+        <button class="css-inspect-cat-btn" data-cat="text">Text</button>
+        <button class="css-inspect-cat-btn" data-cat="visual">Visual</button>
+        <button class="css-inspect-cat-btn" data-cat="other">Other</button>
+      </div>
+      <button id="css-inspect-drawer-close" class="btn btn-icon css-inspect-close">&times;</button>
+    </div>
+    <div id="css-inspect-drawer-body" class="css-inspect-drawer-body">
+      <div class="css-inspect-empty">Click an element to inspect</div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="toast hidden"></div>
 
   <script src="scripts/device-presets.js"></script>
   <script src="scripts/sync.js"></script>
+  <script src="scripts/css-compare.js"></script>
   <script src="scripts/ui-controls.js"></script>
   <script src="scripts/app.js"></script>
 </body>

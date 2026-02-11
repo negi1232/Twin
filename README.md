@@ -39,8 +39,6 @@ localhost の開発サーバーでもリモート URL でも使えるため、�
 
 ## Screenshots
 
-<!-- TODO: アプリの実際のスクリーンショットに差し替えてください -->
-
 <table>
   <tr>
     <td align="center"><strong>メイン画面</strong></td>
@@ -148,6 +146,9 @@ npm run dev        # DevTools 付きで起動
 | `Cmd/Ctrl + Shift + S` | スクリーンショット撮影 & 比較 |
 | `Cmd/Ctrl + Shift + O` | 最新レポートを開く |
 | `Cmd/Ctrl + 1` ~ `5` | デバイスプリセット切替 (SE / 14P / iPad / DT / FHD) |
+| `Cmd/Ctrl + +` | ズームイン |
+| `Cmd/Ctrl + -` | ズームアウト |
+| `Cmd/Ctrl + 0` | ズームリセット (100%) |
 | `Cmd/Ctrl + ,` | 設定モーダルを開く |
 
 ## Settings
