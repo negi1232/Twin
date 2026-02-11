@@ -166,10 +166,13 @@ function createWindow(): void {
   });
 
   createViews();
+  if (!leftView || !rightView) {
+    throw new Error('Failed to create views');
+  }
   const { syncManager } = registerIpcHandlers({
     mainWindow,
-    leftView: leftView!,
-    rightView: rightView!,
+    leftView,
+    rightView,
     setSidebarWidth,
     getSidebarWidth,
   });

@@ -395,7 +395,7 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
   }
 
   function replayInputValue({ selector, value, textContent }: InputValueData): void {
-    const escaped = escapeForScript(textContent !== undefined ? textContent : value!);
+    const escaped = escapeForScript(textContent !== undefined ? textContent : (value ?? ''));
     const escapedSelector = escapeForScript(selector);
 
     let script: string;

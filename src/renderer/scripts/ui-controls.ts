@@ -158,9 +158,9 @@ function initUIControls(): void {
     if (data.error) {
       updateStatus(`Error: ${data.error}`);
       showToast(`Capture failed: ${data.error}`, 'error');
-    } else {
+    } else if (data.summary) {
       lastReportPath = data.reportPath || null;
-      const s = data.summary!;
+      const s = data.summary;
       const statusEl = document.getElementById('status-result') as HTMLElement;
       statusEl.textContent = '';
       const items: Array<{ cls: string; text: string }> = [
@@ -421,7 +421,7 @@ function initUIControls(): void {
 
   async function loadAndRenderTree(): Promise<void> {
     try {
-      currentEntries = await window.electronAPI.readDirectory({ dirPath: currentFolderPath! });
+      currentEntries = await window.electronAPI.readDirectory({ dirPath: currentFolderPath ?? '' });
     } catch {
       currentEntries = [];
     }
