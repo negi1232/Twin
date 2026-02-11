@@ -141,11 +141,21 @@ describe('ui-controls', () => {
     buildDOM();
     api = mockElectronAPI();
     global.getPresetByIndex = getPresetByIndex;
+    // Load shared constants as globals (loaded via CommonJS shim in browser)
+    const constants = require('../../src/shared/constants');
+    global.ZOOM_STEP = constants.ZOOM_STEP;
+    global.MIN_ZOOM = constants.MIN_ZOOM;
+    global.MAX_ZOOM = constants.MAX_ZOOM;
+    global.SIDEBAR_WIDTH = constants.SIDEBAR_WIDTH;
     jest.resetModules();
   });
 
   afterEach(() => {
     delete global.getPresetByIndex;
+    delete global.ZOOM_STEP;
+    delete global.MIN_ZOOM;
+    delete global.MAX_ZOOM;
+    delete global.SIDEBAR_WIDTH;
     delete window.electronAPI;
   });
 

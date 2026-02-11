@@ -54,7 +54,7 @@ function runRegCli(snapshotDir: string, options: RegCliOptions = {}): Promise<Re
     }
 
     const regCliPath = require.resolve('reg-cli/dist/cli.js');
-    execFile('node', [regCliPath, ...args], async (_error, _stdout, stderr) => {
+    execFile('node', [regCliPath, ...args], async (execError, _stdout, stderr) => {
       try {
         const json: RegCliRawJson = JSON.parse(await fs.readFile(jsonPath, 'utf-8'));
         resolve({
@@ -69,7 +69,10 @@ function runRegCli(snapshotDir: string, options: RegCliOptions = {}): Promise<Re
           raw: json,
         });
       } catch (parseError) {
-        reject(new Error(`reg-cli output parse failed: ${(parseError as Error).message}\nstderr: ${stderr}`));
+        const parts = [`reg-cli output parse failed: ${(parseError as Error).message}`];
+        if (execError) parts.push(`execError: ${execError.message}`);
+        if (stderr) parts.push(`stderr: ${stderr}`);
+        reject(new Error(parts.join('\n')));
       }
     });
   });

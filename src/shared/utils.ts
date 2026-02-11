@@ -1,9 +1,25 @@
 /**
- * @module shared/css-categories
- * @description CSS プロパティのカテゴリ分類。
- * Main プロセス (css-compare) と Renderer プロセス (css-compare) の
- * 両方から参照される単一の定義。
+ * @module shared/utils
+ * @description 共有ユーティリティ関数と CSS プロパティ分類。
+ * Main プロセスと Renderer プロセスの両方から使用される。
+ * - Main: import { classifyProperty, ... } from '../shared/utils'
+ * - Renderer: CommonJS shim 経由で <script> タグとしてロード
+ * - Tests: require('../../src/shared/utils')
  */
+
+// --- HTML Escape ---
+
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// --- CSS Property Category Classification ---
 
 const LAYOUT_PROPS: ReadonlySet<string> = new Set([
   'display',
@@ -128,9 +144,4 @@ function classifyProperty(prop: string): string {
   return 'other';
 }
 
-export { LAYOUT_PROPS, TEXT_PROPS, VISUAL_PROPS, classifyProperty };
-
-// Allow renderer <script> tag usage
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { LAYOUT_PROPS, TEXT_PROPS, VISUAL_PROPS, classifyProperty };
-}
+export { escapeHtml, classifyProperty, LAYOUT_PROPS, TEXT_PROPS, VISUAL_PROPS };

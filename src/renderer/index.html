@@ -193,7 +193,25 @@
   <!-- Toast Notification -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="scripts/shared-utils.js"></script>
+  <!-- CommonJS shim: load shared modules (compiled with exports) in browser context -->
+  <script>var exports = {}; var module = { exports: exports };</script>
+  <script src="../shared/utils.js"></script>
+  <script>
+    var escapeHtml = module.exports.escapeHtml;
+    var classifyProperty = module.exports.classifyProperty;
+    var LAYOUT_PROPS = module.exports.LAYOUT_PROPS;
+    var TEXT_PROPS = module.exports.TEXT_PROPS;
+    var VISUAL_PROPS = module.exports.VISUAL_PROPS;
+  </script>
+  <script>exports = {}; module = { exports: exports };</script>
+  <script src="../shared/constants.js"></script>
+  <script>
+    var ZOOM_STEP = module.exports.ZOOM_STEP;
+    var MIN_ZOOM = module.exports.MIN_ZOOM;
+    var MAX_ZOOM = module.exports.MAX_ZOOM;
+    var DEFAULT_ZOOM = module.exports.DEFAULT_ZOOM;
+    var SIDEBAR_WIDTH = module.exports.SIDEBAR_WIDTH;
+  </script>
   <script src="scripts/device-presets.js"></script>
   <script src="scripts/sync.js"></script>
   <script src="scripts/css-compare.js"></script>

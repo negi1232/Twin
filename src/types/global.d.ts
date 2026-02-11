@@ -135,9 +135,18 @@ declare function classifyProperty(prop: string): string;
 declare function getPresetByIndex(index: number): DevicePreset | null;
 declare function isSyncEnabled(): boolean;
 declare function toggleSync(): boolean;
-declare function buildScrollSyncScript(): string;
 declare function buildScrollToScript(scrollX: number, scrollY: number): string;
 declare function extractPathFromUrl(url: string): string;
+
+// Shared constants (loaded via CommonJS shim in index.html)
+declare const ZOOM_STEP: number;
+declare const MIN_ZOOM: number;
+declare const MAX_ZOOM: number;
+declare const DEFAULT_ZOOM: number;
+declare const SIDEBAR_WIDTH: number;
+declare const LAYOUT_PROPS: ReadonlySet<string>;
+declare const TEXT_PROPS: ReadonlySet<string>;
+declare const VISUAL_PROPS: ReadonlySet<string>;
 
 // PRESETS and PRESET_LIST are declared in device-presets.ts as const variables
 

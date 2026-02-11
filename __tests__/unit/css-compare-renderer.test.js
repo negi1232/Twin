@@ -68,7 +68,7 @@ describe('renderer/css-compare', () => {
 
   function init() {
     // Load shared utils as globals (escapeHtml, classifyProperty)
-    const sharedUtils = require('../../src/renderer/scripts/shared-utils');
+    const sharedUtils = require('../../src/shared/utils');
     global.escapeHtml = sharedUtils.escapeHtml;
     global.classifyProperty = sharedUtils.classifyProperty;
     // Load showToast as global (defined at module level in ui-controls)

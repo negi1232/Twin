@@ -1,4 +1,4 @@
-import { classifyProperty, LAYOUT_PROPS, TEXT_PROPS, VISUAL_PROPS } from '../shared/css-categories';
+import { classifyProperty, LAYOUT_PROPS, TEXT_PROPS, VISUAL_PROPS } from '../shared/utils';
 
 export interface CssElement {
   tag: string;

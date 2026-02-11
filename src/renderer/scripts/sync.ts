@@ -21,29 +21,6 @@ function toggleSync(): boolean {
 }
 
 /**
- * スクロールイベントを electronAPI.syncScroll に送信する JS スクリプトを生成する。
- */
-function buildScrollSyncScript(): string {
-  return `
-    (function() {
-      let ticking = false;
-      window.addEventListener('scroll', function() {
-        if (!ticking) {
-          requestAnimationFrame(function() {
-            window.electronAPI.syncScroll({
-              scrollX: window.scrollX,
-              scrollY: window.scrollY
-            });
-            ticking = false;
-          });
-          ticking = true;
-        }
-      });
-    })();
-  `;
-}
-
-/**
  * 指定座標にスクロールする JS スクリプトを生成する。
  */
 function buildScrollToScript(scrollX: number, scrollY: number): string {
@@ -65,7 +42,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     isSyncEnabled,
     toggleSync,
-    buildScrollSyncScript,
     buildScrollToScript,
     extractPathFromUrl,
   };

@@ -77,11 +77,7 @@ function initUIControls(): void {
   let currentEntries: DirectoryEntry[] = [];
   let currentSnapshotDir: string | null = null;
   let currentZoom: number = 1.0;
-  const ZOOM_STEP: number = 0.1;
-  const MIN_ZOOM: number = 0.25;
-  const MAX_ZOOM: number = 3.0;
   const expandedDirs: Set<string> = new Set();
-  const SIDEBAR_WIDTH: number = 250;
 
   // URL navigation
   leftUrlInput.addEventListener('keydown', (e: KeyboardEvent) => {
