@@ -23,6 +23,12 @@ async function startServers() {
   return { expected, actual };
 }
 
+async function startDemoServers() {
+  const expected = await createServer(3200, 'demo-expected.html');
+  const actual = await createServer(3201, 'demo-actual.html');
+  return { expected, actual };
+}
+
 function stopServers(...servers) {
   return Promise.all(
     servers.map(
@@ -34,4 +40,4 @@ function stopServers(...servers) {
   );
 }
 
-module.exports = { createServer, startServers, stopServers };
+module.exports = { createServer, startServers, startDemoServers, stopServers };

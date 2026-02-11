@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Twin Demo - Actual</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; }
+
+    /* Header - gradient color changed */
+    .header {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      padding: 24px 32px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
+    .header nav { display: flex; gap: 20px; }
+    .header nav a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 14px; font-weight: 500; }
+
+    /* Hero - padding and font-size changed */
+    .hero {
+      padding: 40px 32px;
+      text-align: center;
+      background: #fff;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .hero h2 { font-size: 32px; color: #16213e; margin-bottom: 16px; }
+    .hero p { font-size: 15px; color: #868e96; max-width: 480px; margin: 0 auto; line-height: 1.7; }
+
+    /* Cards - gap and border-radius changed */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      padding: 32px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      border: 1px solid #dee2e6;
+    }
+    .card-icon { font-size: 32px; margin-bottom: 12px; }
+    .card h3 { font-size: 16px; color: #16213e; margin-bottom: 8px; }
+    .card p { font-size: 13px; color: #868e96; line-height: 1.5; }
+
+    /* CTA Button - color changed */
+    .cta {
+      text-align: center;
+      padding: 40px 32px;
+    }
+    .cta-btn {
+      display: inline-block;
+      background: #f5576c;
+      color: #fff;
+      padding: 14px 36px;
+      border-radius: 24px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* Footer - background changed */
+    .footer {
+      background: #16213e;
+      color: rgba(255,255,255,0.5);
+      padding: 20px 32px;
+      text-align: center;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header" id="header">
+    <h1>MyProduct</h1>
+    <nav>
+      <a href="#">Features</a>
+      <a href="#">Pricing</a>
+      <a href="#">Docs</a>
+      <a href="#">Contact</a>
+    </nav>
+  </div>
+
+  <div class="hero" id="hero">
+    <h2>Build Better Products</h2>
+    <p>A powerful platform for teams to design, develop, and deliver exceptional digital experiences.</p>
+  </div>
+
+  <div class="cards" id="cards">
+    <div class="card" id="card-1">
+      <div class="card-icon">&#x1F680;</div>
+      <h3>Fast Performance</h3>
+      <p>Optimized for speed with sub-second load times across all devices.</p>
+    </div>
+    <div class="card" id="card-2">
+      <div class="card-icon">&#x1F512;</div>
+      <h3>Secure by Default</h3>
+      <p>Enterprise-grade security with end-to-end encryption built in.</p>
+    </div>
+    <div class="card" id="card-3">
+      <div class="card-icon">&#x1F4CA;</div>
+      <h3>Rich Analytics</h3>
+      <p>Real-time insights and dashboards to track your growth metrics.</p>
+    </div>
+  </div>
+
+  <div class="cta" id="cta">
+    <button class="cta-btn">Get Started Free</button>
+  </div>
+
+  <div class="footer" id="footer">
+    <p>&copy; 2026 MyProduct Inc. All rights reserved.</p>
+  </div>
+</body>
+</html>

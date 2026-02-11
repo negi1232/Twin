@@ -44,6 +44,10 @@ const IPC_CHANNELS = {
   SET_ZOOM: 'set-zoom',
   GET_ZOOM: 'get-zoom',
   ZOOM_CHANGED: 'zoom-changed',
+  CSS_FULL_SCAN: 'css-full-scan',
+  CSS_INSPECT_TOGGLE: 'css-inspect-toggle',
+  CSS_EXPORT_JSON: 'css-export-json',
+  CSS_INSPECT_RESULT: 'css-inspect-result',
 };
 
 module.exports = {

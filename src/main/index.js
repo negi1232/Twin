@@ -301,6 +301,21 @@ function registerShortcuts() {
             if (mainWindow) mainWindow.webContents.send('shortcut-open-report');
           },
         },
+        { type: 'separator' },
+        {
+          label: 'CSS Full Scan',
+          accelerator: 'CommandOrControl+Shift+C',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-css-scan');
+          },
+        },
+        {
+          label: 'CSS Inspect Mode',
+          accelerator: 'CommandOrControl+I',
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send('shortcut-css-inspect');
+          },
+        },
       ],
     },
     {
