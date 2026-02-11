@@ -28,7 +28,7 @@ function initCssCompare(): void {
     try {
       await window.electronAPI.cssFullScan();
     } catch (err) {
-      showCssToast('CSS Scan failed: ' + (err as Error).message, 'error');
+      showCssToast(`CSS Scan failed: ${(err as Error).message}`, 'error');
     } finally {
       cssScanBtn.disabled = false;
       cssScanBtn.textContent = '\u{1F3A8} CSS Scan';
@@ -103,7 +103,7 @@ function initCssCompare(): void {
     if (!dragging) return;
     const delta = startY - e.clientY;
     const newHeight = Math.min(400, Math.max(100, startHeight + delta));
-    inspectDrawer.style.height = newHeight + 'px';
+    inspectDrawer.style.height = `${newHeight}px`;
   });
 
   document.addEventListener('mouseup', () => {
@@ -132,7 +132,9 @@ function initCssCompare(): void {
   inspectCategoryBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       inspectCategoryFilter = btn.dataset.cat || 'all';
-      inspectCategoryBtns.forEach((b) => b.classList.remove('active'));
+      inspectCategoryBtns.forEach((b) => {
+        b.classList.remove('active');
+      });
       btn.classList.add('active');
       renderInspectDiffs();
     });
@@ -153,23 +155,39 @@ function initCssCompare(): void {
   function renderInspectHeader(data: CssInspectResultData): void {
     if (data.error) {
       inspectHeader.innerHTML =
-        '<span class="css-inspect-tag">&lt;' + escapeHtml(data.left ? data.left.tag : '?') + '&gt;</span> ' +
-        '<span class="css-inspect-key">' + escapeHtml(data.left ? data.left.key : '') + '</span> ' +
-        '<span class="css-inspect-error">' + escapeHtml(data.error) + '</span>';
+        '<span class="css-inspect-tag">&lt;' +
+        escapeHtml(data.left ? data.left.tag : '?') +
+        '&gt;</span> ' +
+        '<span class="css-inspect-key">' +
+        escapeHtml(data.left ? data.left.key : '') +
+        '</span> ' +
+        '<span class="css-inspect-error">' +
+        escapeHtml(data.error) +
+        '</span>';
       return;
     }
-    const diffCount = data.diffs ? data.diffs.filter((d) => d.type === 'changed' || d.type === 'added' || d.type === 'deleted').length : 0;
+    const diffCount = data.diffs
+      ? data.diffs.filter((d) => d.type === 'changed' || d.type === 'added' || d.type === 'deleted').length
+      : 0;
     inspectHeader.innerHTML =
-      '<span class="css-inspect-tag">&lt;' + escapeHtml(data.left!.tag) + '&gt;</span> ' +
-      '<span class="css-inspect-key">' + escapeHtml(data.left!.key) + '</span> ' +
-      '<span class="css-inspect-method">' + escapeHtml(data.left!.method) + '</span> ' +
-      '<span class="css-inspect-diff-count">' + diffCount + ' differences</span>';
+      '<span class="css-inspect-tag">&lt;' +
+      escapeHtml(data.left?.tag) +
+      '&gt;</span> ' +
+      '<span class="css-inspect-key">' +
+      escapeHtml(data.left?.key) +
+      '</span> ' +
+      '<span class="css-inspect-method">' +
+      escapeHtml(data.left?.method) +
+      '</span> ' +
+      '<span class="css-inspect-diff-count">' +
+      diffCount +
+      ' differences</span>';
   }
 
   function renderInspectDiffs(): void {
     if (!currentInspectData || currentInspectData.error) {
-      inspectDrawerBody.innerHTML = currentInspectData && currentInspectData.error
-        ? '<div class="css-inspect-empty">' + escapeHtml(currentInspectData.error) + '</div>'
+      inspectDrawerBody.innerHTML = currentInspectData?.error
+        ? `<div class="css-inspect-empty">${escapeHtml(currentInspectData.error)}</div>`
         : '<div class="css-inspect-empty"><div class="css-inspect-guide-title">CSS Inspect Mode</div><div class="css-inspect-guide-text">\u5DE6\u30D1\u30CD\u30EB\u306E\u8981\u7D20\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u53F3\u30D1\u30CD\u30EB\u306E\u5BFE\u5FDC\u3059\u308B\u8981\u7D20\u3068\u306E CSS \u30D7\u30ED\u30D1\u30C6\u30A3\u306E\u5DEE\u5206\u3092\u8868\u793A\u3057\u307E\u3059\u3002</div><div class="css-inspect-guide-steps"><span>1. \u5DE6\u30D1\u30CD\u30EB\u3067\u8981\u7D20\u3092\u30DB\u30D0\u30FC\uFF08\u9752\u679A\u8868\u793A\uFF09</span><span>2. \u30AF\u30EA\u30C3\u30AF\u3057\u3066\u9078\u629E</span><span>3. \u53F3\u30D1\u30CD\u30EB\u306E\u5BFE\u5FDC\u8981\u7D20\uFF08\u30AA\u30EC\u30F3\u30B8\u679A\uFF09\u3068\u6BD4\u8F03</span><span>4. Esc \u30AD\u30FC\u3067\u7D42\u4E86</span></div></div>';
       return;
     }
@@ -182,14 +200,18 @@ function initCssCompare(): void {
     } else {
       // Show all properties
       const allProps = new Set<string>();
-      if (data.left && data.left.styles) Object.keys(data.left.styles).forEach((p) => allProps.add(p));
-      if (data.right && data.right.styles) Object.keys(data.right.styles).forEach((p) => allProps.add(p));
+      if (data.left?.styles) {
+        for (const p of Object.keys(data.left.styles)) allProps.add(p);
+      }
+      if (data.right?.styles) {
+        for (const p of Object.keys(data.right.styles)) allProps.add(p);
+      }
       const diffs = data.diffs || [];
       const diffProps = new Set(diffs.map((d) => d.property));
 
       for (const prop of allProps) {
-        const leftVal = data.left && data.left.styles ? data.left.styles[prop] || '' : '';
-        const rightVal = data.right && data.right.styles ? data.right.styles[prop] || '' : '';
+        const leftVal = data.left?.styles ? data.left.styles[prop] || '' : '';
+        const rightVal = data.right?.styles ? data.right.styles[prop] || '' : '';
         rows.push({
           property: prop,
           expected: leftVal,
@@ -210,19 +232,20 @@ function initCssCompare(): void {
       return;
     }
 
-    let html = '<table class="css-inspect-table"><thead><tr>' +
+    let html =
+      '<table class="css-inspect-table"><thead><tr>' +
       '<th>Property</th><th>Category</th><th>Left (Expected)</th><th>Right (Actual)</th><th></th>' +
       '</tr></thead><tbody>';
 
     for (const row of rows) {
       const isDiff = row.isDiff !== undefined ? row.isDiff : true;
       const rowClass = isDiff ? 'css-diff-row' : '';
-      html += '<tr class="' + rowClass + '">';
-      html += '<td class="css-prop">' + escapeHtml(row.property) + '</td>';
-      html += '<td><span class="css-cat-badge css-cat-' + row.category + '">' + row.category + '</span></td>';
-      html += '<td class="css-expected">' + escapeHtml(row.expected) + '</td>';
-      html += '<td class="css-actual">' + escapeHtml(row.actual) + '</td>';
-      html += '<td class="css-match-icon">' + (isDiff ? '\u2260' : '\u2713') + '</td>';
+      html += `<tr class="${rowClass}">`;
+      html += `<td class="css-prop">${escapeHtml(row.property)}</td>`;
+      html += `<td><span class="css-cat-badge css-cat-${row.category}">${row.category}</span></td>`;
+      html += `<td class="css-expected">${escapeHtml(row.expected)}</td>`;
+      html += `<td class="css-actual">${escapeHtml(row.actual)}</td>`;
+      html += `<td class="css-match-icon">${isDiff ? '\u2260' : '\u2713'}</td>`;
       html += '</tr>';
     }
 
@@ -243,7 +266,7 @@ function initCssCompare(): void {
   function showCssToast(message: string, type: string): void {
     const toast = document.getElementById('toast') as HTMLElement;
     toast.textContent = message;
-    toast.className = 'toast toast-' + type;
+    toast.className = `toast toast-${type}`;
     void toast.offsetWidth;
     toast.classList.add('show');
     clearTimeout(toast._timer);
@@ -254,33 +277,117 @@ function initCssCompare(): void {
 
   // Simple category classification (client-side)
   const LAYOUT_SET: Set<string> = new Set([
-    'display', 'position', 'top', 'right', 'bottom', 'left',
-    'float', 'clear', 'z-index', 'overflow', 'overflow-x', 'overflow-y',
-    'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-    'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-    'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-    'border-width', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
-    'flex', 'flex-grow', 'flex-shrink', 'flex-basis', 'flex-direction', 'flex-wrap',
-    'justify-content', 'align-items', 'align-self', 'align-content',
-    'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
-    'gap', 'row-gap', 'column-gap', 'box-sizing', 'vertical-align',
+    'display',
+    'position',
+    'top',
+    'right',
+    'bottom',
+    'left',
+    'float',
+    'clear',
+    'z-index',
+    'overflow',
+    'overflow-x',
+    'overflow-y',
+    'width',
+    'height',
+    'min-width',
+    'min-height',
+    'max-width',
+    'max-height',
+    'margin',
+    'margin-top',
+    'margin-right',
+    'margin-bottom',
+    'margin-left',
+    'padding',
+    'padding-top',
+    'padding-right',
+    'padding-bottom',
+    'padding-left',
+    'border-width',
+    'border-top-width',
+    'border-right-width',
+    'border-bottom-width',
+    'border-left-width',
+    'flex',
+    'flex-grow',
+    'flex-shrink',
+    'flex-basis',
+    'flex-direction',
+    'flex-wrap',
+    'justify-content',
+    'align-items',
+    'align-self',
+    'align-content',
+    'grid-template-columns',
+    'grid-template-rows',
+    'grid-column',
+    'grid-row',
+    'gap',
+    'row-gap',
+    'column-gap',
+    'box-sizing',
+    'vertical-align',
   ]);
   const TEXT_SET: Set<string> = new Set([
-    'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
-    'line-height', 'letter-spacing', 'word-spacing', 'text-align', 'text-decoration',
-    'text-transform', 'text-indent', 'text-shadow', 'white-space', 'word-break',
-    'word-wrap', 'overflow-wrap', 'color', 'direction', 'unicode-bidi', 'writing-mode',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'font-style',
+    'font-variant',
+    'line-height',
+    'letter-spacing',
+    'word-spacing',
+    'text-align',
+    'text-decoration',
+    'text-transform',
+    'text-indent',
+    'text-shadow',
+    'white-space',
+    'word-break',
+    'word-wrap',
+    'overflow-wrap',
+    'color',
+    'direction',
+    'unicode-bidi',
+    'writing-mode',
   ]);
   const VISUAL_SET: Set<string> = new Set([
-    'background', 'background-color', 'background-image', 'background-position',
-    'background-size', 'background-repeat',
-    'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-    'border-style', 'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
-    'border-radius', 'border-top-left-radius', 'border-top-right-radius',
-    'border-bottom-left-radius', 'border-bottom-right-radius',
-    'box-shadow', 'opacity', 'visibility',
-    'outline', 'outline-color', 'outline-style', 'outline-width',
-    'transform', 'transition', 'animation', 'cursor', 'filter', 'backdrop-filter',
+    'background',
+    'background-color',
+    'background-image',
+    'background-position',
+    'background-size',
+    'background-repeat',
+    'border-color',
+    'border-top-color',
+    'border-right-color',
+    'border-bottom-color',
+    'border-left-color',
+    'border-style',
+    'border-top-style',
+    'border-right-style',
+    'border-bottom-style',
+    'border-left-style',
+    'border-radius',
+    'border-top-left-radius',
+    'border-top-right-radius',
+    'border-bottom-left-radius',
+    'border-bottom-right-radius',
+    'box-shadow',
+    'opacity',
+    'visibility',
+    'outline',
+    'outline-color',
+    'outline-style',
+    'outline-width',
+    'transform',
+    'transition',
+    'animation',
+    'cursor',
+    'filter',
+    'backdrop-filter',
   ]);
 
   function getCategoryForProp(prop: string): string {

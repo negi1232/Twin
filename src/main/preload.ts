@@ -7,7 +7,7 @@
  * invoke 系メソッド（リクエスト/レスポンス）と on 系メソッド（Main → Renderer 通知）で構成。
  */
 
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+import { contextBridge, type IpcRendererEvent, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   captureAndCompare: (payload: { pageName: string }) => ipcRenderer.invoke('capture-and-compare', payload),
@@ -26,14 +26,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFileData: (payload: { filePath: string }) => ipcRenderer.invoke('read-file-data', payload),
   setSidebarWidth: (payload: { width: number }) => ipcRenderer.invoke('set-sidebar-width', payload),
   reinjectSync: () => ipcRenderer.invoke('reinject-sync'),
-  onCaptureResult: (cb: (data: CaptureResultData) => void) => ipcRenderer.on('capture-result', (_event: IpcRendererEvent, data: CaptureResultData) => cb(data)),
+  onCaptureResult: (cb: (data: CaptureResultData) => void) =>
+    ipcRenderer.on('capture-result', (_event: IpcRendererEvent, data: CaptureResultData) => cb(data)),
   onShortcutCapture: (cb: () => void) => ipcRenderer.on('shortcut-capture', () => cb()),
   onShortcutOpenReport: (cb: () => void) => ipcRenderer.on('shortcut-open-report', () => cb()),
-  onShortcutPreset: (cb: (data: { index: number }) => void) => ipcRenderer.on('shortcut-preset', (_event: IpcRendererEvent, data: { index: number }) => cb(data)),
+  onShortcutPreset: (cb: (data: { index: number }) => void) =>
+    ipcRenderer.on('shortcut-preset', (_event: IpcRendererEvent, data: { index: number }) => cb(data)),
   onShortcutSettings: (cb: () => void) => ipcRenderer.on('shortcut-settings', () => cb()),
   setZoom: (payload: { zoom: number }) => ipcRenderer.invoke('set-zoom', payload),
   getZoom: () => ipcRenderer.invoke('get-zoom'),
-  onZoomChanged: (cb: (data: { zoom: number }) => void) => ipcRenderer.on('zoom-changed', (_event: IpcRendererEvent, data: { zoom: number }) => cb(data)),
+  onZoomChanged: (cb: (data: { zoom: number }) => void) =>
+    ipcRenderer.on('zoom-changed', (_event: IpcRendererEvent, data: { zoom: number }) => cb(data)),
   onShortcutZoomIn: (cb: () => void) => ipcRenderer.on('shortcut-zoom-in', () => cb()),
   onShortcutZoomOut: (cb: () => void) => ipcRenderer.on('shortcut-zoom-out', () => cb()),
   onShortcutZoomReset: (cb: () => void) => ipcRenderer.on('shortcut-zoom-reset', () => cb()),
@@ -41,7 +44,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cssFullScan: () => ipcRenderer.invoke('css-full-scan'),
   cssInspectToggle: (payload: { enabled: boolean }) => ipcRenderer.invoke('css-inspect-toggle', payload),
   cssExportJson: (payload?: unknown) => ipcRenderer.invoke('css-export-json', payload),
-  onCssInspectResult: (cb: (data: CssInspectResultData) => void) => ipcRenderer.on('css-inspect-result', (_event: IpcRendererEvent, data: CssInspectResultData) => cb(data)),
+  onCssInspectResult: (cb: (data: CssInspectResultData) => void) =>
+    ipcRenderer.on('css-inspect-result', (_event: IpcRendererEvent, data: CssInspectResultData) => cb(data)),
   onShortcutCssScan: (cb: () => void) => ipcRenderer.on('shortcut-css-scan', () => cb()),
   onShortcutCssInspect: (cb: () => void) => ipcRenderer.on('shortcut-css-inspect', () => cb()),
 });

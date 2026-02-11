@@ -5,9 +5,9 @@
  * HTML レポートと JSON サマリを生成する。
  */
 
-import { execFile } from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs/promises';
+import { execFile } from 'node:child_process';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
 interface RegCliOptions {
   matchingThreshold?: number | null;
@@ -39,8 +39,10 @@ function runRegCli(snapshotDir: string, options: RegCliOptions = {}): Promise<Re
       actualDir,
       expectedDir,
       diffDir,
-      '-R', reportPath,
-      '-J', jsonPath,
+      '-R',
+      reportPath,
+      '-J',
+      jsonPath,
       '-I', // ignoreChange: don't throw on diff detection
     ];
 
@@ -52,7 +54,7 @@ function runRegCli(snapshotDir: string, options: RegCliOptions = {}): Promise<Re
     }
 
     const regCliPath = require.resolve('reg-cli/dist/cli.js');
-    execFile('node', [regCliPath, ...args], async (error, _stdout, stderr) => {
+    execFile('node', [regCliPath, ...args], async (_error, _stdout, stderr) => {
       try {
         const json: RegCliRawJson = JSON.parse(await fs.readFile(jsonPath, 'utf-8'));
         resolve({
@@ -67,9 +69,7 @@ function runRegCli(snapshotDir: string, options: RegCliOptions = {}): Promise<Re
           raw: json,
         });
       } catch (parseError) {
-        reject(new Error(
-          `reg-cli output parse failed: ${(parseError as Error).message}\nstderr: ${stderr}`
-        ));
+        reject(new Error(`reg-cli output parse failed: ${(parseError as Error).message}\nstderr: ${stderr}`));
       }
     });
   });

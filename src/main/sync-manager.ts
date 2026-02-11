@@ -8,7 +8,7 @@
  * フォーム入力（IME 対応）、キーボード入力、ページ内ナビゲーション。
  */
 
-import { WebContentsView } from 'electron';
+import type { WebContentsView } from 'electron';
 
 /** 同期メッセージの識別プレフィックス */
 const SYNC_PREFIX: string = '__twin_sync__';
@@ -276,7 +276,7 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
     return navSyncSuppressed;
   }
 
-  function handleMessage(_event: unknown, level: number, message: string): void {
+  function handleMessage(_event: unknown, _level: number, message: string): void {
     if (!enabled || paused) return;
     if (!message.startsWith(SYNC_PREFIX)) return;
 
@@ -317,9 +317,7 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
 
   function replayScroll({ scrollX, scrollY }: ScrollData): void {
     if (!Number.isFinite(scrollX) || !Number.isFinite(scrollY)) return;
-    rightView.webContents.executeJavaScript(
-      `window.scrollTo(${scrollX}, ${scrollY})`
-    ).catch(() => {});
+    rightView.webContents.executeJavaScript(`window.scrollTo(${scrollX}, ${scrollY})`).catch(() => {});
   }
 
   function replayElementScroll({ selector, scrollLeft, scrollTop }: ElementScrollData): void {
@@ -342,16 +340,19 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
       }
       return null;
     })()`;
-    rightView.webContents.executeJavaScript(script).then((coords: { x: number; y: number } | null) => {
-      if (coords) {
-        const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
-        rightView.webContents.sendInputEvent({
-          type: 'mouseMove',
-          x: Math.round(coords.x * zoom),
-          y: Math.round(coords.y * zoom),
-        });
-      }
-    }).catch(() => {});
+    rightView.webContents
+      .executeJavaScript(script)
+      .then((coords: { x: number; y: number } | null) => {
+        if (coords) {
+          const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
+          rightView.webContents.sendInputEvent({
+            type: 'mouseMove',
+            x: Math.round(coords.x * zoom),
+            y: Math.round(coords.y * zoom),
+          });
+        }
+      })
+      .catch(() => {});
   }
 
   function replayClick({ selector, button }: ClickData): void {
@@ -367,27 +368,30 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
       }
       return null;
     })()`;
-    rightView.webContents.executeJavaScript(script).then((coords: { x: number; y: number } | null) => {
-      if (coords) {
-        const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
-        const x = Math.round(coords.x * zoom);
-        const y = Math.round(coords.y * zoom);
-        rightView.webContents.sendInputEvent({
-          type: 'mouseDown',
-          x,
-          y,
-          button: btn,
-          clickCount: 1,
-        });
-        rightView.webContents.sendInputEvent({
-          type: 'mouseUp',
-          x,
-          y,
-          button: btn,
-          clickCount: 1,
-        });
-      }
-    }).catch(() => {});
+    rightView.webContents
+      .executeJavaScript(script)
+      .then((coords: { x: number; y: number } | null) => {
+        if (coords) {
+          const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
+          const x = Math.round(coords.x * zoom);
+          const y = Math.round(coords.y * zoom);
+          rightView.webContents.sendInputEvent({
+            type: 'mouseDown',
+            x,
+            y,
+            button: btn,
+            clickCount: 1,
+          });
+          rightView.webContents.sendInputEvent({
+            type: 'mouseUp',
+            x,
+            y,
+            button: btn,
+            clickCount: 1,
+          });
+        }
+      })
+      .catch(() => {});
   }
 
   function replayInputValue({ selector, value, textContent }: InputValueData): void {

@@ -7,8 +7,8 @@
 const PRESETS: Record<string, { width: number; height: number }> = {
   'iPhone SE': { width: 375, height: 667 },
   'iPhone 14 Pro': { width: 393, height: 852 },
-  'iPad': { width: 768, height: 1024 },
-  'Desktop': { width: 1280, height: 900 },
+  iPad: { width: 768, height: 1024 },
+  Desktop: { width: 1280, height: 900 },
   'Full HD': { width: 1920, height: 1080 },
 };
 

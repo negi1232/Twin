@@ -5,11 +5,10 @@
  * アプリケーションメニュー（キーボードショートカット）の登録を行う。
  */
 
-import { app, BrowserWindow, WebContentsView, Menu, session } from 'electron';
-import * as path from 'path';
+import * as path from 'node:path';
+import { app, BrowserWindow, Menu, session, WebContentsView } from 'electron';
 import { registerIpcHandlers } from './ipc-handlers';
 import { getStore } from './store';
-import type { SyncManager } from './sync-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let leftView: WebContentsView | null = null;
@@ -35,8 +34,8 @@ function createViews(): void {
   leftView = new WebContentsView({ webPreferences: viewPreferences });
   rightView = new WebContentsView({ webPreferences: viewPreferences });
 
-  mainWindow!.contentView.addChildView(leftView);
-  mainWindow!.contentView.addChildView(rightView);
+  mainWindow?.contentView.addChildView(leftView);
+  mainWindow?.contentView.addChildView(rightView);
 
   layoutViews();
 
@@ -148,8 +147,8 @@ function createWindow(): void {
 
   // Force zoom to 1.0 — clear any cached zoom from previous sessions
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow!.webContents.setZoomFactor(1.0);
-    mainWindow!.webContents.setZoomLevel(0);
+    mainWindow?.webContents.setZoomFactor(1.0);
+    mainWindow?.webContents.setZoomLevel(0);
   });
 
   mainWindow.on('resize', () => {
@@ -167,7 +166,13 @@ function createWindow(): void {
   });
 
   createViews();
-  const { syncManager } = registerIpcHandlers({ mainWindow, leftView: leftView!, rightView: rightView!, setSidebarWidth, getSidebarWidth });
+  const { syncManager } = registerIpcHandlers({
+    mainWindow,
+    leftView: leftView!,
+    rightView: rightView!,
+    setSidebarWidth,
+    getSidebarWidth,
+  });
   registerShortcuts();
 
   // Re-inject sync script and resume sync when app regains focus
@@ -176,7 +181,7 @@ function createWindow(): void {
       clearTimeout(blurTimeout);
       blurTimeout = null;
     }
-    if (syncManager && syncManager.isPaused()) {
+    if (syncManager?.isPaused()) {
       syncManager.resume();
       syncManager.inject();
     }
@@ -239,7 +244,7 @@ function registerShortcuts(): void {
           label: 'Reload Active View',
           accelerator: 'CommandOrControl+Shift+R',
           click: () => {
-            if (leftView && leftView.webContents.isFocused()) {
+            if (leftView?.webContents.isFocused()) {
               leftView.webContents.reload();
             } else if (rightView) {
               rightView.webContents.reload();
@@ -273,7 +278,7 @@ function registerShortcuts(): void {
           label: `Device Preset ${key}`,
           accelerator: `CommandOrControl+${key}`,
           click: () => {
-            if (mainWindow) mainWindow.webContents.send('shortcut-preset', { index: parseInt(key) - 1 });
+            if (mainWindow) mainWindow.webContents.send('shortcut-preset', { index: parseInt(key, 10) - 1 });
           },
         })),
       ],
@@ -326,11 +331,7 @@ function registerShortcuts(): void {
     },
     {
       label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        { role: 'close' },
-      ],
+      submenu: [{ role: 'minimize' }, { role: 'zoom' }, { role: 'close' }],
     },
   ];
 

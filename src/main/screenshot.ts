@@ -3,9 +3,9 @@
  * @description 左右ビューのスクリーンショットを撮影し、expected / actual ディレクトリに保存する。
  */
 
-import { mkdir, writeFile } from 'fs/promises';
-import * as path from 'path';
-import { WebContentsView } from 'electron';
+import { mkdir, writeFile } from 'node:fs/promises';
+import * as path from 'node:path';
+import type { WebContentsView } from 'electron';
 
 /**
  * 左右ビューのスクリーンショットを同時に撮影し PNG ファイルとして保存する。
@@ -19,7 +19,7 @@ async function captureScreenshots(
   leftView: WebContentsView,
   rightView: WebContentsView,
   snapshotDir: string,
-  pageName: string
+  pageName: string,
 ): Promise<string> {
   const timestamp = Date.now();
   const fileName = `${pageName}_${timestamp}.png`;

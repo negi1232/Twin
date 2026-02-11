@@ -5,28 +5,28 @@
  * サイドバー操作（フォルダ選択・ディレクトリ読み取り・ファイルプレビュー）を提供する。
  */
 
-import { ipcMain, BrowserWindow, dialog, IpcMainInvokeEvent } from 'electron';
-import * as path from 'path';
-import * as fs from 'fs';
-import { captureScreenshots } from './screenshot';
-import { runRegCli } from './reg-runner';
-import { getSettings, saveSettings, getStore } from './store';
-import { createSyncManager, SyncManager } from './sync-manager';
-import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM } from '../shared/constants';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { WebContentsView } from 'electron';
+import { BrowserWindow, dialog, type IpcMainInvokeEvent, ipcMain } from 'electron';
+import { DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM } from '../shared/constants';
 import {
-  runFullScan,
-  generateScanReportHTML,
   buildGetElementStylesScript,
   buildHighlightScript,
-  compareStyles,
-  classifyProperty,
-  CSS_INSPECT_SCRIPT,
+  CLEAR_HIGHLIGHT_SCRIPT,
   CSS_INSPECT_CLEANUP_SCRIPT,
   CSS_INSPECT_PREFIX,
-  CLEAR_HIGHLIGHT_SCRIPT,
-  CssScanResult,
+  CSS_INSPECT_SCRIPT,
+  type CssScanResult,
+  classifyProperty,
+  compareStyles,
+  generateScanReportHTML,
+  runFullScan,
 } from './css-compare';
-import type { WebContentsView } from 'electron';
+import { runRegCli } from './reg-runner';
+import { captureScreenshots } from './screenshot';
+import { getSettings, getStore, saveSettings } from './store';
+import { createSyncManager, type SyncManager } from './sync-manager';
 
 /** ナビゲーションで許可する URL スキーム */
 const ALLOWED_URL_SCHEMES: string[] = ['http:', 'https:'];
@@ -74,7 +74,13 @@ function isPathUnderBase(targetPath: string, basePath: string): boolean {
 /**
  * すべての IPC ハンドラを登録し、SyncManager を初期化して返す。
  */
-function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth, getSidebarWidth }: IpcHandlerOptions): { syncManager: SyncManager } {
+function registerIpcHandlers({
+  mainWindow,
+  leftView,
+  rightView,
+  setSidebarWidth,
+  getSidebarWidth,
+}: IpcHandlerOptions): { syncManager: SyncManager } {
   // --- Sync Manager ---
   const syncManager = createSyncManager(leftView, rightView);
   syncManager.start();
@@ -148,20 +154,23 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
   });
 
   // Change BrowserView size (device preset)
-  ipcMain.handle('set-device-preset', (_event: IpcMainInvokeEvent, { width, height }: { width: number; height: number }) => {
-    const TOOLBAR_HEIGHT = 52;
-    const STATUS_BAR_HEIGHT = 28;
-    const sw = getSidebarWidth ? getSidebarWidth() : 0;
-    if (leftView) {
-      leftView.setBounds({ x: sw, y: TOOLBAR_HEIGHT, width, height });
-    }
-    if (rightView) {
-      rightView.setBounds({ x: sw + width, y: TOOLBAR_HEIGHT, width, height });
-    }
-    if (mainWindow) {
-      mainWindow.setContentSize(sw + width * 2, height + TOOLBAR_HEIGHT + STATUS_BAR_HEIGHT);
-    }
-  });
+  ipcMain.handle(
+    'set-device-preset',
+    (_event: IpcMainInvokeEvent, { width, height }: { width: number; height: number }) => {
+      const TOOLBAR_HEIGHT = 52;
+      const STATUS_BAR_HEIGHT = 28;
+      const sw = getSidebarWidth ? getSidebarWidth() : 0;
+      if (leftView) {
+        leftView.setBounds({ x: sw, y: TOOLBAR_HEIGHT, width, height });
+      }
+      if (rightView) {
+        rightView.setBounds({ x: sw + width, y: TOOLBAR_HEIGHT, width, height });
+      }
+      if (mainWindow) {
+        mainWindow.setContentSize(sw + width * 2, height + TOOLBAR_HEIGHT + STATUS_BAR_HEIGHT);
+      }
+    },
+  );
 
   // Navigate to URL
   ipcMain.handle('navigate', (_event: IpcMainInvokeEvent, { url, target }: { url: string; target: string }) => {
@@ -345,7 +354,7 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
         sandbox: true,
       },
     });
-    reportWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    reportWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 
     return scanResult.summary;
   });
@@ -419,9 +428,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     }
 
     // Highlight matching element in right view
-    const highlighted = await rightView.webContents.executeJavaScript(
-      buildHighlightScript(leftData.key)
-    ).catch(() => false);
+    const highlighted = await rightView.webContents
+      .executeJavaScript(buildHighlightScript(leftData.key))
+      .catch(() => false);
 
     if (!highlighted) {
       if (mainWindow && !mainWindow.webContents.isDestroyed()) {
@@ -436,9 +445,9 @@ function registerIpcHandlers({ mainWindow, leftView, rightView, setSidebarWidth,
     }
 
     // Get right element styles
-    const rightData: { tag: string; styles: Record<string, string> } | null = await rightView.webContents.executeJavaScript(
-      buildGetElementStylesScript(leftData.key, leftData.method)
-    ).catch(() => null);
+    const rightData: { tag: string; styles: Record<string, string> } | null = await rightView.webContents
+      .executeJavaScript(buildGetElementStylesScript(leftData.key, leftData.method))
+      .catch(() => null);
 
     if (!rightData) {
       if (mainWindow && !mainWindow.webContents.isDestroyed()) {

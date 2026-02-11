@@ -1,37 +1,118 @@
 // CSS property category sets
 const LAYOUT_PROPS: Set<string> = new Set([
-  'display', 'position', 'top', 'right', 'bottom', 'left',
-  'float', 'clear', 'z-index', 'overflow', 'overflow-x', 'overflow-y',
-  'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-  'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-  'border-width', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
-  'flex', 'flex-grow', 'flex-shrink', 'flex-basis', 'flex-direction', 'flex-wrap',
-  'justify-content', 'align-items', 'align-self', 'align-content',
-  'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
-  'gap', 'row-gap', 'column-gap',
-  'box-sizing', 'vertical-align',
+  'display',
+  'position',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'float',
+  'clear',
+  'z-index',
+  'overflow',
+  'overflow-x',
+  'overflow-y',
+  'width',
+  'height',
+  'min-width',
+  'min-height',
+  'max-width',
+  'max-height',
+  'margin',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'padding',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-width',
+  'border-top-width',
+  'border-right-width',
+  'border-bottom-width',
+  'border-left-width',
+  'flex',
+  'flex-grow',
+  'flex-shrink',
+  'flex-basis',
+  'flex-direction',
+  'flex-wrap',
+  'justify-content',
+  'align-items',
+  'align-self',
+  'align-content',
+  'grid-template-columns',
+  'grid-template-rows',
+  'grid-column',
+  'grid-row',
+  'gap',
+  'row-gap',
+  'column-gap',
+  'box-sizing',
+  'vertical-align',
 ]);
 
 const TEXT_PROPS: Set<string> = new Set([
-  'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
-  'line-height', 'letter-spacing', 'word-spacing', 'text-align', 'text-decoration',
-  'text-transform', 'text-indent', 'text-shadow', 'white-space', 'word-break',
-  'word-wrap', 'overflow-wrap', 'color', 'direction', 'unicode-bidi',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'font-style',
+  'font-variant',
+  'line-height',
+  'letter-spacing',
+  'word-spacing',
+  'text-align',
+  'text-decoration',
+  'text-transform',
+  'text-indent',
+  'text-shadow',
+  'white-space',
+  'word-break',
+  'word-wrap',
+  'overflow-wrap',
+  'color',
+  'direction',
+  'unicode-bidi',
   'writing-mode',
 ]);
 
 const VISUAL_PROPS: Set<string> = new Set([
-  'background', 'background-color', 'background-image', 'background-position',
-  'background-size', 'background-repeat',
-  'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-  'border-style', 'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
-  'border-radius', 'border-top-left-radius', 'border-top-right-radius',
-  'border-bottom-left-radius', 'border-bottom-right-radius',
-  'box-shadow', 'opacity', 'visibility',
-  'outline', 'outline-color', 'outline-style', 'outline-width',
-  'transform', 'transition', 'animation',
-  'cursor', 'filter', 'backdrop-filter',
+  'background',
+  'background-color',
+  'background-image',
+  'background-position',
+  'background-size',
+  'background-repeat',
+  'border-color',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'border-style',
+  'border-top-style',
+  'border-right-style',
+  'border-bottom-style',
+  'border-left-style',
+  'border-radius',
+  'border-top-left-radius',
+  'border-top-right-radius',
+  'border-bottom-left-radius',
+  'border-bottom-right-radius',
+  'box-shadow',
+  'opacity',
+  'visibility',
+  'outline',
+  'outline-color',
+  'outline-style',
+  'outline-width',
+  'transform',
+  'transition',
+  'animation',
+  'cursor',
+  'filter',
+  'backdrop-filter',
 ]);
 
 export interface CssElement {
@@ -81,7 +162,7 @@ export interface CssScanResult {
   summary: ScanSummary;
 }
 
-import { WebContentsView } from 'electron';
+import type { WebContentsView } from 'electron';
 
 /**
  * Classify a CSS property into a category.
@@ -279,7 +360,13 @@ const CSS_INSPECT_CLEANUP_SCRIPT: string = `(function() {
  * Build a script to get computed styles for a single element by its match key.
  */
 function buildGetElementStylesScript(key: string, method: string): string {
-  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const escapedKey = key
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
   return `(function() {
     var el;
     try {
@@ -305,7 +392,13 @@ function buildGetElementStylesScript(key: string, method: string): string {
  * Build a script to highlight an element in the right view with an orange border.
  */
 function buildHighlightScript(key: string): string {
-  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const escapedKey = key
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
   return `(function() {
     // Remove previous highlight
     var prev = document.getElementById('__twin_right_highlight');

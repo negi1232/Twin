@@ -111,7 +111,7 @@ function initUIControls(): void {
     const folderInfo = document.getElementById('new-report-folder-info') as HTMLElement;
     const folderPathEl = document.getElementById('new-report-folder-path') as HTMLElement;
     if (currentFolderPath) {
-      folderPathEl.textContent = currentFolderPath + '/';
+      folderPathEl.textContent = `${currentFolderPath}/`;
       folderInfo.classList.remove('hidden');
     } else {
       folderInfo.classList.add('hidden');
@@ -130,7 +130,7 @@ function initUIControls(): void {
     newReportModal.classList.add('hidden');
     window.electronAPI.setViewsVisible({ visible: true });
     if (currentFolderPath) {
-      const newPath = currentFolderPath + '/' + testName;
+      const newPath = `${currentFolderPath}/${testName}`;
       try {
         await window.electronAPI.createDirectory({ dirPath: newPath });
       } catch {
@@ -213,9 +213,9 @@ function initUIControls(): void {
   // Zoom controls
   function updateZoomDisplay(zoom: number): void {
     currentZoom = zoom;
-    const pct = Math.round(zoom * 100) + '%';
+    const pct = `${Math.round(zoom * 100)}%`;
     zoomLevelBtn.textContent = pct;
-    (document.getElementById('status-zoom') as HTMLElement).textContent = 'Zoom: ' + pct;
+    (document.getElementById('status-zoom') as HTMLElement).textContent = `Zoom: ${pct}`;
   }
 
   function zoomIn(): void {
@@ -248,7 +248,7 @@ function initUIControls(): void {
   // Device presets
   document.querySelectorAll('.btn-preset').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const index = parseInt((btn as HTMLElement).dataset.preset || '0');
+      const index = parseInt((btn as HTMLElement).dataset.preset || '0', 10);
       applyPreset(index);
     });
   });
@@ -261,7 +261,9 @@ function initUIControls(): void {
     (document.getElementById('status-size') as HTMLElement).textContent = `${preset.width} x ${preset.height}`;
 
     // Update active state
-    document.querySelectorAll('.btn-preset').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.btn-preset').forEach((b) => {
+      b.classList.remove('active');
+    });
     const activeBtn = document.querySelector(`.btn-preset[data-preset="${index}"]`);
     if (activeBtn) activeBtn.classList.add('active');
   }
@@ -273,7 +275,9 @@ function initUIControls(): void {
     settingsModal.classList.remove('hidden');
     window.electronAPI.setViewsVisible({ visible: false });
     window.electronAPI.getSettings().then((settings: AppSettings) => {
-      (document.getElementById('setting-matching-threshold') as HTMLInputElement).value = String(settings.matchingThreshold);
+      (document.getElementById('setting-matching-threshold') as HTMLInputElement).value = String(
+        settings.matchingThreshold,
+      );
       (document.getElementById('setting-threshold-rate') as HTMLInputElement).value = String(settings.thresholdRate);
       (document.getElementById('setting-snapshot-dir') as HTMLInputElement).value = settings.snapshotDir;
     });
@@ -349,7 +353,7 @@ function initUIControls(): void {
   async function createNewFolder(): Promise<void> {
     const name = sidebarNewFolderNameInput.value.trim();
     if (!name || !currentFolderPath) return;
-    const newPath = currentFolderPath + '/' + name;
+    const newPath = `${currentFolderPath}/${name}`;
     try {
       await window.electronAPI.createDirectory({ dirPath: newPath });
       sidebarNewFolderForm.classList.add('hidden');
@@ -608,7 +612,7 @@ function initUIControls(): void {
     rightUrlInput.value = settings.rightUrl || 'http://localhost:3001';
     currentSnapshotDir = settings.snapshotDir || null;
     updateSnapshotDirDisplay();
-    if (currentSnapshotDir && currentSnapshotDir.startsWith('/')) {
+    if (currentSnapshotDir?.startsWith('/')) {
       const parts = currentSnapshotDir.split('/');
       currentFolderPath = parts.length > 2 ? parts.slice(0, -1).join('/') : currentSnapshotDir;
       loadAndRenderTree();
