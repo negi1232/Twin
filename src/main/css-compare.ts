@@ -1,4 +1,4 @@
-import { classifyProperty, LAYOUT_PROPS, TEXT_PROPS, VISUAL_PROPS } from '../shared/utils';
+import { classifyProperty } from '../shared/utils';
 
 export interface CssElement {
   tag: string;
@@ -725,7 +725,6 @@ init();
 }
 
 export {
-  classifyProperty,
   matchElements,
   compareStyles,
   runFullScan,
@@ -737,7 +736,4 @@ export {
   CSS_INSPECT_CLEANUP_SCRIPT,
   CSS_INSPECT_PREFIX,
   CLEAR_HIGHLIGHT_SCRIPT,
-  LAYOUT_PROPS,
-  TEXT_PROPS,
-  VISUAL_PROPS,
 };

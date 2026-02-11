@@ -7,6 +7,7 @@
 
 import * as path from 'node:path';
 import { app, BrowserWindow, Menu, session, WebContentsView } from 'electron';
+import { TOOLBAR_HEIGHT, STATUS_BAR_HEIGHT } from '../shared/constants';
 import { registerIpcHandlers } from './ipc-handlers';
 import { getStore } from './store';
 
@@ -14,9 +15,6 @@ let mainWindow: BrowserWindow | null = null;
 let leftView: WebContentsView | null = null;
 let rightView: WebContentsView | null = null;
 let sidebarWidth: number = 0;
-
-const TOOLBAR_HEIGHT: number = 52;
-const STATUS_BAR_HEIGHT: number = 28;
 const preloadPath: string = path.join(__dirname, 'preload.js');
 
 /**

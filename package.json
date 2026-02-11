@@ -4,7 +4,7 @@
   "description": "CSS Comparison Tool - Compare Computed Styles across two localhost views in real time",
   "main": "dist/main/index.js",
   "scripts": {
-    "build:ts": "tsc && cp src/renderer/index.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/",
+    "build:ts": "rm -rf dist && tsc && cp src/renderer/index.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/",
     "start": "npm run build:ts && electron dist/main/index.js",
     "dev": "npm run build:ts && electron dist/main/index.js --dev",
     "test": "jest --coverage",

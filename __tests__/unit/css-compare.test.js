@@ -1,5 +1,10 @@
 const {
   classifyProperty,
+  LAYOUT_PROPS,
+  TEXT_PROPS,
+  VISUAL_PROPS,
+} = require('../../src/shared/utils');
+const {
   matchElements,
   compareStyles,
   runFullScan,
@@ -11,9 +16,6 @@ const {
   CSS_INSPECT_CLEANUP_SCRIPT,
   CSS_INSPECT_PREFIX,
   CLEAR_HIGHLIGHT_SCRIPT,
-  LAYOUT_PROPS,
-  TEXT_PROPS,
-  VISUAL_PROPS,
 } = require('../../src/main/css-compare');
 
 // ---------- classifyProperty ----------

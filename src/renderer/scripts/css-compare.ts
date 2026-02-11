@@ -59,7 +59,9 @@ function initCssCompare(): void {
   function disableInspectMode(): void {
     if (!inspectActive) return;
     inspectActive = false;
-    window.electronAPI.cssInspectToggle({ enabled: false }).catch(() => {});
+    window.electronAPI.cssInspectToggle({ enabled: false }).catch((err) => {
+      console.error('Failed to disable inspect mode:', (err as Error).message);
+    });
     updateInspectButtonState();
     hideInspectDrawer();
   }

@@ -17,6 +17,7 @@ import {
   STATUS_BAR_HEIGHT,
   TOOLBAR_HEIGHT,
 } from '../shared/constants';
+import { classifyProperty } from '../shared/utils';
 import {
   buildGetElementStylesScript,
   buildHighlightScript,
@@ -25,7 +26,6 @@ import {
   CSS_INSPECT_PREFIX,
   CSS_INSPECT_SCRIPT,
   type CssScanResult,
-  classifyProperty,
   compareStyles,
   generateScanReportHTML,
   runFullScan,
