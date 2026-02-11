@@ -44,4 +44,68 @@ describe('Device Presets', () => {
     expect(getPresetByIndex(5)).toBeNull();
     expect(getPresetByIndex(100)).toBeNull();
   });
+
+  test('iPhone 14 Pro has correct dimensions', () => {
+    expect(PRESETS['iPhone 14 Pro']).toEqual({ width: 393, height: 852 });
+  });
+
+  test('iPad has correct dimensions', () => {
+    expect(PRESETS['iPad']).toEqual({ width: 768, height: 1024 });
+  });
+
+  test('Desktop has correct dimensions', () => {
+    expect(PRESETS['Desktop']).toEqual({ width: 1280, height: 900 });
+  });
+
+  test('PRESET_LIST items have name, width, and height', () => {
+    PRESET_LIST.forEach((preset) => {
+      expect(preset).toHaveProperty('name');
+      expect(preset).toHaveProperty('width');
+      expect(preset).toHaveProperty('height');
+      expect(typeof preset.name).toBe('string');
+    });
+  });
+
+  test('getPresetByIndex returns all 5 presets', () => {
+    for (let i = 0; i < 5; i++) {
+      const preset = getPresetByIndex(i);
+      expect(preset).not.toBeNull();
+      expect(preset.name).toBeTruthy();
+      expect(preset.width).toBeGreaterThan(0);
+      expect(preset.height).toBeGreaterThan(0);
+    }
+  });
+
+  test('PRESET_LIST order matches PRESETS keys', () => {
+    const names = PRESET_LIST.map((p) => p.name);
+    expect(names).toEqual(['iPhone SE', 'iPhone 14 Pro', 'iPad', 'Desktop', 'Full HD']);
+  });
+
+  test('getPresetByIndex returns falsy for float index', () => {
+    expect(getPresetByIndex(1.5)).toBeFalsy();
+  });
+
+  test('getPresetByIndex returns falsy for NaN', () => {
+    expect(getPresetByIndex(NaN)).toBeFalsy();
+  });
+
+  test('all preset widths are positive integers', () => {
+    PRESET_LIST.forEach((preset) => {
+      expect(Number.isInteger(preset.width)).toBe(true);
+      expect(preset.width).toBeGreaterThan(0);
+    });
+  });
+
+  test('all preset heights are positive integers', () => {
+    PRESET_LIST.forEach((preset) => {
+      expect(Number.isInteger(preset.height)).toBe(true);
+      expect(preset.height).toBeGreaterThan(0);
+    });
+  });
+
+  test('presets are sorted by width ascending', () => {
+    for (let i = 1; i < PRESET_LIST.length; i++) {
+      expect(PRESET_LIST[i].width).toBeGreaterThanOrEqual(PRESET_LIST[i - 1].width);
+    }
+  });
 });

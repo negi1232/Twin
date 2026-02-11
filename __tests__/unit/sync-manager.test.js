@@ -747,4 +747,276 @@ describe('escapeForScript', () => {
   test('returns unchanged for safe strings', () => {
     expect(escapeForScript('hello world 123')).toBe('hello world 123');
   });
+
+  test('escapes only dollar sign (not followed by brace)', () => {
+    expect(escapeForScript('$100')).toBe('\\$100');
+  });
+
+  test('escapes multiple consecutive backslashes', () => {
+    expect(escapeForScript('a\\\\b')).toBe('a\\\\\\\\b');
+  });
+
+  test('handles very long strings', () => {
+    const long = 'a'.repeat(10000);
+    expect(escapeForScript(long)).toBe(long);
+  });
+});
+
+// --- Additional SyncManager edge case tests ---
+describe('SyncManager edge cases', () => {
+  let leftView, rightView, manager;
+
+  function createMockView2() {
+    const listeners = {};
+    return {
+      webContents: {
+        on: jest.fn((event, cb) => {
+          if (!listeners[event]) listeners[event] = [];
+          listeners[event].push(cb);
+        }),
+        removeListener: jest.fn((event, cb) => {
+          if (listeners[event]) {
+            listeners[event] = listeners[event].filter((l) => l !== cb);
+          }
+        }),
+        executeJavaScript: jest.fn().mockResolvedValue(undefined),
+        sendInputEvent: jest.fn(),
+        isDestroyed: jest.fn(() => false),
+        getZoomFactor: jest.fn(() => 1.0),
+      },
+      _listeners: listeners,
+      _emit(event, ...args) {
+        (listeners[event] || []).forEach((cb) => cb(...args));
+      },
+    };
+  }
+
+  beforeEach(() => {
+    leftView = createMockView2();
+    rightView = createMockView2();
+    manager = createSyncManager(leftView, rightView);
+  });
+
+  test('scroll with NaN scrollX is ignored', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: NaN, scrollY: 100 } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('scroll with null scrollY is ignored', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 0, scrollY: null } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('scroll with negative values still replays', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: -10, scrollY: -20 } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledWith('window.scrollTo(-10, -20)');
+  });
+
+  test('scroll with very large values replays correctly', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 999999, scrollY: 888888 } });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledWith('window.scrollTo(999999, 888888)');
+  });
+
+  test('unknown message type is silently ignored', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'unknown', data: {} });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+    expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  test('message with empty type is silently ignored', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({ type: '', data: {} });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('click with middle button sends middle button events', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 50, y: 60 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'middle' } });
+    manager._handleMessage(null, 0, msg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', button: 'middle' })
+    );
+  });
+
+  test('click with right button sends right button events', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 50, y: 60 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'right' } });
+    manager._handleMessage(null, 0, msg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', button: 'right' })
+    );
+  });
+
+  test('multiple suppress calls reset the timer', () => {
+    jest.useFakeTimers();
+    manager.suppressNavSync();
+    expect(manager.isNavSyncSuppressed()).toBe(true);
+    jest.advanceTimersByTime(400);
+    manager.suppressNavSync();
+    expect(manager.isNavSyncSuppressed()).toBe(true);
+    jest.advanceTimersByTime(400);
+    expect(manager.isNavSyncSuppressed()).toBe(true);
+    jest.advanceTimersByTime(200);
+    expect(manager.isNavSyncSuppressed()).toBe(false);
+    jest.useRealTimers();
+  });
+
+  test('rapid enable/disable toggling maintains correct state', () => {
+    for (let i = 0; i < 10; i++) {
+      manager.setEnabled(i % 2 === 0);
+    }
+    expect(manager.isEnabled()).toBe(false);
+    manager.setEnabled(true);
+    expect(manager.isEnabled()).toBe(true);
+  });
+
+  test('setEnabled coerces truthy values to boolean', () => {
+    manager.setEnabled(1);
+    expect(manager.isEnabled()).toBe(true);
+    manager.setEnabled(0);
+    expect(manager.isEnabled()).toBe(false);
+    manager.setEnabled('yes');
+    expect(manager.isEnabled()).toBe(true);
+    manager.setEnabled('');
+    expect(manager.isEnabled()).toBe(false);
+    manager.setEnabled(null);
+    expect(manager.isEnabled()).toBe(false);
+  });
+
+  test('keydown with all modifiers sends all modifier flags', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'keydown',
+      data: { key: 'a', code: 'KeyA', keyCode: 65, shift: true, ctrl: true, alt: true, meta: true },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'keyDown', modifiers: ['shift', 'control', 'alt', 'meta'] })
+    );
+  });
+
+  test('keyup for printable char does NOT send char event', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'keyup',
+      data: { key: 'z', code: 'KeyZ', keyCode: 90, shift: false, ctrl: false, alt: false, meta: false },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(1);
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'keyUp' })
+    );
+  });
+
+  test('inputvalue with empty value', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#field', value: '' },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('#field');
+  });
+
+  test('inputvalue with empty textContent for contenteditable', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '.editor', textContent: '' },
+    });
+    manager._handleMessage(null, 0, msg);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('textContent');
+  });
+
+  test('sequential scroll and click messages both replay', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValue({ x: 50, y: 50 });
+    const scrollMsg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 100, scrollY: 200 } });
+    const clickMsg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'left' } });
+    manager._handleMessage(null, 0, scrollMsg);
+    manager._handleMessage(null, 0, clickMsg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(2);
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(2);
+  });
+
+  test('hover works when getZoomFactor is not available', async () => {
+    rightView.webContents.getZoomFactor = undefined;
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 100, y: 200 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#btn' } });
+    manager._handleMessage(null, 0, msg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseMove', x: 100, y: 200 })
+    );
+  });
+
+  test('INJECTION_SCRIPT contains sync prefix', () => {
+    const { INJECTION_SCRIPT } = require('../../src/main/sync-manager');
+    expect(typeof INJECTION_SCRIPT).toBe('string');
+    expect(INJECTION_SCRIPT.length).toBeGreaterThan(0);
+    expect(INJECTION_SCRIPT).toContain(SYNC_PREFIX);
+  });
+
+  test('SYNC_PREFIX value is correct', () => {
+    expect(SYNC_PREFIX).toBe('__twin_sync__');
+  });
+
+  test('start can be called multiple times without error', () => {
+    manager.start();
+    manager.start();
+    expect(leftView.webContents.on).toHaveBeenCalled();
+  });
+
+  test('stop can be called without start', () => {
+    expect(() => manager.stop()).not.toThrow();
+  });
+
+  test('messages are ignored when rightView is null', () => {
+    const nullManager = createSyncManager(leftView, null);
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'scroll', data: { scrollX: 0, scrollY: 0 } });
+    nullManager._handleMessage(null, 0, msg);
+  });
+
+  test('click replay handles executeJavaScript returning undefined coords', async () => {
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce(undefined);
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  test('elementscroll with Infinity scrollLeft is ignored', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.box', scrollLeft: Infinity, scrollTop: 0 },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('elementscroll with NaN scrollTop is ignored', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'elementscroll',
+      data: { selector: '.box', scrollLeft: 0, scrollTop: NaN },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).not.toHaveBeenCalled();
+  });
+
+  test('click without getZoomFactor uses default zoom 1', async () => {
+    rightView.webContents.getZoomFactor = undefined;
+    rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 100, y: 200 });
+    const msg = SYNC_PREFIX + JSON.stringify({ type: 'click', data: { selector: '#btn', button: 'left' } });
+    manager._handleMessage(null, 0, msg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'mouseDown', x: 100, y: 200 })
+    );
+  });
 });

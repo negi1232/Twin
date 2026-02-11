@@ -519,4 +519,287 @@ describe('exported constants', () => {
       expect(TEXT_PROPS.has(prop)).toBe(false);
     }
   });
+
+  test('LAYOUT_PROPS contains all flex-related properties', () => {
+    const flexProps = ['flex', 'flex-grow', 'flex-shrink', 'flex-basis', 'flex-direction', 'flex-wrap'];
+    for (const p of flexProps) {
+      expect(LAYOUT_PROPS.has(p)).toBe(true);
+    }
+  });
+
+  test('LAYOUT_PROPS contains all grid-related properties', () => {
+    const gridProps = ['grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row', 'gap', 'row-gap', 'column-gap'];
+    for (const p of gridProps) {
+      expect(LAYOUT_PROPS.has(p)).toBe(true);
+    }
+  });
+
+  test('TEXT_PROPS contains all font-related properties', () => {
+    const fontProps = ['font-family', 'font-size', 'font-weight', 'font-style', 'font-variant'];
+    for (const p of fontProps) {
+      expect(TEXT_PROPS.has(p)).toBe(true);
+    }
+  });
+
+  test('VISUAL_PROPS contains all border-color properties', () => {
+    const borderColorProps = ['border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'];
+    for (const p of borderColorProps) {
+      expect(VISUAL_PROPS.has(p)).toBe(true);
+    }
+  });
+
+  test('VISUAL_PROPS contains all border-radius properties', () => {
+    const radiusProps = ['border-radius', 'border-top-left-radius', 'border-top-right-radius', 'border-bottom-left-radius', 'border-bottom-right-radius'];
+    for (const p of radiusProps) {
+      expect(VISUAL_PROPS.has(p)).toBe(true);
+    }
+  });
+});
+
+// ---------- Additional classifyProperty tests ----------
+describe('classifyProperty edge cases', () => {
+  test('all margin properties are layout', () => {
+    for (const p of ['margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left']) {
+      expect(classifyProperty(p)).toBe('layout');
+    }
+  });
+
+  test('all padding properties are layout', () => {
+    for (const p of ['padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left']) {
+      expect(classifyProperty(p)).toBe('layout');
+    }
+  });
+
+  test('all overflow properties are layout', () => {
+    expect(classifyProperty('overflow')).toBe('layout');
+    expect(classifyProperty('overflow-x')).toBe('layout');
+    expect(classifyProperty('overflow-y')).toBe('layout');
+  });
+
+  test('all background properties are visual', () => {
+    for (const p of ['background', 'background-color', 'background-image', 'background-position', 'background-size', 'background-repeat']) {
+      expect(classifyProperty(p)).toBe('visual');
+    }
+  });
+
+  test('all outline properties are visual', () => {
+    for (const p of ['outline', 'outline-color', 'outline-style', 'outline-width']) {
+      expect(classifyProperty(p)).toBe('visual');
+    }
+  });
+
+  test('vendor-prefixed properties are other', () => {
+    expect(classifyProperty('-webkit-appearance')).toBe('other');
+    expect(classifyProperty('-moz-appearance')).toBe('other');
+  });
+});
+
+// ---------- Additional matchElements tests ----------
+describe('matchElements edge cases', () => {
+  test('duplicate keys in left matches same right element', () => {
+    const left = [
+      { key: '#dup', tag: 'div', method: 'id', styles: { color: 'red' } },
+      { key: '#dup', tag: 'div', method: 'id', styles: { color: 'blue' } },
+    ];
+    const right = [{ key: '#dup', tag: 'div', method: 'id', styles: { color: 'green' } }];
+    const result = matchElements(left, right);
+    expect(result.matched).toHaveLength(2);
+  });
+
+  test('large number of elements', () => {
+    const leftElements = Array.from({ length: 100 }, (_, i) => ({
+      key: `#el-${i}`, tag: 'div', method: 'id', styles: {},
+    }));
+    const rightElements = Array.from({ length: 100 }, (_, i) => ({
+      key: `#el-${i}`, tag: 'div', method: 'id', styles: {},
+    }));
+    const result = matchElements(leftElements, rightElements);
+    expect(result.matched).toHaveLength(100);
+  });
+
+  test('elements with various matching methods', () => {
+    const left = [
+      { key: '#by-id', tag: 'div', method: 'id', styles: {} },
+      { key: '[data-testid="cta"]', tag: 'button', method: 'data-testid', styles: {} },
+      { key: '.unique-class', tag: 'span', method: 'unique-class', styles: {} },
+      { key: 'body > div:nth-of-type(2)', tag: 'div', method: 'dom-path', styles: {} },
+    ];
+    const right = [...left];
+    const result = matchElements(left, right);
+    expect(result.matched).toHaveLength(4);
+  });
+});
+
+// ---------- Additional compareStyles tests ----------
+describe('compareStyles edge cases', () => {
+  test('many properties with one changed', () => {
+    const base = {};
+    for (let i = 0; i < 50; i++) base[`prop-${i}`] = `value-${i}`;
+    const left = { ...base };
+    const right = { ...base, 'prop-25': 'different-value' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].property).toBe('prop-25');
+  });
+
+  test('all properties changed', () => {
+    const left = { a: '1', b: '2', c: '3' };
+    const right = { a: '4', b: '5', c: '6' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(3);
+    diffs.forEach(d => expect(d.type).toBe('changed'));
+  });
+
+  test('all properties added', () => {
+    const diffs = compareStyles({}, { a: '1', b: '2' });
+    expect(diffs).toHaveLength(2);
+    diffs.forEach(d => expect(d.type).toBe('added'));
+  });
+
+  test('all properties deleted', () => {
+    const diffs = compareStyles({ a: '1', b: '2' }, {});
+    expect(diffs).toHaveLength(2);
+    diffs.forEach(d => expect(d.type).toBe('deleted'));
+  });
+
+  test('identical empty string values not reported', () => {
+    expect(compareStyles({ color: '' }, { color: '' })).toHaveLength(0);
+  });
+});
+
+// ---------- Additional runFullScan tests ----------
+describe('runFullScan edge cases', () => {
+  test('handles executeJavaScript rejection from leftView', async () => {
+    const mockLeft = {
+      webContents: {
+        isDestroyed: () => false,
+        executeJavaScript: jest.fn().mockRejectedValue(new Error('Script failed')),
+      },
+    };
+    const mockRight = {
+      webContents: {
+        isDestroyed: () => false,
+        executeJavaScript: jest.fn().mockResolvedValue([]),
+      },
+    };
+    await expect(runFullScan(mockLeft, mockRight)).rejects.toThrow('Script failed');
+  });
+
+  test('handles elements with many style differences', async () => {
+    const leftStyles = {};
+    const rightStyles = {};
+    for (let i = 0; i < 20; i++) {
+      leftStyles[`prop-${i}`] = `left-${i}`;
+      rightStyles[`prop-${i}`] = `right-${i}`;
+    }
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([{ tag: 'div', key: '#big', method: 'id', styles: leftStyles }]) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([{ tag: 'div', key: '#big', method: 'id', styles: rightStyles }]) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.changed[0].diffCount).toBe(20);
+  });
+
+  test('totalDiffProperties sums across all elements', async () => {
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'div', key: '#a', method: 'id', styles: { color: 'red', display: 'block' } },
+        { tag: 'div', key: '#b', method: 'id', styles: { color: 'blue' } },
+      ]) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'div', key: '#a', method: 'id', styles: { color: 'blue', display: 'flex' } },
+        { tag: 'div', key: '#b', method: 'id', styles: { color: 'green' } },
+      ]) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.summary.totalDiffProperties).toBe(3);
+  });
+});
+
+// ---------- Additional generateScanReportHTML tests ----------
+describe('generateScanReportHTML edge cases', () => {
+  test('report contains filter buttons', () => {
+    const scanResult = {
+      leftCount: 1, rightCount: 1, scannedElements: 2,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('data-type');
+    expect(html).toContain('data-cat');
+  });
+
+  test('report contains export and copy buttons', () => {
+    const scanResult = {
+      leftCount: 0, rightCount: 0, scannedElements: 0,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('export-json');
+    expect(html).toContain('copy-clipboard');
+  });
+
+  test('report includes added and deleted elements', () => {
+    const scanResult = {
+      leftCount: 2, rightCount: 2, scannedElements: 4,
+      changed: [],
+      added: [{ tag: 'span', key: '#new', method: 'id', type: 'added' }],
+      deleted: [{ tag: 'p', key: '#old', method: 'id', type: 'deleted' }],
+      summary: { changedElements: 0, addedElements: 1, deletedElements: 1, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('#new');
+    expect(html).toContain('#old');
+  });
+
+  test('report contains CSP meta tag', () => {
+    const scanResult = {
+      leftCount: 0, rightCount: 0, scannedElements: 0,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('Content-Security-Policy');
+  });
+});
+
+// ---------- buildGetElementStylesScript additional tests ----------
+describe('buildGetElementStylesScript edge cases', () => {
+  test('handles key with double quotes', () => {
+    const script = buildGetElementStylesScript('[data-testid="my-btn"]', 'data-testid');
+    expect(script).toContain('[data-testid="my-btn"]');
+  });
+
+  test('generated script returns null for missing element', () => {
+    const script = buildGetElementStylesScript('#nonexistent', 'id');
+    expect(script).toContain('return null');
+  });
+
+  test('generated script contains getComputedStyle call', () => {
+    const script = buildGetElementStylesScript('#test', 'id');
+    expect(script).toContain('getComputedStyle');
+  });
+});
+
+// ---------- buildHighlightScript additional tests ----------
+describe('buildHighlightScript edge cases', () => {
+  test('highlight script uses fixed positioning', () => {
+    const script = buildHighlightScript('#test');
+    expect(script).toContain('position:fixed');
+  });
+
+  test('highlight script returns false for missing element', () => {
+    const script = buildHighlightScript('#missing');
+    expect(script).toContain('return false');
+  });
+
+  test('highlight script returns true for found element', () => {
+    const script = buildHighlightScript('#exists');
+    expect(script).toContain('return true');
+  });
 });
