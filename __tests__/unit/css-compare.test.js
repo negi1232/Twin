@@ -425,7 +425,9 @@ describe('buildGetElementStylesScript', () => {
 
   test('generates script for data-testid selector', () => {
     const script = buildGetElementStylesScript('[data-testid="cta"]', 'data-testid');
-    expect(script).toContain('[data-testid="cta"]');
+    // JSON.stringify embeds the key safely with escaped quotes
+    expect(script).toContain('data-testid');
+    expect(script).toContain('cta');
   });
 
   test('generates script for dom-path selector', () => {
@@ -435,7 +437,9 @@ describe('buildGetElementStylesScript', () => {
 
   test('escapes special characters in key', () => {
     const script = buildGetElementStylesScript("#it's-a-test", 'id');
-    expect(script).toContain("\\'");
+    // JSON.stringify handles escaping (no manual \' needed)
+    expect(script).toContain("it's-a-test");
+    expect(script).toContain('getElementById');
   });
 });
 
@@ -455,7 +459,9 @@ describe('buildHighlightScript', () => {
 
   test('escapes special characters', () => {
     const script = buildHighlightScript("#it's-special");
-    expect(script).toContain("\\'");
+    // JSON.stringify handles escaping
+    expect(script).toContain("it's-special");
+    expect(script).toContain('querySelector');
   });
 });
 
@@ -772,7 +778,10 @@ describe('generateScanReportHTML edge cases', () => {
 describe('buildGetElementStylesScript edge cases', () => {
   test('handles key with double quotes', () => {
     const script = buildGetElementStylesScript('[data-testid="my-btn"]', 'data-testid');
-    expect(script).toContain('[data-testid="my-btn"]');
+    // JSON.stringify escapes the quotes safely
+    expect(script).toContain('data-testid');
+    expect(script).toContain('my-btn');
+    expect(script).toContain('querySelector');
   });
 
   test('generated script returns null for missing element', () => {

@@ -50,8 +50,8 @@ function createViews(): void {
   rightView.webContents.setZoomFactor(1.0);
   rightView.webContents.setZoomLevel(0);
 
-  leftView.webContents.loadURL(leftUrl).catch(() => {});
-  rightView.webContents.loadURL(rightUrl).catch(() => {});
+  leftView.webContents.loadURL(leftUrl).catch((err) => console.error('Failed to load left URL:', err.message));
+  rightView.webContents.loadURL(rightUrl).catch((err) => console.error('Failed to load right URL:', err.message));
 
   // Error handling — ignore ERR_ABORTED (-3) which fires on normal redirects
   leftView.webContents.on('did-fail-load', (_event, code, description, url) => {

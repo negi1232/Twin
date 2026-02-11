@@ -49,10 +49,14 @@ interface KeyData {
   meta: boolean;
 }
 
-interface SyncMessage {
-  type: string;
-  data: ScrollData | ElementScrollData | HoverData | ClickData | InputValueData | KeyData;
-}
+type SyncMessage =
+  | { type: 'scroll'; data: ScrollData }
+  | { type: 'elementscroll'; data: ElementScrollData }
+  | { type: 'hover'; data: HoverData }
+  | { type: 'click'; data: ClickData }
+  | { type: 'inputvalue'; data: InputValueData }
+  | { type: 'keydown'; data: KeyData }
+  | { type: 'keyup'; data: KeyData };
 
 export interface SyncManager {
   start(): void;
@@ -287,37 +291,38 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
       return;
     }
 
-    const { type, data } = parsed;
     if (!rightView || rightView.webContents.isDestroyed()) return;
 
-    switch (type) {
+    switch (parsed.type) {
       case 'scroll':
-        replayScroll(data as ScrollData);
+        replayScroll(parsed.data);
         break;
       case 'elementscroll':
-        replayElementScroll(data as ElementScrollData);
+        replayElementScroll(parsed.data);
         break;
       case 'hover':
-        replayHover(data as HoverData);
+        replayHover(parsed.data);
         break;
       case 'click':
-        replayClick(data as ClickData);
+        replayClick(parsed.data);
         break;
       case 'inputvalue':
-        replayInputValue(data as InputValueData);
+        replayInputValue(parsed.data);
         break;
       case 'keydown':
-        replayKey('keyDown', data as KeyData);
+        replayKey('keyDown', parsed.data);
         break;
       case 'keyup':
-        replayKey('keyUp', data as KeyData);
+        replayKey('keyUp', parsed.data);
         break;
     }
   }
 
   function replayScroll({ scrollX, scrollY }: ScrollData): void {
     if (!Number.isFinite(scrollX) || !Number.isFinite(scrollY)) return;
-    rightView.webContents.executeJavaScript(`window.scrollTo(${scrollX}, ${scrollY})`).catch(() => {});
+    rightView.webContents
+      .executeJavaScript(`window.scrollTo(${scrollX}, ${scrollY})`)
+      .catch((err: Error) => console.error('Sync replay failed:', err.message));
   }
 
   function replayElementScroll({ selector, scrollLeft, scrollTop }: ElementScrollData): void {
@@ -327,7 +332,9 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
       var el = document.querySelector('${escapedSelector}');
       if(el){ el.scrollLeft=${scrollLeft}; el.scrollTop=${scrollTop}; }
     })()`;
-    rightView.webContents.executeJavaScript(script).catch(() => {});
+    rightView.webContents
+      .executeJavaScript(script)
+      .catch((err: Error) => console.error('Sync replay failed:', err.message));
   }
 
   function replayHover({ selector }: HoverData): void {
@@ -352,7 +359,7 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
           });
         }
       })
-      .catch(() => {});
+      .catch((err: Error) => console.error('Sync replay failed:', err.message));
   }
 
   function replayClick({ selector, button }: ClickData): void {
@@ -391,7 +398,7 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
           });
         }
       })
-      .catch(() => {});
+      .catch((err: Error) => console.error('Sync replay failed:', err.message));
   }
 
   function replayInputValue({ selector, value, textContent }: InputValueData): void {
@@ -419,7 +426,9 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
       })()`;
     }
 
-    rightView.webContents.executeJavaScript(script).catch(() => {});
+    rightView.webContents
+      .executeJavaScript(script)
+      .catch((err: Error) => console.error('Sync replay failed:', err.message));
   }
 
   function replayKey(type: string, { key, keyCode, shift, ctrl, alt, meta }: KeyData): void {
@@ -449,7 +458,9 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
 
   function inject(): void {
     if (!leftView || leftView.webContents.isDestroyed()) return;
-    leftView.webContents.executeJavaScript(INJECTION_SCRIPT).catch(() => {});
+    leftView.webContents
+      .executeJavaScript(INJECTION_SCRIPT)
+      .catch((err: Error) => console.error('Sync replay failed:', err.message));
   }
 
   function start(): void {

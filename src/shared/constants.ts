@@ -27,6 +27,9 @@ export const MAX_ZOOM: number = 3.0;
 /** ズームのデフォルト値 */
 export const DEFAULT_ZOOM: number = 1.0;
 
+/** ファイル読み込みの最大サイズ (50MB) */
+export const MAX_FILE_SIZE: number = 50 * 1024 * 1024;
+
 /** IPC 通信で使用するチャンネル名 */
 export const IPC_CHANNELS = {
   CAPTURE_AND_COMPARE: 'capture-and-compare',

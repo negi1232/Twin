@@ -5,6 +5,26 @@
  * デバイスプリセット切替・設定管理・ファイルブラウザ・プレビューを提供する。
  */
 
+/** Toast タイマー管理 (DOM プロパティ汚染を避ける) */
+const toastTimers: WeakMap<HTMLElement, ReturnType<typeof setTimeout>> = new WeakMap();
+
+/** トースト通知を表示する (renderer 全体から利用可能) */
+function showToast(message: string, type: string): void {
+  const toast = document.getElementById('toast') as HTMLElement;
+  toast.textContent = message;
+  toast.className = `toast toast-${type}`;
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  const prev = toastTimers.get(toast);
+  if (prev) clearTimeout(prev);
+  toastTimers.set(
+    toast,
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2500),
+  );
+}
+
 /**
  * すべての UI コントロールのイベントリスナーを初期化する。
  * DOMContentLoaded 後に呼ばれることを想定。
@@ -312,18 +332,7 @@ function initUIControls(): void {
     (document.getElementById('status-result') as HTMLElement).textContent = text;
   }
 
-  function showToast(message: string, type: string): void {
-    const toast = document.getElementById('toast') as HTMLElement;
-    toast.textContent = message;
-    toast.className = `toast toast-${type}`;
-    // Force reflow to restart transition
-    void toast.offsetWidth;
-    toast.classList.add('show');
-    clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => {
-      toast.classList.remove('show');
-    }, 2500);
-  }
+  // showToast is now a global function (defined above initUIControls)
 
   // Sidebar toggle
   toggleSidebarBtn.addEventListener('click', () => {
@@ -621,5 +630,5 @@ function initUIControls(): void {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { initUIControls };
+  module.exports = { initUIControls, showToast };
 }

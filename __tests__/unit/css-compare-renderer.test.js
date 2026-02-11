@@ -61,9 +61,20 @@ describe('renderer/css-compare', () => {
 
   afterEach(() => {
     delete window.electronAPI;
+    delete global.escapeHtml;
+    delete global.classifyProperty;
+    delete global.showToast;
   });
 
   function init() {
+    // Load shared utils as globals (escapeHtml, classifyProperty)
+    const sharedUtils = require('../../src/renderer/scripts/shared-utils');
+    global.escapeHtml = sharedUtils.escapeHtml;
+    global.classifyProperty = sharedUtils.classifyProperty;
+    // Load showToast as global (defined at module level in ui-controls)
+    const uiControls = require('../../src/renderer/scripts/ui-controls');
+    global.showToast = uiControls.showToast;
+    // Now load css-compare which depends on the above globals
     const { initCssCompare } = require('../../src/renderer/scripts/css-compare');
     initCssCompare();
   }

@@ -9,7 +9,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { WebContentsView } from 'electron';
 import { BrowserWindow, dialog, type IpcMainInvokeEvent, ipcMain } from 'electron';
-import { DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM } from '../shared/constants';
+import {
+  DEFAULT_ZOOM,
+  MAX_FILE_SIZE,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  STATUS_BAR_HEIGHT,
+  TOOLBAR_HEIGHT,
+} from '../shared/constants';
 import {
   buildGetElementStylesScript,
   buildHighlightScript,
@@ -157,8 +164,9 @@ function registerIpcHandlers({
   ipcMain.handle(
     'set-device-preset',
     (_event: IpcMainInvokeEvent, { width, height }: { width: number; height: number }) => {
-      const TOOLBAR_HEIGHT = 52;
-      const STATUS_BAR_HEIGHT = 28;
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        throw new Error('Invalid device preset dimensions');
+      }
       const sw = getSidebarWidth ? getSidebarWidth() : 0;
       if (leftView) {
         leftView.setBounds({ x: sw, y: TOOLBAR_HEIGHT, width, height });
@@ -178,10 +186,10 @@ function registerIpcHandlers({
       throw new Error('Only http: and https: URLs are allowed');
     }
     if (target === 'left' && leftView && !leftView.webContents.isDestroyed()) {
-      leftView.webContents.loadURL(url).catch(() => {});
+      leftView.webContents.loadURL(url).catch((err) => console.error('Failed to load left URL:', err.message));
       getStore().set('leftUrl', url);
     } else if (target === 'right' && rightView && !rightView.webContents.isDestroyed()) {
-      rightView.webContents.loadURL(url).catch(() => {});
+      rightView.webContents.loadURL(url).catch((err) => console.error('Failed to load right URL:', err.message));
       getStore().set('rightUrl', url);
     }
   });
@@ -287,7 +295,6 @@ function registerIpcHandlers({
       '.svg': 'image/svg+xml',
     };
     const mimeType = mimeMap[ext] || 'application/octet-stream';
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     const stats = await fs.promises.stat(resolved);
     if (stats.size > MAX_FILE_SIZE) {
       throw new Error('File too large to read (max 50MB)');
@@ -315,6 +322,9 @@ function registerIpcHandlers({
   let currentZoom: number = DEFAULT_ZOOM;
 
   ipcMain.handle('set-zoom', (_event: IpcMainInvokeEvent, { zoom }: { zoom: number }) => {
+    if (!Number.isFinite(zoom)) {
+      throw new Error('Invalid zoom value');
+    }
     const clamped = Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom)) * 100) / 100;
     currentZoom = clamped;
     if (leftView && !leftView.webContents.isDestroyed()) {
@@ -366,16 +376,22 @@ function registerIpcHandlers({
     if (cssInspectActive) {
       // Inject inspect script into left view
       if (leftView && !leftView.webContents.isDestroyed()) {
-        await leftView.webContents.executeJavaScript(CSS_INSPECT_SCRIPT).catch(() => {});
+        await leftView.webContents
+          .executeJavaScript(CSS_INSPECT_SCRIPT)
+          .catch((err) => console.error('CSS inspect injection failed:', err.message));
       }
     } else {
       // Cleanup inspect mode from left view
       if (leftView && !leftView.webContents.isDestroyed()) {
-        await leftView.webContents.executeJavaScript(CSS_INSPECT_CLEANUP_SCRIPT).catch(() => {});
+        await leftView.webContents
+          .executeJavaScript(CSS_INSPECT_CLEANUP_SCRIPT)
+          .catch((err) => console.error('CSS inspect cleanup failed:', err.message));
       }
       // Clear right view highlight
       if (rightView && !rightView.webContents.isDestroyed()) {
-        await rightView.webContents.executeJavaScript(CLEAR_HIGHLIGHT_SCRIPT).catch(() => {});
+        await rightView.webContents
+          .executeJavaScript(CLEAR_HIGHLIGHT_SCRIPT)
+          .catch((err) => console.error('Clear highlight failed:', err.message));
       }
     }
 
@@ -509,7 +525,9 @@ function registerIpcHandlers({
         const navPath = new URL(url).pathname;
         const rightUrl = new URL(rightView.webContents.getURL());
         rightUrl.pathname = navPath;
-        rightView.webContents.loadURL(rightUrl.toString()).catch(() => {});
+        rightView.webContents
+          .loadURL(rightUrl.toString())
+          .catch((err) => console.error('Nav sync failed:', err.message));
       } catch {
         // ignore URL parse errors
       }

@@ -129,6 +129,9 @@ interface ScanSummary {
 
 declare function initUIControls(): void;
 declare function initCssCompare(): void;
+declare function showToast(message: string, type: string): void;
+declare function escapeHtml(str: string | null | undefined): string;
+declare function classifyProperty(prop: string): string;
 declare function getPresetByIndex(index: number): DevicePreset | null;
 declare function isSyncEnabled(): boolean;
 declare function toggleSync(): boolean;
@@ -142,10 +145,4 @@ declare function extractPathFromUrl(url: string): string;
 
 interface Window {
   electronAPI: ElectronAPI;
-}
-
-// --- Toast element extension ---
-
-interface HTMLElement {
-  _timer?: ReturnType<typeof setTimeout>;
 }
