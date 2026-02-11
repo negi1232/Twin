@@ -962,3 +962,277 @@ body.sidebar-open #status-bar {
   border-radius: var(--radius-sm);
   background: repeating-conic-gradient(#1a1a2e 0% 25%, #0d1117 0% 50%) 0 0 / 16px 16px;
 }
+
+/* ============================================
+   CSS Inspect Button Active State
+   ============================================ */
+#css-inspect-btn.css-inspect-active {
+  background: rgba(88, 166, 255, 0.15);
+  border-color: rgba(88, 166, 255, 0.4);
+  color: var(--accent-blue);
+}
+
+#css-inspect-btn.css-inspect-active:hover {
+  background: rgba(88, 166, 255, 0.25);
+  border-color: rgba(88, 166, 255, 0.6);
+}
+
+/* CSS Scan spinner */
+.css-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--text-secondary);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: css-spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+@keyframes css-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   CSS Inspect Drawer
+   ============================================ */
+.css-inspect-drawer {
+  position: fixed;
+  bottom: 28px;
+  left: 0;
+  width: 100%;
+  height: 200px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-default);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  transition: height 0s;
+}
+
+.css-inspect-drawer.hidden {
+  display: none;
+}
+
+body.sidebar-open .css-inspect-drawer {
+  left: 250px;
+  width: calc(100% - 250px);
+}
+
+.css-inspect-drawer-handle {
+  height: 4px;
+  background: var(--border-default);
+  cursor: ns-resize;
+  flex-shrink: 0;
+  transition: background var(--transition-fast);
+}
+
+.css-inspect-drawer-handle:hover {
+  background: var(--accent-blue);
+}
+
+.css-inspect-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+}
+
+.css-inspect-header-info {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.css-inspect-tag {
+  color: var(--accent-blue);
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.css-inspect-key {
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.css-inspect-method {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.css-inspect-diff-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--status-failed);
+}
+
+.css-inspect-error {
+  color: var(--status-new);
+  font-size: 11px;
+}
+
+.css-inspect-drawer-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.css-inspect-filter-btn,
+.css-inspect-cat-btn {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 11px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.css-inspect-filter-btn:hover,
+.css-inspect-cat-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.css-inspect-filter-btn.active,
+.css-inspect-cat-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.css-inspect-filter-sep {
+  color: var(--border-default);
+  font-size: 11px;
+}
+
+.css-inspect-close {
+  font-size: 16px;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.css-inspect-drawer-body {
+  flex: 1;
+  overflow: auto;
+  font-size: 11px;
+}
+
+.css-inspect-drawer-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.css-inspect-drawer-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.css-inspect-drawer-body::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+.css-inspect-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* CSS Inspect Diff Table */
+.css-inspect-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.css-inspect-table thead th {
+  position: sticky;
+  top: 0;
+  padding: 6px 12px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.css-inspect-table tbody td {
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border-default);
+  font-family: monospace;
+  font-size: 11px;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.css-inspect-table .css-prop {
+  color: var(--accent-blue);
+}
+
+.css-inspect-table .css-expected {
+  color: var(--status-passed);
+}
+
+.css-inspect-table .css-actual {
+  color: var(--status-failed);
+}
+
+.css-inspect-table .css-match-icon {
+  text-align: center;
+  width: 30px;
+}
+
+.css-diff-row {
+  background: rgba(248, 81, 73, 0.04);
+}
+
+.css-diff-row:hover {
+  background: rgba(248, 81, 73, 0.08);
+}
+
+.css-cat-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  display: inline-block;
+}
+
+.css-cat-layout {
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent-blue);
+}
+
+.css-cat-text {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--status-passed);
+}
+
+.css-cat-visual {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--status-new);
+}
+
+.css-cat-other {
+  background: rgba(139, 148, 158, 0.15);
+  color: var(--text-secondary);
+}

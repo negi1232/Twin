@@ -54,6 +54,7 @@ const mockRightView = {
 
 const mockBrowserWindow = jest.fn().mockImplementation(() => ({
   loadFile: jest.fn(),
+  loadURL: jest.fn(),
 }));
 
 const mockDialog = {
@@ -135,6 +136,29 @@ jest.mock('../../src/main/sync-manager', () => ({
   createSyncManager: jest.fn(() => mockSyncManager),
 }));
 
+const mockScanResult = {
+  leftCount: 2,
+  rightCount: 2,
+  scannedElements: 4,
+  changed: [{ tag: 'div', key: '#header', method: 'id', type: 'changed', diffCount: 1, diffs: [{ property: 'color', expected: 'red', actual: 'blue', category: 'text', type: 'changed' }] }],
+  added: [],
+  deleted: [],
+  summary: { changedElements: 1, addedElements: 0, deletedElements: 0, totalDiffProperties: 1 },
+};
+
+jest.mock('../../src/main/css-compare', () => ({
+  runFullScan: jest.fn().mockResolvedValue(mockScanResult),
+  generateScanReportHTML: jest.fn().mockReturnValue('<html><body>Report</body></html>'),
+  buildGetElementStylesScript: jest.fn().mockReturnValue('(function(){ return { tag: "div", styles: {} }; })()'),
+  buildHighlightScript: jest.fn().mockReturnValue('(function(){ return true; })()'),
+  compareStyles: jest.fn().mockReturnValue([]),
+  classifyProperty: jest.fn().mockReturnValue('other'),
+  CSS_INSPECT_SCRIPT: '/* inspect script */',
+  CSS_INSPECT_CLEANUP_SCRIPT: '/* cleanup */',
+  CSS_INSPECT_PREFIX: '__twin_css__',
+  CLEAR_HIGHLIGHT_SCRIPT: '/* clear */',
+}));
+
 let mockSidebarWidth = 0;
 const mockSetSidebarWidth = jest.fn((w) => { mockSidebarWidth = w; });
 const mockGetSidebarWidth = jest.fn(() => mockSidebarWidth);
@@ -190,7 +214,7 @@ describe('ipc-handlers integration', () => {
 
   // ===== Channel Registration =====
   describe('channel registration', () => {
-    test('registers all 18 expected IPC channels', () => {
+    test('registers all 21 expected IPC channels', () => {
       const expected = [
         'capture-and-compare',
         'open-report',
@@ -210,6 +234,9 @@ describe('ipc-handlers integration', () => {
         'set-sidebar-width',
         'set-zoom',
         'get-zoom',
+        'css-full-scan',
+        'css-inspect-toggle',
+        'css-export-json',
       ];
       expected.forEach((channel) => {
         expect(handlers[channel]).toBeDefined();
@@ -762,6 +789,249 @@ describe('ipc-handlers integration', () => {
       mockRightView.webContents.loadURL.mockRejectedValueOnce(new Error('fail'));
       await handlers['navigate']({}, { url: 'http://bad.com', target: 'right' });
       await new Promise((r) => setTimeout(r, 0));
+    });
+  });
+
+  // ===== css-full-scan =====
+  describe('css-full-scan', () => {
+    test('runs full scan and opens result window', async () => {
+      const { runFullScan } = require('../../src/main/css-compare');
+      const result = await handlers['css-full-scan']({});
+      expect(runFullScan).toHaveBeenCalled();
+      expect(mockBrowserWindow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          width: 1000,
+          height: 700,
+          title: 'Twin - CSS Scan Report',
+        })
+      );
+      expect(result).toEqual(mockScanResult.summary);
+    });
+  });
+
+  // ===== css-inspect-toggle =====
+  describe('css-inspect-toggle', () => {
+    test('enables inspect mode and injects script', async () => {
+      const result = await handlers['css-inspect-toggle']({}, { enabled: true });
+      expect(result).toEqual({ enabled: true });
+      expect(mockLeftView.webContents.executeJavaScript).toHaveBeenCalled();
+    });
+
+    test('disables inspect mode and cleans up', async () => {
+      // First enable
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      mockLeftView.webContents.executeJavaScript.mockClear();
+      mockRightView.webContents.executeJavaScript.mockClear();
+
+      // Then disable
+      const result = await handlers['css-inspect-toggle']({}, { enabled: false });
+      expect(result).toEqual({ enabled: false });
+      // Should call cleanup scripts
+      expect(mockLeftView.webContents.executeJavaScript).toHaveBeenCalled();
+      expect(mockRightView.webContents.executeJavaScript).toHaveBeenCalled();
+    });
+  });
+
+  // ===== css-export-json =====
+  describe('css-export-json', () => {
+    test('throws when no scan result available', async () => {
+      await expect(handlers['css-export-json']({})).rejects.toThrow('No scan result to export');
+    });
+
+    test('exports JSON after a scan', async () => {
+      // Perform a scan first
+      await handlers['css-full-scan']({});
+
+      const fs = require('fs');
+      fs.promises.writeFile = jest.fn().mockResolvedValue(undefined);
+      mockDialog.showSaveDialog = jest.fn().mockResolvedValue({ canceled: false, filePath: '/tmp/report.json' });
+
+      const result = await handlers['css-export-json']({});
+      expect(result).toEqual({ filePath: '/tmp/report.json' });
+      expect(fs.promises.writeFile).toHaveBeenCalledWith(
+        '/tmp/report.json',
+        expect.stringContaining('"changedElements"'),
+        'utf-8'
+      );
+    });
+
+    test('returns null when save dialog is canceled', async () => {
+      await handlers['css-full-scan']({});
+      mockDialog.showSaveDialog = jest.fn().mockResolvedValue({ canceled: true });
+      const result = await handlers['css-export-json']({});
+      expect(result).toBeNull();
+    });
+
+    test('returns null when mainWindow is null', async () => {
+      jest.resetModules();
+      Object.keys(handlers).forEach((k) => delete handlers[k]);
+      const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
+      registerIpcHandlers({
+        mainWindow: null,
+        leftView: mockLeftView,
+        rightView: mockRightView,
+        setSidebarWidth: mockSetSidebarWidth,
+        getSidebarWidth: mockGetSidebarWidth,
+      });
+      // Run scan first
+      await handlers['css-full-scan']({});
+      const result = await handlers['css-export-json']({});
+      expect(result).toBeNull();
+    });
+  });
+
+  // ===== CSS inspect console-message handling =====
+  describe('css-inspect-message handling', () => {
+    function getConsoleMessageHandler() {
+      const calls = mockLeftView.webContents.on.mock.calls.filter(
+        (call) => call[0] === 'console-message'
+      );
+      // The CSS handler is the second console-message listener (first is sync-manager)
+      return calls.length > 1 ? calls[1][1] : calls[0][1];
+    }
+
+    test('registers console-message listener for CSS inspect', () => {
+      const calls = mockLeftView.webContents.on.mock.calls.filter(
+        (call) => call[0] === 'console-message'
+      );
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    test('ignores messages when inspect is not active', () => {
+      const handler = getConsoleMessageHandler();
+      mockWebContents.send.mockClear();
+      handler({}, 0, '__twin_css__{"type":"inspect-click","data":{"key":"#test","tag":"div","method":"id","styles":{}}}');
+      // Should not send any result because inspect is not active
+      expect(mockWebContents.send).not.toHaveBeenCalledWith('css-inspect-result', expect.anything());
+    });
+
+    test('ignores non-css-prefixed messages', async () => {
+      // Enable inspect first
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+      mockWebContents.send.mockClear();
+      handler({}, 0, 'regular console log message');
+      expect(mockWebContents.send).not.toHaveBeenCalledWith('css-inspect-result', expect.anything());
+    });
+
+    test('ignores malformed JSON messages', async () => {
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+      mockWebContents.send.mockClear();
+      handler({}, 0, '__twin_css__{invalid json}');
+      expect(mockWebContents.send).not.toHaveBeenCalledWith('css-inspect-result', expect.anything());
+    });
+
+    test('handles inspect-click and sends result on successful match', async () => {
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+
+      mockRightView.webContents.executeJavaScript
+        .mockResolvedValueOnce(true) // highlight
+        .mockResolvedValueOnce({ tag: 'div', styles: { color: 'blue' } }); // getElementStyles
+
+      const { compareStyles } = require('../../src/main/css-compare');
+      compareStyles.mockReturnValue([{ property: 'color', expected: 'red', actual: 'blue', type: 'changed', category: 'text' }]);
+
+      mockWebContents.send.mockClear();
+      const leftData = { key: '#test', tag: 'div', method: 'id', styles: { color: 'red' } };
+      handler({}, 0, '__twin_css__' + JSON.stringify({ type: 'inspect-click', data: leftData }));
+
+      // Wait for async handling
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockWebContents.send).toHaveBeenCalledWith('css-inspect-result', expect.objectContaining({
+        left: leftData,
+        error: null,
+      }));
+    });
+
+    test('sends error when right view highlight fails', async () => {
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+
+      mockRightView.webContents.executeJavaScript.mockResolvedValueOnce(false); // highlight fails
+
+      mockWebContents.send.mockClear();
+      const leftData = { key: '#missing', tag: 'div', method: 'id', styles: {} };
+      handler({}, 0, '__twin_css__' + JSON.stringify({ type: 'inspect-click', data: leftData }));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockWebContents.send).toHaveBeenCalledWith('css-inspect-result', expect.objectContaining({
+        error: 'Matching element not found in right panel',
+      }));
+    });
+
+    test('sends error when right data retrieval fails', async () => {
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+
+      mockRightView.webContents.executeJavaScript
+        .mockResolvedValueOnce(true) // highlight
+        .mockResolvedValueOnce(null); // getElementStyles fails
+
+      mockWebContents.send.mockClear();
+      const leftData = { key: '#test', tag: 'div', method: 'id', styles: {} };
+      handler({}, 0, '__twin_css__' + JSON.stringify({ type: 'inspect-click', data: leftData }));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockWebContents.send).toHaveBeenCalledWith('css-inspect-result', expect.objectContaining({
+        error: 'Could not retrieve styles from right panel',
+      }));
+    });
+
+    test('sends error when rightView is destroyed', async () => {
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      const handler = getConsoleMessageHandler();
+
+      mockRightView.webContents.isDestroyed.mockReturnValueOnce(true);
+
+      mockWebContents.send.mockClear();
+      const leftData = { key: '#test', tag: 'div', method: 'id', styles: {} };
+      handler({}, 0, '__twin_css__' + JSON.stringify({ type: 'inspect-click', data: leftData }));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockWebContents.send).toHaveBeenCalledWith('css-inspect-result', expect.objectContaining({
+        error: 'Right view is not available',
+      }));
+    });
+  });
+
+  // ===== CSS inspect auto-disable on navigation =====
+  describe('css-inspect auto-disable on navigation', () => {
+    function getDidNavigateHandler() {
+      const calls = mockLeftView.webContents.on.mock.calls.filter(
+        (call) => call[0] === 'did-navigate'
+      );
+      return calls.length > 0 ? calls[0][1] : null;
+    }
+
+    test('registers did-navigate listener on leftView', () => {
+      const handler = getDidNavigateHandler();
+      expect(handler).toBeTruthy();
+    });
+
+    test('disables inspect mode on page navigation', async () => {
+      // Enable inspect mode
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+      mockWebContents.send.mockClear();
+
+      const handler = getDidNavigateHandler();
+      handler();
+
+      expect(mockWebContents.send).toHaveBeenCalledWith('css-inspect-result', expect.objectContaining({
+        modeDisabled: true,
+      }));
+    });
+
+    test('does nothing when inspect is not active', () => {
+      mockWebContents.send.mockClear();
+      const handler = getDidNavigateHandler();
+      handler();
+      expect(mockWebContents.send).not.toHaveBeenCalledWith('css-inspect-result', expect.anything());
     });
   });
 });
