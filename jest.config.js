@@ -7,7 +7,7 @@ module.exports = {
   ],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
+    '^.+\\.ts$': ['ts-jest', { diagnostics: false }],
   },
   collectCoverageFrom: [
     'src/**/*.ts',
