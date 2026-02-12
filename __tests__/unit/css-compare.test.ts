@@ -1,3 +1,5 @@
+export {};
+
 const {
   classifyProperty,
   LAYOUT_PROPS,
@@ -190,7 +192,7 @@ describe('compareStyles', () => {
     const right = { 'margin-top': '10px' };
     const diffs = compareStyles(left, right);
     expect(diffs).toHaveLength(2);
-    const props = diffs.map((d) => d.property).sort();
+    const props = diffs.map((d: any) => d.property).sort();
     expect(props).toEqual(['font-size', 'margin-top']);
   });
 
@@ -199,8 +201,8 @@ describe('compareStyles', () => {
     const right = { display: 'flex', 'font-size': '16px', 'background-color': 'black', content: 'none' };
     const diffs = compareStyles(left, right);
     expect(diffs).toHaveLength(4);
-    const cats = {};
-    diffs.forEach((d) => { cats[d.property] = d.category; });
+    const cats: Record<string, string> = {};
+    diffs.forEach((d: any) => { cats[d.property] = d.category; });
     expect(cats['display']).toBe('layout');
     expect(cats['font-size']).toBe('text');
     expect(cats['background-color']).toBe('visual');
@@ -641,7 +643,7 @@ describe('matchElements edge cases', () => {
 // ---------- Additional compareStyles tests ----------
 describe('compareStyles edge cases', () => {
   test('many properties with one changed', () => {
-    const base = {};
+    const base: Record<string, string> = {};
     for (let i = 0; i < 50; i++) base[`prop-${i}`] = `value-${i}`;
     const left = { ...base };
     const right = { ...base, 'prop-25': 'different-value' };
@@ -655,19 +657,19 @@ describe('compareStyles edge cases', () => {
     const right = { a: '4', b: '5', c: '6' };
     const diffs = compareStyles(left, right);
     expect(diffs).toHaveLength(3);
-    diffs.forEach(d => expect(d.type).toBe('changed'));
+    diffs.forEach((d: any) => expect(d.type).toBe('changed'));
   });
 
   test('all properties added', () => {
     const diffs = compareStyles({}, { a: '1', b: '2' });
     expect(diffs).toHaveLength(2);
-    diffs.forEach(d => expect(d.type).toBe('added'));
+    diffs.forEach((d: any) => expect(d.type).toBe('added'));
   });
 
   test('all properties deleted', () => {
     const diffs = compareStyles({ a: '1', b: '2' }, {});
     expect(diffs).toHaveLength(2);
-    diffs.forEach(d => expect(d.type).toBe('deleted'));
+    diffs.forEach((d: any) => expect(d.type).toBe('deleted'));
   });
 
   test('identical empty string values not reported', () => {
@@ -694,8 +696,8 @@ describe('runFullScan edge cases', () => {
   });
 
   test('handles elements with many style differences', async () => {
-    const leftStyles = {};
-    const rightStyles = {};
+    const leftStyles: Record<string, string> = {};
+    const rightStyles: Record<string, string> = {};
     for (let i = 0; i < 20; i++) {
       leftStyles[`prop-${i}`] = `left-${i}`;
       rightStyles[`prop-${i}`] = `right-${i}`;

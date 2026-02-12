@@ -2,12 +2,12 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/__tests__'],
   testMatch: [
-    '**/__tests__/unit/**/*.test.js',
-    '**/__tests__/integration/**/*.test.js',
+    '**/__tests__/unit/**/*.test.ts',
+    '**/__tests__/integration/**/*.test.ts',
   ],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
   },
   collectCoverageFrom: [
     'src/**/*.ts',

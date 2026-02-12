@@ -1,11 +1,13 @@
+export {};
+
 const path = require('path');
 
 // ---------- Mocks ----------
 
 // Collect ipcMain.handle registrations
-const handlers = {};
+const handlers: Record<string, any> = {};
 const mockIpcMain = {
-  handle: jest.fn((channel, handler) => {
+  handle: jest.fn((channel: string, handler: any) => {
     handlers[channel] = handler;
   }),
 };
@@ -20,7 +22,7 @@ const mockWebContents = {
   executeJavaScript: jest.fn().mockResolvedValue(undefined),
 };
 
-const mockLeftWebContents = {
+const mockLeftWebContents: Record<string, any> = {
   reload: jest.fn(),
   loadURL: jest.fn().mockResolvedValue(undefined),
   getURL: jest.fn().mockReturnValue('http://localhost:3000/'),
@@ -34,12 +36,12 @@ const mockMainWindow = {
   setContentSize: jest.fn(),
 };
 
-const mockLeftView = {
+const mockLeftView: Record<string, any> = {
   webContents: mockLeftWebContents,
   setBounds: jest.fn(),
 };
 
-const mockRightView = {
+const mockRightView: Record<string, any> = {
   webContents: {
     reload: jest.fn(),
     loadURL: jest.fn().mockResolvedValue(undefined),
@@ -48,7 +50,7 @@ const mockRightView = {
     isDestroyed: jest.fn().mockReturnValue(false),
     executeJavaScript: jest.fn().mockResolvedValue(undefined),
     sendInputEvent: jest.fn(),
-  },
+  } as Record<string, any>,
   setBounds: jest.fn(),
 };
 
@@ -57,7 +59,7 @@ const mockBrowserWindow = jest.fn().mockImplementation(() => ({
   loadURL: jest.fn(),
 }));
 
-const mockDialog = {
+const mockDialog: Record<string, any> = {
   showOpenDialog: jest.fn().mockResolvedValue({ canceled: false, filePaths: ['/selected/folder'] }),
 };
 
@@ -68,7 +70,7 @@ jest.mock('electron', () => ({
 }));
 
 jest.mock('fs', () => ({
-  realpathSync: jest.fn((p) => p),
+  realpathSync: jest.fn((p: string) => p),
   promises: {
     readdir: jest.fn().mockResolvedValue([]),
     mkdir: jest.fn().mockResolvedValue(undefined),
@@ -88,7 +90,7 @@ jest.mock('../../src/main/reg-runner', () => ({
   }),
 }));
 
-const mockStoreData = {};
+const mockStoreData: Record<string, any> = {};
 jest.mock('../../src/main/store', () => ({
   getSettings: jest.fn(() => ({
     leftUrl: 'http://localhost:3000',
@@ -97,12 +99,12 @@ jest.mock('../../src/main/store', () => ({
     matchingThreshold: 0,
     thresholdRate: 0,
   })),
-  saveSettings: jest.fn((settings) => {
+  saveSettings: jest.fn((settings: any) => {
     Object.assign(mockStoreData, settings);
   }),
   getStore: jest.fn(() => ({
-    get: jest.fn((key) => {
-      const defaults = {
+    get: jest.fn((key: string) => {
+      const defaults: Record<string, any> = {
         snapshotDir: './snapshots',
         matchingThreshold: 0,
         thresholdRate: 0,
@@ -111,7 +113,7 @@ jest.mock('../../src/main/store', () => ({
       };
       return mockStoreData[key] !== undefined ? mockStoreData[key] : defaults[key];
     }),
-    set: jest.fn((key, value) => {
+    set: jest.fn((key: string, value: any) => {
       mockStoreData[key] = value;
     }),
   })),
@@ -125,7 +127,7 @@ const mockSyncManager = {
   stop: jest.fn(),
   inject: jest.fn(),
   isEnabled: jest.fn(() => mockSyncEnabled),
-  setEnabled: jest.fn((v) => { mockSyncEnabled = v; }),
+  setEnabled: jest.fn((v: boolean) => { mockSyncEnabled = v; }),
   isPaused: jest.fn(() => mockSyncPaused),
   pause: jest.fn(() => { mockSyncPaused = true; }),
   resume: jest.fn(() => { mockSyncPaused = false; }),
@@ -160,7 +162,7 @@ jest.mock('../../src/main/css-compare', () => ({
 }));
 
 let mockSidebarWidth = 0;
-const mockSetSidebarWidth = jest.fn((w) => { mockSidebarWidth = w; });
+const mockSetSidebarWidth = jest.fn((w: number) => { mockSidebarWidth = w; });
 const mockGetSidebarWidth = jest.fn(() => mockSidebarWidth);
 
 jest.mock('../../src/main/index', () => ({
@@ -697,7 +699,7 @@ describe('ipc-handlers integration', () => {
   describe('did-navigate-in-page sync', () => {
     function getNavigateHandler() {
       const onCall = mockLeftView.webContents.on.mock.calls.find(
-        (call) => call[0] === 'did-navigate-in-page'
+        (call: any[]) => call[0] === 'did-navigate-in-page'
       );
       return onCall[1];
     }
@@ -884,7 +886,7 @@ describe('ipc-handlers integration', () => {
   describe('css-inspect-message handling', () => {
     function getConsoleMessageHandler() {
       const calls = mockLeftView.webContents.on.mock.calls.filter(
-        (call) => call[0] === 'console-message'
+        (call: any[]) => call[0] === 'console-message'
       );
       // The CSS handler is the second console-message listener (first is sync-manager)
       return calls.length > 1 ? calls[1][1] : calls[0][1];
@@ -892,7 +894,7 @@ describe('ipc-handlers integration', () => {
 
     test('registers console-message listener for CSS inspect', () => {
       const calls = mockLeftView.webContents.on.mock.calls.filter(
-        (call) => call[0] === 'console-message'
+        (call: any[]) => call[0] === 'console-message'
       );
       expect(calls.length).toBeGreaterThanOrEqual(1);
     });
@@ -1004,7 +1006,7 @@ describe('ipc-handlers integration', () => {
   describe('css-inspect auto-disable on navigation', () => {
     function getDidNavigateHandler() {
       const calls = mockLeftView.webContents.on.mock.calls.filter(
-        (call) => call[0] === 'did-navigate'
+        (call: any[]) => call[0] === 'did-navigate'
       );
       return calls.length > 0 ? calls[0][1] : null;
     }
@@ -1173,7 +1175,7 @@ describe('ipc-handlers integration', () => {
     beforeEach(async () => {
       // Ensure mocks are properly configured for file access
       const fs = require('fs');
-      fs.realpathSync.mockImplementation((p) => p);
+      fs.realpathSync.mockImplementation((p: string) => p);
       mockDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected/folder'] });
       // Set allowedBasePath by calling select-folder
       await handlers['select-folder']({});
@@ -1258,7 +1260,7 @@ describe('ipc-handlers integration', () => {
       mockSyncEnabled = false;
       mockSyncManager.isEnabled.mockReturnValue(false);
       const didNavigateInPage = mockLeftWebContents.on.mock.calls.find(
-        (call) => call[0] === 'did-navigate-in-page'
+        (call: any[]) => call[0] === 'did-navigate-in-page'
       );
       if (didNavigateInPage) {
         const handler = didNavigateInPage[1];
@@ -1271,7 +1273,7 @@ describe('ipc-handlers integration', () => {
       mockSyncPaused = true;
       mockSyncManager.isPaused.mockReturnValue(true);
       const didNavigateInPage = mockLeftWebContents.on.mock.calls.find(
-        (call) => call[0] === 'did-navigate-in-page'
+        (call: any[]) => call[0] === 'did-navigate-in-page'
       );
       if (didNavigateInPage) {
         const handler = didNavigateInPage[1];
@@ -1283,7 +1285,7 @@ describe('ipc-handlers integration', () => {
     test('does not navigate when nav sync is suppressed', () => {
       mockNavSyncSuppressed = true;
       const didNavigateInPage = mockLeftWebContents.on.mock.calls.find(
-        (call) => call[0] === 'did-navigate-in-page'
+        (call: any[]) => call[0] === 'did-navigate-in-page'
       );
       if (didNavigateInPage) {
         const handler = didNavigateInPage[1];
@@ -1323,7 +1325,7 @@ describe('ipc-handlers integration', () => {
 
       const fs = require('fs');
       // Make realpathSync throw for a specific path (simulates non-existent path)
-      fs.realpathSync.mockImplementation((p) => {
+      fs.realpathSync.mockImplementation((p: string) => {
         if (p === '/selected/folder/nonexistent/file.png') {
           throw new Error('ENOENT: no such file or directory');
         }
@@ -1335,7 +1337,7 @@ describe('ipc-handlers integration', () => {
       ).rejects.toThrow('Access denied');
 
       // Restore
-      fs.realpathSync.mockImplementation((p) => p);
+      fs.realpathSync.mockImplementation((p: string) => p);
     });
   });
 
@@ -1364,7 +1366,7 @@ describe('ipc-handlers integration', () => {
   describe('css-inspect executeJavaScript rejections', () => {
     function getConsoleMessageHandler() {
       const calls = mockLeftView.webContents.on.mock.calls.filter(
-        (call) => call[0] === 'console-message',
+        (call: any[]) => call[0] === 'console-message',
       );
       return calls.length > 1 ? calls[1][1] : calls[0][1];
     }

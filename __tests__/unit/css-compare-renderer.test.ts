@@ -1,4 +1,5 @@
 /** @jest-environment jsdom */
+export {};
 
 // ---------- helpers ----------
 
@@ -24,21 +25,21 @@ function buildDOM() {
 }
 
 function mockElectronAPI() {
-  const callbacks = {};
+  const callbacks: Record<string, any> = {};
   const api = {
     cssFullScan: jest.fn().mockResolvedValue(undefined),
     cssInspectToggle: jest.fn().mockResolvedValue({ enabled: true }),
-    onCssInspectResult: jest.fn((cb) => {
+    onCssInspectResult: jest.fn((cb: any) => {
       callbacks['css-inspect-result'] = cb;
     }),
-    onShortcutCssScan: jest.fn((cb) => {
+    onShortcutCssScan: jest.fn((cb: any) => {
       callbacks['shortcut-css-scan'] = cb;
     }),
-    onShortcutCssInspect: jest.fn((cb) => {
+    onShortcutCssInspect: jest.fn((cb: any) => {
       callbacks['shortcut-css-inspect'] = cb;
     }),
   };
-  window.electronAPI = api;
+  (window as any).electronAPI = api;
   return { api, callbacks };
 }
 
@@ -48,8 +49,8 @@ function flush() {
 
 // ---------- suite ----------
 describe('renderer/css-compare', () => {
-  let api;
-  let callbacks;
+  let api: any;
+  let callbacks: Record<string, any>;
 
   beforeEach(() => {
     buildDOM();
@@ -60,20 +61,20 @@ describe('renderer/css-compare', () => {
   });
 
   afterEach(() => {
-    delete window.electronAPI;
-    delete global.escapeHtml;
-    delete global.classifyProperty;
-    delete global.showToast;
+    delete (window as any).electronAPI;
+    delete (global as any).escapeHtml;
+    delete (global as any).classifyProperty;
+    delete (global as any).showToast;
   });
 
   function init() {
     // Load shared utils as globals (escapeHtml, classifyProperty)
     const sharedUtils = require('../../src/shared/utils');
-    global.escapeHtml = sharedUtils.escapeHtml;
-    global.classifyProperty = sharedUtils.classifyProperty;
+    (global as any).escapeHtml = sharedUtils.escapeHtml;
+    (global as any).classifyProperty = sharedUtils.classifyProperty;
     // Load showToast as global (defined at module level in ui-controls)
     const uiControls = require('../../src/renderer/scripts/ui-controls');
-    global.showToast = uiControls.showToast;
+    (global as any).showToast = uiControls.showToast;
     // Now load css-compare which depends on the above globals
     const { initCssCompare } = require('../../src/renderer/scripts/css-compare');
     initCssCompare();
@@ -83,18 +84,18 @@ describe('renderer/css-compare', () => {
   describe('CSS Full Scan', () => {
     test('clicking scan button calls cssFullScan', async () => {
       init();
-      document.getElementById('css-scan-btn').click();
+      document.getElementById('css-scan-btn')!.click();
       await flush();
       expect(api.cssFullScan).toHaveBeenCalled();
     });
 
     test('scan button shows spinner during scan and restores text after', async () => {
-      let resolvePromise;
+      let resolvePromise: any;
       api.cssFullScan.mockImplementation(
         () => new Promise((resolve) => { resolvePromise = resolve; }),
       );
       init();
-      const btn = document.getElementById('css-scan-btn');
+      const btn = document.getElementById('css-scan-btn') as HTMLButtonElement;
       btn.click();
       await flush();
       expect(btn.disabled).toBe(true);
@@ -108,7 +109,7 @@ describe('renderer/css-compare', () => {
     test('scan button restores text on error', async () => {
       api.cssFullScan.mockRejectedValue(new Error('scan failed'));
       init();
-      const btn = document.getElementById('css-scan-btn');
+      const btn = document.getElementById('css-scan-btn') as HTMLButtonElement;
       btn.click();
       await flush();
       expect(btn.disabled).toBe(false);
@@ -118,9 +119,9 @@ describe('renderer/css-compare', () => {
     test('scan error shows toast', async () => {
       api.cssFullScan.mockRejectedValue(new Error('network error'));
       init();
-      document.getElementById('css-scan-btn').click();
+      document.getElementById('css-scan-btn')!.click();
       await flush();
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.textContent).toContain('CSS Scan failed');
       expect(toast.textContent).toContain('network error');
     });
@@ -130,14 +131,14 @@ describe('renderer/css-compare', () => {
   describe('CSS Inspect Mode', () => {
     test('clicking inspect button toggles inspect mode on', async () => {
       init();
-      document.getElementById('css-inspect-btn').click();
+      document.getElementById('css-inspect-btn')!.click();
       await flush();
       expect(api.cssInspectToggle).toHaveBeenCalledWith({ enabled: true });
     });
 
     test('clicking inspect button twice toggles off', async () => {
       init();
-      const btn = document.getElementById('css-inspect-btn');
+      const btn = document.getElementById('css-inspect-btn')!;
       btn.click();
       await flush();
       btn.click();
@@ -147,7 +148,7 @@ describe('renderer/css-compare', () => {
 
     test('inspect button shows active state when on', async () => {
       init();
-      const btn = document.getElementById('css-inspect-btn');
+      const btn = document.getElementById('css-inspect-btn')!;
       btn.click();
       await flush();
       expect(btn.classList.contains('css-inspect-active')).toBe(true);
@@ -157,7 +158,7 @@ describe('renderer/css-compare', () => {
     test('inspect button resets on API error', async () => {
       api.cssInspectToggle.mockRejectedValue(new Error('fail'));
       init();
-      const btn = document.getElementById('css-inspect-btn');
+      const btn = document.getElementById('css-inspect-btn')!;
       btn.click();
       await flush();
       expect(btn.classList.contains('css-inspect-active')).toBe(false);
@@ -166,7 +167,7 @@ describe('renderer/css-compare', () => {
 
     test('Escape key disables inspect mode when active', async () => {
       init();
-      const btn = document.getElementById('css-inspect-btn');
+      const btn = document.getElementById('css-inspect-btn')!;
       btn.click();
       await flush();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -187,7 +188,7 @@ describe('renderer/css-compare', () => {
   describe('Inspect Drawer', () => {
     test('inspect result shows drawer', () => {
       init();
-      const drawer = document.getElementById('css-inspect-drawer');
+      const drawer = document.getElementById('css-inspect-drawer')!;
       expect(drawer.classList.contains('hidden')).toBe(true);
       callbacks['css-inspect-result']({
         left: { tag: 'div', key: '#test', method: 'id', styles: { color: 'red' } },
@@ -206,15 +207,15 @@ describe('renderer/css-compare', () => {
         diffs: [],
         error: null,
       });
-      const drawer = document.getElementById('css-inspect-drawer');
+      const drawer = document.getElementById('css-inspect-drawer')!;
       expect(drawer.classList.contains('hidden')).toBe(false);
-      document.getElementById('css-inspect-drawer-close').click();
+      document.getElementById('css-inspect-drawer-close')!.click();
       expect(drawer.classList.contains('hidden')).toBe(true);
     });
 
     test('modeDisabled result disables inspect mode', async () => {
       init();
-      const btn = document.getElementById('css-inspect-btn');
+      const btn = document.getElementById('css-inspect-btn')!;
       btn.click();
       await flush();
       callbacks['css-inspect-result']({ modeDisabled: true });
@@ -234,8 +235,8 @@ describe('renderer/css-compare', () => {
         diffs: [],
         error: null,
       });
-      const handle = document.getElementById('css-inspect-drawer-handle');
-      const drawer = document.getElementById('css-inspect-drawer');
+      const handle = document.getElementById('css-inspect-drawer-handle')!;
+      const drawer = document.getElementById('css-inspect-drawer')!;
       // Start drag
       handle.dispatchEvent(new MouseEvent('mousedown', { clientY: 500, bubbles: true }));
       expect(document.body.style.cursor).toBe('ns-resize');
@@ -250,7 +251,7 @@ describe('renderer/css-compare', () => {
 
     test('mousemove without drag does nothing', () => {
       init();
-      const drawer = document.getElementById('css-inspect-drawer');
+      const drawer = document.getElementById('css-inspect-drawer')!;
       document.dispatchEvent(new MouseEvent('mousemove', { clientY: 400, bubbles: true }));
       expect(drawer.style.height).toBe('');
     });
@@ -266,7 +267,7 @@ describe('renderer/css-compare', () => {
         diffs: [],
         error: 'Element not found',
       });
-      const header = document.getElementById('css-inspect-header-info');
+      const header = document.getElementById('css-inspect-header-info')!;
       expect(header.innerHTML).toContain('span');
       expect(header.innerHTML).toContain('Element not found');
       expect(header.innerHTML).toContain('css-inspect-error');
@@ -283,7 +284,7 @@ describe('renderer/css-compare', () => {
         ],
         error: null,
       });
-      const header = document.getElementById('css-inspect-header-info');
+      const header = document.getElementById('css-inspect-header-info')!;
       expect(header.innerHTML).toContain('2 differences');
       expect(header.innerHTML).toContain('div');
       expect(header.innerHTML).toContain('#main');
@@ -300,7 +301,7 @@ describe('renderer/css-compare', () => {
         diffs: [{ property: 'color', expected: 'red', actual: 'blue', category: 'text', type: 'changed' }],
         error: null,
       });
-      const body = document.getElementById('css-inspect-drawer-body');
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('css-inspect-table');
       expect(body.innerHTML).toContain('color');
       expect(body.innerHTML).toContain('red');
@@ -315,7 +316,7 @@ describe('renderer/css-compare', () => {
         diffs: [],
         error: null,
       });
-      const body = document.getElementById('css-inspect-drawer-body');
+      const body = document.getElementById('css-inspect-drawer-body')!;
       // Empty diffs in diff-only mode → "No matching properties"
       expect(body.innerHTML).toContain('No matching properties');
     });
@@ -332,7 +333,7 @@ describe('renderer/css-compare', () => {
         diffs: [],
         error: null,
       });
-      const body = document.getElementById('css-inspect-drawer-body');
+      const body = document.getElementById('css-inspect-drawer-body')!;
       // No diffs in diff-only mode → empty message
       expect(body.innerHTML).toContain('No matching properties');
     });
@@ -345,7 +346,7 @@ describe('renderer/css-compare', () => {
         diffs: [],
         error: 'Right panel not available',
       });
-      const body = document.getElementById('css-inspect-drawer-body');
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('Right panel not available');
     });
   });
@@ -368,9 +369,9 @@ describe('renderer/css-compare', () => {
 
     test('switching to "All" filter shows all properties', () => {
       setupWithData();
-      const allBtn = document.getElementById('css-inspect-filter-all');
+      const allBtn = document.getElementById('css-inspect-filter-all')!;
       allBtn.click();
-      const body = document.getElementById('css-inspect-drawer-body');
+      const body = document.getElementById('css-inspect-drawer-body')!;
       // Should show non-diff properties too (z-index)
       expect(body.innerHTML).toContain('z-index');
       expect(body.innerHTML).toContain('color');
@@ -379,18 +380,18 @@ describe('renderer/css-compare', () => {
 
     test('switching back to "Diff" filter shows only diffs', () => {
       setupWithData();
-      document.getElementById('css-inspect-filter-all').click();
-      document.getElementById('css-inspect-filter-diff').click();
-      const body = document.getElementById('css-inspect-drawer-body');
+      document.getElementById('css-inspect-filter-all')!.click();
+      document.getElementById('css-inspect-filter-diff')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('color');
       expect(body.innerHTML).not.toContain('z-index');
     });
 
     test('category filter shows only matching category', () => {
       setupWithData();
-      const textCatBtn = document.querySelector('.css-inspect-cat-btn[data-cat="text"]');
+      const textCatBtn = document.querySelector('.css-inspect-cat-btn[data-cat="text"]') as HTMLElement;
       textCatBtn.click();
-      const body = document.getElementById('css-inspect-drawer-body');
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('color');
       expect(body.innerHTML).not.toContain('display');
       expect(body.innerHTML).not.toContain('opacity');
@@ -399,10 +400,10 @@ describe('renderer/css-compare', () => {
     test('category filter "all" shows all categories', () => {
       setupWithData();
       // First filter to text
-      document.querySelector('.css-inspect-cat-btn[data-cat="text"]').click();
+      (document.querySelector('.css-inspect-cat-btn[data-cat="text"]') as HTMLElement).click();
       // Then back to all
-      document.querySelector('.css-inspect-cat-btn[data-cat="all"]').click();
-      const body = document.getElementById('css-inspect-drawer-body');
+      (document.querySelector('.css-inspect-cat-btn[data-cat="all"]') as HTMLElement).click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('color');
       expect(body.innerHTML).toContain('display');
       expect(body.innerHTML).toContain('opacity');
@@ -411,10 +412,10 @@ describe('renderer/css-compare', () => {
     test('"All" filter + category filter works together', () => {
       setupWithData();
       // Show all props
-      document.getElementById('css-inspect-filter-all').click();
+      document.getElementById('css-inspect-filter-all')!.click();
       // Then filter to layout
-      document.querySelector('.css-inspect-cat-btn[data-cat="layout"]').click();
-      const body = document.getElementById('css-inspect-drawer-body');
+      (document.querySelector('.css-inspect-cat-btn[data-cat="layout"]') as HTMLElement).click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('display');
       expect(body.innerHTML).toContain('z-index');
       expect(body.innerHTML).not.toContain('color');
@@ -422,15 +423,15 @@ describe('renderer/css-compare', () => {
 
     test('category filter renders empty message when no matches', () => {
       setupWithData();
-      document.querySelector('.css-inspect-cat-btn[data-cat="other"]').click();
-      const body = document.getElementById('css-inspect-drawer-body');
+      (document.querySelector('.css-inspect-cat-btn[data-cat="other"]') as HTMLElement).click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('No matching properties');
     });
   });
 
   // ===== getCategoryForProp =====
   describe('Category classification', () => {
-    function checkCategory(property, expectedCat) {
+    function checkCategory(property: string, expectedCat: string) {
       init();
       callbacks['css-inspect-result']({
         left: { tag: 'div', key: '#c', method: 'id', styles: { [property]: 'a' } },
@@ -439,9 +440,9 @@ describe('renderer/css-compare', () => {
         error: null,
       });
       // Switch to all filter + specific category to verify classification
-      document.getElementById('css-inspect-filter-all').click();
-      document.querySelector(`.css-inspect-cat-btn[data-cat="${expectedCat}"]`).click();
-      const body = document.getElementById('css-inspect-drawer-body');
+      document.getElementById('css-inspect-filter-all')!.click();
+      (document.querySelector(`.css-inspect-cat-btn[data-cat="${expectedCat}"]`) as HTMLElement).click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain(property);
     }
 
@@ -472,7 +473,7 @@ describe('renderer/css-compare', () => {
         diffs: [],
         error: 'Test <b>bold</b> & "quotes"',
       });
-      const header = document.getElementById('css-inspect-header-info');
+      const header = document.getElementById('css-inspect-header-info')!;
       expect(header.innerHTML).not.toContain('<script>');
       expect(header.innerHTML).toContain('&lt;script&gt;');
       expect(header.innerHTML).toContain('&amp;');
@@ -489,7 +490,7 @@ describe('renderer/css-compare', () => {
         error: null,
       });
       // Should not throw with null-ish values
-      const header = document.getElementById('css-inspect-header-info');
+      const header = document.getElementById('css-inspect-header-info')!;
       expect(header.innerHTML).toBeTruthy();
     });
   });
@@ -519,9 +520,9 @@ describe('renderer/css-compare', () => {
     test('shows toast with error type on scan failure', async () => {
       api.cssFullScan.mockRejectedValue(new Error('timeout'));
       init();
-      document.getElementById('css-scan-btn').click();
+      document.getElementById('css-scan-btn')!.click();
       await flush();
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.className).toContain('toast-error');
       expect(toast.textContent).toContain('timeout');
     });

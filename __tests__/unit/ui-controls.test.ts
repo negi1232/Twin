@@ -1,6 +1,9 @@
 /** @jest-environment jsdom */
+export {};
 
-const { getPresetByIndex, PRESET_LIST } = require('../../src/renderer/scripts/device-presets');
+const devicePresets = require('../../src/renderer/scripts/device-presets');
+const _getPresetByIndex = devicePresets.getPresetByIndex;
+const _PRESET_LIST = devicePresets.PRESET_LIST;
 
 // ---------- helpers ----------
 function buildDOM() {
@@ -124,7 +127,7 @@ function mockElectronAPI() {
     onShortcutZoomOut: jest.fn(),
     onShortcutZoomReset: jest.fn(),
   };
-  window.electronAPI = api;
+  (window as any).electronAPI = api;
   return api;
 }
 
@@ -135,28 +138,28 @@ function flush() {
 
 // ---------- suite ----------
 describe('ui-controls', () => {
-  let api;
+  let api: any;
 
   beforeEach(() => {
     buildDOM();
     api = mockElectronAPI();
-    global.getPresetByIndex = getPresetByIndex;
+    (global as any).getPresetByIndex = _getPresetByIndex;
     // Load shared constants as globals (loaded via CommonJS shim in browser)
     const constants = require('../../src/shared/constants');
-    global.ZOOM_STEP = constants.ZOOM_STEP;
-    global.MIN_ZOOM = constants.MIN_ZOOM;
-    global.MAX_ZOOM = constants.MAX_ZOOM;
-    global.SIDEBAR_WIDTH = constants.SIDEBAR_WIDTH;
+    (global as any).ZOOM_STEP = constants.ZOOM_STEP;
+    (global as any).MIN_ZOOM = constants.MIN_ZOOM;
+    (global as any).MAX_ZOOM = constants.MAX_ZOOM;
+    (global as any).SIDEBAR_WIDTH = constants.SIDEBAR_WIDTH;
     jest.resetModules();
   });
 
   afterEach(() => {
-    delete global.getPresetByIndex;
-    delete global.ZOOM_STEP;
-    delete global.MIN_ZOOM;
-    delete global.MAX_ZOOM;
-    delete global.SIDEBAR_WIDTH;
-    delete window.electronAPI;
+    delete (global as any).getPresetByIndex;
+    delete (global as any).ZOOM_STEP;
+    delete (global as any).MIN_ZOOM;
+    delete (global as any).MAX_ZOOM;
+    delete (global as any).SIDEBAR_WIDTH;
+    delete (window as any).electronAPI;
   });
 
   function init() {
@@ -169,7 +172,7 @@ describe('ui-controls', () => {
     test('Enter key on left-url calls navigate with left target', async () => {
       init();
       await flush();
-      const input = document.getElementById('left-url');
+      const input = document.getElementById('left-url') as HTMLInputElement;
       input.value = 'http://example.com';
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       expect(api.navigate).toHaveBeenCalledWith({ url: 'http://example.com', target: 'left' });
@@ -178,7 +181,7 @@ describe('ui-controls', () => {
     test('Enter key on right-url calls navigate with right target', async () => {
       init();
       await flush();
-      const input = document.getElementById('right-url');
+      const input = document.getElementById('right-url') as HTMLInputElement;
       input.value = 'http://other.com';
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       expect(api.navigate).toHaveBeenCalledWith({ url: 'http://other.com', target: 'right' });
@@ -187,7 +190,7 @@ describe('ui-controls', () => {
     test('non-Enter key does not trigger navigate', async () => {
       init();
       await flush();
-      const input = document.getElementById('left-url');
+      const input = document.getElementById('left-url') as HTMLInputElement;
       input.value = 'http://example.com';
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
       expect(api.navigate).not.toHaveBeenCalled();
@@ -196,7 +199,7 @@ describe('ui-controls', () => {
     test('Enter during IME composition does not trigger navigate', async () => {
       init();
       await flush();
-      const input = document.getElementById('left-url');
+      const input = document.getElementById('left-url') as HTMLInputElement;
       input.value = 'http://example.com';
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
       expect(api.navigate).not.toHaveBeenCalled();
@@ -208,21 +211,21 @@ describe('ui-controls', () => {
     test('reload-left button calls reloadViews with left', async () => {
       init();
       await flush();
-      document.getElementById('reload-left').click();
+      document.getElementById('reload-left')!.click();
       expect(api.reloadViews).toHaveBeenCalledWith({ target: 'left' });
     });
 
     test('reload-right button calls reloadViews with right', async () => {
       init();
       await flush();
-      document.getElementById('reload-right').click();
+      document.getElementById('reload-right')!.click();
       expect(api.reloadViews).toHaveBeenCalledWith({ target: 'right' });
     });
 
     test('reload-sync-btn reloads both views and re-injects sync', async () => {
       init();
       await flush();
-      document.getElementById('reload-sync-btn').click();
+      document.getElementById('reload-sync-btn')!.click();
       await flush();
       expect(api.reloadViews).toHaveBeenCalledWith({ target: 'both' });
       expect(api.reinjectSync).toHaveBeenCalled();
@@ -234,14 +237,14 @@ describe('ui-controls', () => {
     test('capture-btn calls captureAndCompare with pageName "page"', async () => {
       init();
       await flush();
-      document.getElementById('capture-btn').click();
+      document.getElementById('capture-btn')!.click();
       expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'page' });
     });
   });
 
   // ===== onCaptureResult =====
   describe('onCaptureResult', () => {
-    function triggerCaptureResult(data) {
+    function triggerCaptureResult(data: any) {
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb(data);
     }
@@ -253,10 +256,10 @@ describe('ui-controls', () => {
         summary: { passed: 1, failed: 0, new: 0, deleted: 0 },
         reportPath: '/tmp/report/index.html',
       });
-      const statusResult = document.getElementById('status-result');
+      const statusResult = document.getElementById('status-result')!;
       expect(statusResult.innerHTML).toContain('Passed: 1');
       expect(statusResult.innerHTML).toContain('Failed: 0');
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.textContent).toBe('Captured! No differences found');
       expect(toast.className).toContain('toast-success');
     });
@@ -268,7 +271,7 @@ describe('ui-controls', () => {
         summary: { passed: 0, failed: 2, new: 0, deleted: 0 },
         reportPath: '/tmp/report/index.html',
       });
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.textContent).toBe('Captured! 2 difference(s) found');
       expect(toast.className).toContain('toast-error');
     });
@@ -277,9 +280,9 @@ describe('ui-controls', () => {
       init();
       await flush();
       triggerCaptureResult({ error: 'Something broke' });
-      const statusResult = document.getElementById('status-result');
+      const statusResult = document.getElementById('status-result')!;
       expect(statusResult.textContent).toBe('Error: Something broke');
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.textContent).toContain('Capture failed');
       expect(toast.className).toContain('toast-error');
     });
@@ -290,36 +293,36 @@ describe('ui-controls', () => {
     test('clicking New opens modal, hides BrowserViews, and clears inputs', async () => {
       init();
       await flush();
-      const modal = document.getElementById('new-report-modal');
+      const modal = document.getElementById('new-report-modal')!;
       expect(modal.classList.contains('hidden')).toBe(true);
-      document.getElementById('new-report-btn').click();
+      document.getElementById('new-report-btn')!.click();
       expect(modal.classList.contains('hidden')).toBe(false);
-      expect(document.getElementById('report-test-name').value).toBe('');
+      expect((document.getElementById('report-test-name') as HTMLInputElement).value).toBe('');
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
     });
 
     test('empty test name does not trigger capture', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
-      document.getElementById('report-test-name').value = '  ';
-      document.getElementById('new-report-capture').click();
+      document.getElementById('new-report-btn')!.click();
+      (document.getElementById('report-test-name') as HTMLInputElement).value = '  ';
+      document.getElementById('new-report-capture')!.click();
       await flush();
       expect(api.captureAndCompare).not.toHaveBeenCalled();
-      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(false);
     });
 
     test('valid test name triggers capture without folder (no sidebar)', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
+      document.getElementById('new-report-btn')!.click();
       api.setViewsVisible.mockClear();
-      document.getElementById('report-test-name').value = 'login-page';
-      document.getElementById('new-report-capture').click();
+      (document.getElementById('report-test-name') as HTMLInputElement).value = 'login-page';
+      document.getElementById('new-report-capture')!.click();
       await flush();
       expect(api.createDirectory).not.toHaveBeenCalled();
       expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'login-page' });
-      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
@@ -329,14 +332,14 @@ describe('ui-controls', () => {
       init();
       await flush();
       // Open a folder first
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
       // Now click New
-      document.getElementById('new-report-btn').click();
-      expect(document.getElementById('new-report-folder-info').classList.contains('hidden')).toBe(false);
-      expect(document.getElementById('new-report-folder-path').textContent).toBe('/vrt-tests/');
-      document.getElementById('report-test-name').value = 'login-page';
-      document.getElementById('new-report-capture').click();
+      document.getElementById('new-report-btn')!.click();
+      expect(document.getElementById('new-report-folder-info')!.classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('new-report-folder-path')!.textContent).toBe('/vrt-tests/');
+      (document.getElementById('report-test-name') as HTMLInputElement).value = 'login-page';
+      document.getElementById('new-report-capture')!.click();
       await flush();
       expect(api.createDirectory).toHaveBeenCalledWith({ dirPath: '/vrt-tests/login-page' });
       expect(api.saveSettings).toHaveBeenCalledWith({ settings: { snapshotDir: '/vrt-tests/login-page' } });
@@ -346,25 +349,25 @@ describe('ui-controls', () => {
     test('folder info is hidden when no folder is open', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
-      expect(document.getElementById('new-report-folder-info').classList.contains('hidden')).toBe(true);
+      document.getElementById('new-report-btn')!.click();
+      expect(document.getElementById('new-report-folder-info')!.classList.contains('hidden')).toBe(true);
     });
 
     test('cancel closes modal and restores BrowserViews', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
+      document.getElementById('new-report-btn')!.click();
       api.setViewsVisible.mockClear();
-      document.getElementById('new-report-cancel').click();
-      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(true);
+      document.getElementById('new-report-cancel')!.click();
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
     test('Enter key in test name input triggers capture', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
-      const nameInput = document.getElementById('report-test-name');
+      document.getElementById('new-report-btn')!.click();
+      const nameInput = document.getElementById('report-test-name') as HTMLInputElement;
       nameInput.value = 'my-test';
       nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
@@ -374,8 +377,8 @@ describe('ui-controls', () => {
     test('Enter during IME composition does not trigger capture', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
-      const nameInput = document.getElementById('report-test-name');
+      document.getElementById('new-report-btn')!.click();
+      const nameInput = document.getElementById('report-test-name') as HTMLInputElement;
       nameInput.value = 'テスト';
       nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
       await flush();
@@ -388,31 +391,31 @@ describe('ui-controls', () => {
     test('initial state has sync-on class', async () => {
       init();
       await flush();
-      const btn = document.getElementById('toggle-sync');
+      const btn = document.getElementById('toggle-sync')!;
       expect(btn.classList.contains('sync-on')).toBe(true);
     });
 
     test('clicking toggle switches to sync-off', async () => {
       init();
       await flush();
-      const btn = document.getElementById('toggle-sync');
+      const btn = document.getElementById('toggle-sync')!;
       btn.click();
       expect(btn.classList.contains('sync-off')).toBe(true);
       expect(btn.classList.contains('sync-on')).toBe(false);
       expect(btn.textContent).toContain('Sync OFF');
-      expect(document.getElementById('status-sync').textContent).toBe('Sync: OFF');
+      expect(document.getElementById('status-sync')!.textContent).toBe('Sync: OFF');
       expect(api.setSyncEnabled).toHaveBeenCalledWith({ enabled: false });
     });
 
     test('clicking toggle twice restores sync-on', async () => {
       init();
       await flush();
-      const btn = document.getElementById('toggle-sync');
+      const btn = document.getElementById('toggle-sync')!;
       btn.click();
       btn.click();
       expect(btn.classList.contains('sync-on')).toBe(true);
       expect(btn.textContent).toContain('Sync ON');
-      expect(document.getElementById('status-sync').textContent).toBe('Sync: ON');
+      expect(document.getElementById('status-sync')!.textContent).toBe('Sync: ON');
       expect(api.setSyncEnabled).toHaveBeenCalledWith({ enabled: true });
     });
   });
@@ -422,30 +425,30 @@ describe('ui-controls', () => {
     test('clicking a preset calls setDevicePreset with correct size', async () => {
       init();
       await flush();
-      const btn = document.querySelector('.btn-preset[data-preset="0"]');
+      const btn = document.querySelector('.btn-preset[data-preset="0"]') as HTMLElement;
       btn.click();
-      const preset = PRESET_LIST[0];
+      const preset = _PRESET_LIST[0];
       expect(api.setDevicePreset).toHaveBeenCalledWith({ width: preset.width, height: preset.height });
     });
 
     test('clicking a preset updates status-size', async () => {
       init();
       await flush();
-      document.querySelector('.btn-preset[data-preset="3"]').click();
-      const preset = PRESET_LIST[3];
-      expect(document.getElementById('status-size').textContent).toBe(`${preset.width} x ${preset.height}`);
+      (document.querySelector('.btn-preset[data-preset="3"]') as HTMLElement).click();
+      const preset = _PRESET_LIST[3];
+      expect(document.getElementById('status-size')!.textContent).toBe(`${preset.width} x ${preset.height}`);
     });
 
     test('active class is set on clicked preset and removed from others', async () => {
       init();
       await flush();
-      document.querySelector('.btn-preset[data-preset="1"]').click();
-      expect(document.querySelector('.btn-preset[data-preset="1"]').classList.contains('active')).toBe(true);
-      expect(document.querySelector('.btn-preset[data-preset="0"]').classList.contains('active')).toBe(false);
+      (document.querySelector('.btn-preset[data-preset="1"]') as HTMLElement).click();
+      expect(document.querySelector('.btn-preset[data-preset="1"]')!.classList.contains('active')).toBe(true);
+      expect(document.querySelector('.btn-preset[data-preset="0"]')!.classList.contains('active')).toBe(false);
 
-      document.querySelector('.btn-preset[data-preset="2"]').click();
-      expect(document.querySelector('.btn-preset[data-preset="2"]').classList.contains('active')).toBe(true);
-      expect(document.querySelector('.btn-preset[data-preset="1"]').classList.contains('active')).toBe(false);
+      (document.querySelector('.btn-preset[data-preset="2"]') as HTMLElement).click();
+      expect(document.querySelector('.btn-preset[data-preset="2"]')!.classList.contains('active')).toBe(true);
+      expect(document.querySelector('.btn-preset[data-preset="1"]')!.classList.contains('active')).toBe(false);
     });
   });
 
@@ -454,21 +457,21 @@ describe('ui-controls', () => {
     test('zoom in button calls setZoom with increased value', async () => {
       init();
       await flush();
-      document.getElementById('zoom-in-btn').click();
+      document.getElementById('zoom-in-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(1.1, 1) });
     });
 
     test('zoom out button calls setZoom with decreased value', async () => {
       init();
       await flush();
-      document.getElementById('zoom-out-btn').click();
+      document.getElementById('zoom-out-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(0.9, 1) });
     });
 
     test('zoom level button resets zoom to 100%', async () => {
       init();
       await flush();
-      document.getElementById('zoom-level-btn').click();
+      document.getElementById('zoom-level-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: 1.0 });
     });
 
@@ -477,23 +480,23 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onZoomChanged.mock.calls[0][0];
       cb({ zoom: 1.5 });
-      expect(document.getElementById('zoom-level-btn').textContent).toBe('150%');
-      expect(document.getElementById('status-zoom').textContent).toBe('Zoom: 150%');
+      expect(document.getElementById('zoom-level-btn')!.textContent).toBe('150%');
+      expect(document.getElementById('status-zoom')!.textContent).toBe('Zoom: 150%');
     });
 
     test('initial zoom is loaded from getZoom', async () => {
       api.getZoom.mockResolvedValue({ zoom: 0.75 });
       init();
       await flush();
-      expect(document.getElementById('zoom-level-btn').textContent).toBe('75%');
-      expect(document.getElementById('status-zoom').textContent).toBe('Zoom: 75%');
+      expect(document.getElementById('zoom-level-btn')!.textContent).toBe('75%');
+      expect(document.getElementById('status-zoom')!.textContent).toBe('Zoom: 75%');
     });
 
     test('zoom in does not exceed max zoom (3.0)', async () => {
       api.getZoom.mockResolvedValue({ zoom: 3.0 });
       init();
       await flush();
-      document.getElementById('zoom-in-btn').click();
+      document.getElementById('zoom-in-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: 3.0 });
     });
 
@@ -501,7 +504,7 @@ describe('ui-controls', () => {
       api.getZoom.mockResolvedValue({ zoom: 0.25 });
       init();
       await flush();
-      document.getElementById('zoom-out-btn').click();
+      document.getElementById('zoom-out-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: 0.25 });
     });
 
@@ -535,8 +538,8 @@ describe('ui-controls', () => {
     test('clicking settings button opens modal, hides BrowserViews, and loads settings', async () => {
       init();
       await flush();
-      document.getElementById('settings-btn').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('settings-btn')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(false);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
       await flush();
       expect(api.getSettings).toHaveBeenCalled();
@@ -545,13 +548,13 @@ describe('ui-controls', () => {
     test('saving settings closes modal and restores BrowserViews', async () => {
       init();
       await flush();
-      document.getElementById('settings-btn').click();
+      document.getElementById('settings-btn')!.click();
       await flush();
       api.setViewsVisible.mockClear();
-      document.getElementById('setting-matching-threshold').value = '0.5';
-      document.getElementById('setting-threshold-rate').value = '0.1';
-      document.getElementById('setting-snapshot-dir').value = './my-snaps';
-      document.getElementById('settings-save').click();
+      (document.getElementById('setting-matching-threshold') as HTMLInputElement).value = '0.5';
+      (document.getElementById('setting-threshold-rate') as HTMLInputElement).value = '0.1';
+      (document.getElementById('setting-snapshot-dir') as HTMLInputElement).value = './my-snaps';
+      document.getElementById('settings-save')!.click();
       expect(api.saveSettings).toHaveBeenCalledWith({
         settings: {
           matchingThreshold: 0.5,
@@ -559,18 +562,18 @@ describe('ui-controls', () => {
           snapshotDir: './my-snaps',
         },
       });
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
     test('cancel closes settings modal, restores BrowserViews, without saving', async () => {
       init();
       await flush();
-      document.getElementById('settings-btn').click();
+      document.getElementById('settings-btn')!.click();
       await flush();
       api.setViewsVisible.mockClear();
-      document.getElementById('settings-cancel').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
+      document.getElementById('settings-cancel')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
       expect(api.saveSettings).not.toHaveBeenCalled();
     });
@@ -612,7 +615,7 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onShortcutPreset.mock.calls[0][0];
       cb({ index: 2 });
-      const preset = PRESET_LIST[2];
+      const preset = _PRESET_LIST[2];
       expect(api.setDevicePreset).toHaveBeenCalledWith({ width: preset.width, height: preset.height });
     });
 
@@ -621,7 +624,7 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onShortcutSettings.mock.calls[0][0];
       cb();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(false);
     });
   });
 
@@ -635,16 +638,16 @@ describe('ui-controls', () => {
     ];
 
     function getTreeNames() {
-      return Array.from(document.getElementById('sidebar-tree').querySelectorAll('.tree-item > .tree-name'))
+      return Array.from(document.getElementById('sidebar-tree')!.querySelectorAll('.tree-item > .tree-name'))
         .map((el) => el.textContent);
     }
 
-    async function openFolderWithEntries(entries) {
+    async function openFolderWithEntries(entries?: any[]) {
       api.selectFolder.mockResolvedValue('/test');
       api.readDirectory.mockResolvedValue(entries || mixedEntries);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
     }
 
@@ -652,9 +655,9 @@ describe('ui-controls', () => {
     test('clicking toggle-sidebar opens sidebar and sets width', async () => {
       init();
       await flush();
-      const sidebar = document.getElementById('sidebar');
+      const sidebar = document.getElementById('sidebar')!;
       expect(sidebar.classList.contains('collapsed')).toBe(true);
-      document.getElementById('toggle-sidebar').click();
+      document.getElementById('toggle-sidebar')!.click();
       expect(sidebar.classList.contains('collapsed')).toBe(false);
       expect(document.body.classList.contains('sidebar-open')).toBe(true);
       expect(api.setSidebarWidth).toHaveBeenCalledWith({ width: 250 });
@@ -663,9 +666,9 @@ describe('ui-controls', () => {
     test('clicking toggle-sidebar twice closes sidebar', async () => {
       init();
       await flush();
-      document.getElementById('toggle-sidebar').click();
-      document.getElementById('toggle-sidebar').click();
-      expect(document.getElementById('sidebar').classList.contains('collapsed')).toBe(true);
+      document.getElementById('toggle-sidebar')!.click();
+      document.getElementById('toggle-sidebar')!.click();
+      expect(document.getElementById('sidebar')!.classList.contains('collapsed')).toBe(true);
       expect(document.body.classList.contains('sidebar-open')).toBe(false);
       expect(api.setSidebarWidth).toHaveBeenLastCalledWith({ width: 0 });
     });
@@ -676,7 +679,7 @@ describe('ui-controls', () => {
         { name: 'subdir', isDirectory: true, path: '/test/subdir' },
         { name: 'file.txt', isDirectory: false, path: '/test/file.txt' },
       ]);
-      const items = document.getElementById('sidebar-tree').querySelectorAll('.tree-item');
+      const items = document.getElementById('sidebar-tree')!.querySelectorAll('.tree-item');
       expect(items.length).toBe(2);
     });
 
@@ -684,9 +687,9 @@ describe('ui-controls', () => {
       api.selectFolder.mockResolvedValue(null);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
+      expect(document.getElementById('sidebar-tree')!.children.length).toBe(0);
     });
 
     // --- Expand / Collapse ---
@@ -699,13 +702,13 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.getElementById('sidebar-tree').querySelector('.tree-item').click();
+      (document.getElementById('sidebar-tree')!.querySelector('.tree-item') as HTMLElement).click();
       await flush();
-      const children = document.getElementById('sidebar-tree').querySelector('.tree-children');
+      const children = document.getElementById('sidebar-tree')!.querySelector('.tree-children')!;
       expect(children.classList.contains('expanded')).toBe(true);
-      expect(children.querySelector('.tree-name').textContent).toBe('child.txt');
+      expect(children.querySelector('.tree-name')!.textContent).toBe('child.txt');
     });
 
     test('clicking an expanded directory collapses it', async () => {
@@ -717,14 +720,14 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      const dirItem = document.getElementById('sidebar-tree')!.querySelector('.tree-item') as HTMLElement;
       dirItem.click();
       await flush();
       dirItem.click();
       await flush();
-      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(false);
+      expect(document.getElementById('sidebar-tree')!.querySelector('.tree-children')!.classList.contains('expanded')).toBe(false);
     });
 
     test('readDirectory error is handled gracefully', async () => {
@@ -732,9 +735,9 @@ describe('ui-controls', () => {
       api.readDirectory.mockRejectedValue(new Error('ENOENT'));
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
+      expect(document.getElementById('sidebar-tree')!.children.length).toBe(0);
     });
 
     test('child directory readDirectory error is handled gracefully', async () => {
@@ -744,11 +747,11 @@ describe('ui-controls', () => {
       ]).mockRejectedValueOnce(new Error('EPERM'));
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.getElementById('sidebar-tree').querySelector('.tree-item').click();
+      (document.getElementById('sidebar-tree')!.querySelector('.tree-item') as HTMLElement).click();
       await flush();
-      const children = document.getElementById('sidebar-tree').querySelector('.tree-children');
+      const children = document.getElementById('sidebar-tree')!.querySelector('.tree-children')!;
       expect(children.classList.contains('expanded')).toBe(true);
       expect(children.querySelectorAll('.tree-item').length).toBe(0);
     });
@@ -756,24 +759,24 @@ describe('ui-controls', () => {
     // --- Sort select ---
     test('sort select name-asc sorts alphabetically', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-sort').value = 'name-asc';
-      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      (document.getElementById('sidebar-sort') as HTMLSelectElement).value = 'name-asc';
+      document.getElementById('sidebar-sort')!.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       expect(getTreeNames()).toEqual(['alpha', 'beta.txt', 'delta', 'gamma.js']);
     });
 
     test('sort select name-desc sorts reverse alphabetically', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-sort').value = 'name-desc';
-      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      (document.getElementById('sidebar-sort') as HTMLSelectElement).value = 'name-desc';
+      document.getElementById('sidebar-sort')!.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       expect(getTreeNames()).toEqual(['gamma.js', 'delta', 'beta.txt', 'alpha']);
     });
 
     test('sort select type groups directories first', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-sort').value = 'type';
-      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      (document.getElementById('sidebar-sort') as HTMLSelectElement).value = 'type';
+      document.getElementById('sidebar-sort')!.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       const names = getTreeNames();
       expect(names).toEqual(['alpha', 'delta', 'beta.txt', 'gamma.js']);
@@ -782,44 +785,44 @@ describe('ui-controls', () => {
     test('sort change without folder does nothing', async () => {
       init();
       await flush();
-      document.getElementById('sidebar-sort').value = 'name-desc';
-      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      (document.getElementById('sidebar-sort') as HTMLSelectElement).value = 'name-desc';
+      document.getElementById('sidebar-sort')!.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
-      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
+      expect(document.getElementById('sidebar-tree')!.children.length).toBe(0);
     });
 
     // --- Filter radio buttons ---
     test('filter radio "directories" shows only directories', async () => {
       await openFolderWithEntries();
-      const radio = document.querySelector('input[name="sidebar-filter"][value="directories"]');
+      const radio = document.querySelector('input[name="sidebar-filter"][value="directories"]') as HTMLInputElement;
       radio.checked = true;
       radio.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       const names = getTreeNames();
-      expect(names.every((n) => !n.includes('.'))).toBe(true);
+      expect(names.every((n) => !n!.includes('.'))).toBe(true);
       expect(names.length).toBe(2);
     });
 
     test('filter radio "files" shows only files', async () => {
       await openFolderWithEntries();
-      const radio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      const radio = document.querySelector('input[name="sidebar-filter"][value="files"]') as HTMLInputElement;
       radio.checked = true;
       radio.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       const names = getTreeNames();
-      expect(names.every((n) => n.includes('.'))).toBe(true);
+      expect(names.every((n) => n!.includes('.'))).toBe(true);
       expect(names.length).toBe(2);
     });
 
     test('filter radio "all" shows everything', async () => {
       await openFolderWithEntries();
       // Switch to files first
-      const filesRadio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      const filesRadio = document.querySelector('input[name="sidebar-filter"][value="files"]') as HTMLInputElement;
       filesRadio.checked = true;
       filesRadio.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       // Then switch back to all
-      const allRadio = document.querySelector('input[name="sidebar-filter"][value="all"]');
+      const allRadio = document.querySelector('input[name="sidebar-filter"][value="all"]') as HTMLInputElement;
       allRadio.checked = true;
       allRadio.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
@@ -829,23 +832,23 @@ describe('ui-controls', () => {
     test('filter change without folder does nothing', async () => {
       init();
       await flush();
-      const radio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      const radio = document.querySelector('input[name="sidebar-filter"][value="files"]') as HTMLInputElement;
       radio.checked = true;
       radio.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
-      expect(document.getElementById('sidebar-tree').children.length).toBe(0);
+      expect(document.getElementById('sidebar-tree')!.children.length).toBe(0);
     });
 
     test('sort and filter combine correctly', async () => {
       await openFolderWithEntries();
       // Filter to directories only
-      const dirsRadio = document.querySelector('input[name="sidebar-filter"][value="directories"]');
+      const dirsRadio = document.querySelector('input[name="sidebar-filter"][value="directories"]') as HTMLInputElement;
       dirsRadio.checked = true;
       dirsRadio.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       // Sort descending
-      document.getElementById('sidebar-sort').value = 'name-desc';
-      document.getElementById('sidebar-sort').dispatchEvent(new Event('change', { bubbles: true }));
+      (document.getElementById('sidebar-sort') as HTMLSelectElement).value = 'name-desc';
+      document.getElementById('sidebar-sort')!.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
       expect(getTreeNames()).toEqual(['delta', 'alpha']);
     });
@@ -860,12 +863,12 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      const dirItem = document.getElementById('sidebar-tree')!.querySelector('.tree-item')!;
       dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
-      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+      expect(document.getElementById('sidebar-tree')!.querySelector('.tree-children')!.classList.contains('expanded')).toBe(true);
     });
 
     test('Space key expands a directory', async () => {
@@ -877,12 +880,12 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      const dirItem = document.getElementById('sidebar-tree')!.querySelector('.tree-item')!;
       dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
       await flush();
-      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+      expect(document.getElementById('sidebar-tree')!.querySelector('.tree-children')!.classList.contains('expanded')).toBe(true);
     });
 
     test('Enter key collapses an expanded directory', async () => {
@@ -894,14 +897,14 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      const dirItem = document.getElementById('sidebar-tree')!.querySelector('.tree-item') as HTMLElement;
       dirItem.click();
       await flush();
       dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
-      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(false);
+      expect(document.getElementById('sidebar-tree')!.querySelector('.tree-children')!.classList.contains('expanded')).toBe(false);
     });
 
     test('non-Enter/Space key does not toggle directory', async () => {
@@ -911,12 +914,12 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const dirItem = document.getElementById('sidebar-tree').querySelector('.tree-item');
+      const dirItem = document.getElementById('sidebar-tree')!.querySelector('.tree-item')!;
       dirItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
       await flush();
-      expect(document.getElementById('sidebar-tree').querySelector('.tree-children').classList.contains('expanded')).toBe(false);
+      expect(document.getElementById('sidebar-tree')!.querySelector('.tree-children')!.classList.contains('expanded')).toBe(false);
     });
 
     // --- Accessibility ---
@@ -925,7 +928,7 @@ describe('ui-controls', () => {
         { name: 'dir', isDirectory: true, path: '/test/dir' },
         { name: 'file.txt', isDirectory: false, path: '/test/file.txt' },
       ]);
-      const items = document.getElementById('sidebar-tree').querySelectorAll('.tree-item');
+      const items = document.getElementById('sidebar-tree')!.querySelectorAll('.tree-item');
       items.forEach((item) => {
         expect(item.getAttribute('tabindex')).toBe('0');
       });
@@ -945,7 +948,7 @@ describe('ui-controls', () => {
       api.readDirectory.mockResolvedValue([]);
       init();
       await flush();
-      const outputDisplay = document.getElementById('sidebar-output-dir');
+      const outputDisplay = document.getElementById('sidebar-output-dir')!;
       expect(outputDisplay.textContent).toBe('snapshots');
       expect(outputDisplay.title).toBe('/home/user/snapshots');
     });
@@ -983,7 +986,7 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'output', isDirectory: true, path: '/test/output' },
       ]);
-      const pinBtn = document.querySelector('.tree-pin-btn');
+      const pinBtn = document.querySelector('.tree-pin-btn') as HTMLElement;
       expect(pinBtn).not.toBeNull();
       pinBtn.click();
       await flush();
@@ -996,10 +999,10 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'sub', isDirectory: true, path: '/test/sub' },
       ]);
-      const pinBtn = document.querySelector('.tree-pin-btn');
+      const pinBtn = document.querySelector('.tree-pin-btn') as HTMLElement;
       pinBtn.click();
       await flush();
-      const children = document.querySelector('.tree-children');
+      const children = document.querySelector('.tree-children')!;
       expect(children.classList.contains('expanded')).toBe(false);
     });
 
@@ -1009,11 +1012,11 @@ describe('ui-controls', () => {
         { name: 'other', isDirectory: true, path: '/test/other' },
       ]);
       // Click pin on first directory to set it as output
-      const pinBtn = document.querySelector('.tree-pin-btn');
+      const pinBtn = document.querySelector('.tree-pin-btn') as HTMLElement;
       pinBtn.click();
       await flush();
       // After pin click, tree re-renders with active class
-      const items = document.getElementById('sidebar-tree').querySelectorAll('.tree-item');
+      const items = document.getElementById('sidebar-tree')!.querySelectorAll('.tree-item');
       expect(items[0].classList.contains('tree-item-active-output')).toBe(true);
       expect(items[1].classList.contains('tree-item-active-output')).toBe(false);
     });
@@ -1030,10 +1033,10 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'my-output', isDirectory: true, path: '/test/my-output' },
       ]);
-      const pinBtn = document.querySelector('.tree-pin-btn');
+      const pinBtn = document.querySelector('.tree-pin-btn') as HTMLElement;
       pinBtn.click();
       await flush();
-      const outputDisplay = document.getElementById('sidebar-output-dir');
+      const outputDisplay = document.getElementById('sidebar-output-dir')!;
       expect(outputDisplay.textContent).toBe('my-output');
       expect(outputDisplay.title).toBe('/test/my-output');
     });
@@ -1042,29 +1045,29 @@ describe('ui-controls', () => {
     test('new folder button does nothing without open folder', async () => {
       init();
       await flush();
-      document.getElementById('sidebar-new-folder').click();
-      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+      document.getElementById('sidebar-new-folder')!.click();
+      expect(document.getElementById('sidebar-new-folder-form')!.classList.contains('hidden')).toBe(true);
     });
 
     test('new folder button shows form when folder is open', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      const form = document.getElementById('sidebar-new-folder-form');
+      document.getElementById('sidebar-new-folder')!.click();
+      const form = document.getElementById('sidebar-new-folder-form')!;
       expect(form.classList.contains('hidden')).toBe(false);
     });
 
     test('new folder cancel hides form', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      document.getElementById('sidebar-new-folder-cancel').click();
-      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+      document.getElementById('sidebar-new-folder')!.click();
+      document.getElementById('sidebar-new-folder-cancel')!.click();
+      expect(document.getElementById('sidebar-new-folder-form')!.classList.contains('hidden')).toBe(true);
     });
 
     test('new folder OK creates directory and sets as output', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      document.getElementById('sidebar-new-folder-name').value = 'vrt-test';
-      document.getElementById('sidebar-new-folder-ok').click();
+      document.getElementById('sidebar-new-folder')!.click();
+      (document.getElementById('sidebar-new-folder-name') as HTMLInputElement).value = 'vrt-test';
+      document.getElementById('sidebar-new-folder-ok')!.click();
       await flush();
       expect(api.createDirectory).toHaveBeenCalledWith({ dirPath: '/test/vrt-test' });
       expect(api.saveSettings).toHaveBeenCalledWith({
@@ -1074,17 +1077,17 @@ describe('ui-controls', () => {
 
     test('new folder OK with empty name does nothing', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      document.getElementById('sidebar-new-folder-name').value = '   ';
-      document.getElementById('sidebar-new-folder-ok').click();
+      document.getElementById('sidebar-new-folder')!.click();
+      (document.getElementById('sidebar-new-folder-name') as HTMLInputElement).value = '   ';
+      document.getElementById('sidebar-new-folder-ok')!.click();
       await flush();
       expect(api.createDirectory).not.toHaveBeenCalled();
     });
 
     test('Enter key in new folder input creates folder', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      const input = document.getElementById('sidebar-new-folder-name');
+      document.getElementById('sidebar-new-folder')!.click();
+      const input = document.getElementById('sidebar-new-folder-name') as HTMLInputElement;
       input.value = 'my-test';
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
@@ -1093,30 +1096,30 @@ describe('ui-controls', () => {
 
     test('Escape key in new folder input hides form', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      const input = document.getElementById('sidebar-new-folder-name');
+      document.getElementById('sidebar-new-folder')!.click();
+      const input = document.getElementById('sidebar-new-folder-name')!;
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('sidebar-new-folder-form')!.classList.contains('hidden')).toBe(true);
     });
 
     test('new folder creation error shows error toast', async () => {
       api.createDirectory.mockRejectedValue(new Error('EACCES'));
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      document.getElementById('sidebar-new-folder-name').value = 'bad-folder';
-      document.getElementById('sidebar-new-folder-ok').click();
+      document.getElementById('sidebar-new-folder')!.click();
+      (document.getElementById('sidebar-new-folder-name') as HTMLInputElement).value = 'bad-folder';
+      document.getElementById('sidebar-new-folder-ok')!.click();
       await flush();
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.className).toContain('toast-error');
     });
 
     test('new folder hides form after successful creation', async () => {
       await openFolderWithEntries();
-      document.getElementById('sidebar-new-folder').click();
-      document.getElementById('sidebar-new-folder-name').value = 'new-dir';
-      document.getElementById('sidebar-new-folder-ok').click();
+      document.getElementById('sidebar-new-folder')!.click();
+      (document.getElementById('sidebar-new-folder-name') as HTMLInputElement).value = 'new-dir';
+      document.getElementById('sidebar-new-folder-ok')!.click();
       await flush();
-      expect(document.getElementById('sidebar-new-folder-form').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('sidebar-new-folder-form')!.classList.contains('hidden')).toBe(true);
     });
 
     // --- File Preview ---
@@ -1124,24 +1127,24 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'screenshot.png', isDirectory: false, path: '/test/screenshot.png' },
       ]);
-      const fileItem = document.querySelector('.tree-item');
+      const fileItem = document.querySelector('.tree-item') as HTMLElement;
       api.setViewsVisible.mockClear();
       fileItem.click();
       // Modal and view hiding happen immediately (before async load)
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(false);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
       await flush();
       // After data loads, image is set
       expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/screenshot.png' });
-      expect(document.getElementById('preview-image').src).toContain('data:image/png');
-      expect(document.getElementById('preview-filename').textContent).toBe('test.png');
+      expect((document.getElementById('preview-image') as HTMLImageElement).src).toContain('data:image/png');
+      expect(document.getElementById('preview-filename')!.textContent).toBe('test.png');
     });
 
     test('clicking HTML file opens report via openReport', async () => {
       await openFolderWithEntries([
         { name: 'report.html', isDirectory: false, path: '/test/report.html' },
       ]);
-      document.querySelector('.tree-item').click();
+      (document.querySelector('.tree-item') as HTMLElement).click();
       await flush();
       expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/test/report.html' });
       expect(api.readFileData).not.toHaveBeenCalled();
@@ -1151,11 +1154,11 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'img.jpg', isDirectory: false, path: '/test/img.jpg' },
       ]);
-      document.querySelector('.tree-item').click();
+      (document.querySelector('.tree-item') as HTMLElement).click();
       await flush();
       api.setViewsVisible.mockClear();
-      document.getElementById('preview-close').click();
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      document.getElementById('preview-close')!.click();
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
@@ -1163,11 +1166,11 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'img.png', isDirectory: false, path: '/test/img.png' },
       ]);
-      document.querySelector('.tree-item').click();
+      (document.querySelector('.tree-item') as HTMLElement).click();
       await flush();
       api.setViewsVisible.mockClear();
-      document.getElementById('preview-overlay').click();
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      document.getElementById('preview-overlay')!.click();
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
@@ -1175,11 +1178,11 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'img.webp', isDirectory: false, path: '/test/img.webp' },
       ]);
-      document.querySelector('.tree-item').click();
+      (document.querySelector('.tree-item') as HTMLElement).click();
       await flush();
       api.setViewsVisible.mockClear();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
@@ -1187,7 +1190,7 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'data.json', isDirectory: false, path: '/test/data.json' },
       ]);
-      const item = document.querySelector('.tree-item');
+      const item = document.querySelector('.tree-item') as HTMLElement;
       expect(item.classList.contains('tree-item-inert')).toBe(true);
       item.click();
       await flush();
@@ -1215,11 +1218,11 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'img.gif', isDirectory: false, path: '/test/img.gif' },
       ]);
-      const item = document.querySelector('.tree-item');
+      const item = document.querySelector('.tree-item')!;
       item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
       expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/img.gif' });
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(false);
     });
 
     test('tree preserves expanded state after capture result', async () => {
@@ -1242,12 +1245,12 @@ describe('ui-controls', () => {
         ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
       // Expand 'sub'
-      document.getElementById('sidebar-tree').querySelector('.tree-item').click();
+      (document.getElementById('sidebar-tree')!.querySelector('.tree-item') as HTMLElement).click();
       await flush();
-      expect(document.querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+      expect(document.querySelector('.tree-children')!.classList.contains('expanded')).toBe(true);
       // Trigger capture result
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb({
@@ -1256,7 +1259,7 @@ describe('ui-controls', () => {
       });
       await flush();
       // 'sub' should still be expanded with updated children
-      expect(document.querySelector('.tree-children').classList.contains('expanded')).toBe(true);
+      expect(document.querySelector('.tree-children')!.classList.contains('expanded')).toBe(true);
       const childNames = Array.from(document.querySelectorAll('.tree-children .tree-name'))
         .map((el) => el.textContent);
       expect(childNames).toContain('new.png');
@@ -1267,13 +1270,13 @@ describe('ui-controls', () => {
       await openFolderWithEntries([
         { name: 'bad.png', isDirectory: false, path: '/test/bad.png' },
       ]);
-      document.querySelector('.tree-item').click();
+      (document.querySelector('.tree-item') as HTMLElement).click();
       // Modal opens immediately before async load
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(false);
       await flush();
       // After error, modal is closed
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
-      const toast = document.getElementById('toast');
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(true);
+      const toast = document.getElementById('toast')!;
       expect(toast.className).toContain('toast-error');
     });
   });
@@ -1292,7 +1295,7 @@ describe('ui-controls', () => {
         summary: { passed: 1, failed: 0, new: 0, deleted: 0 },
         reportPath: '/tmp/r.html',
       });
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.classList.contains('show')).toBe(true);
       expect(toast.className).toContain('toast-success');
 
@@ -1306,7 +1309,7 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb({ error: 'fail' });
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.className).toContain('toast-error');
     });
   });
@@ -1323,8 +1326,8 @@ describe('ui-controls', () => {
       });
       init();
       await flush();
-      expect(document.getElementById('left-url').value).toBe('http://my-left.com');
-      expect(document.getElementById('right-url').value).toBe('http://my-right.com');
+      expect((document.getElementById('left-url') as HTMLInputElement).value).toBe('http://my-left.com');
+      expect((document.getElementById('right-url') as HTMLInputElement).value).toBe('http://my-right.com');
     });
 
     test('uses fallback URLs when settings have no URL', async () => {
@@ -1335,8 +1338,8 @@ describe('ui-controls', () => {
       });
       init();
       await flush();
-      expect(document.getElementById('left-url').value).toBe('http://localhost:3000');
-      expect(document.getElementById('right-url').value).toBe('http://localhost:3001');
+      expect((document.getElementById('left-url') as HTMLInputElement).value).toBe('http://localhost:3000');
+      expect((document.getElementById('right-url') as HTMLInputElement).value).toBe('http://localhost:3001');
     });
   });
 
@@ -1345,7 +1348,7 @@ describe('ui-controls', () => {
     test('clicking report does nothing when no report path', async () => {
       init();
       await flush();
-      document.getElementById('report-btn').click();
+      document.getElementById('report-btn')!.click();
       expect(api.openReport).not.toHaveBeenCalled();
     });
 
@@ -1357,7 +1360,7 @@ describe('ui-controls', () => {
         summary: { passed: 1, failed: 0, new: 0, deleted: 0 },
         reportPath: '/tmp/my-report/index.html',
       });
-      document.getElementById('report-btn').click();
+      document.getElementById('report-btn')!.click();
       expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/tmp/my-report/index.html' });
     });
   });
@@ -1368,9 +1371,9 @@ describe('ui-controls', () => {
       api.captureAndCompare.mockRejectedValue(new Error('Network error'));
       init();
       await flush();
-      document.getElementById('capture-btn').click();
+      document.getElementById('capture-btn')!.click();
       await flush();
-      expect(document.getElementById('status-result').textContent).toBe('Error: Network error');
+      expect(document.getElementById('status-result')!.textContent).toBe('Error: Network error');
     });
   });
 
@@ -1379,27 +1382,27 @@ describe('ui-controls', () => {
     test('opening settings modal then closing restores views before opening new report modal', async () => {
       init();
       await flush();
-      document.getElementById('settings-btn').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('settings-btn')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(false);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
-      document.getElementById('settings-cancel').click();
+      document.getElementById('settings-cancel')!.click();
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
       api.setViewsVisible.mockClear();
-      document.getElementById('new-report-btn').click();
-      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('new-report-btn')!.click();
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(false);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
     });
 
     test('settings save then open new report maintains correct view visibility', async () => {
       init();
       await flush();
-      document.getElementById('settings-btn').click();
-      document.getElementById('settings-save').click();
+      document.getElementById('settings-btn')!.click();
+      document.getElementById('settings-save')!.click();
       api.setViewsVisible.mockClear();
-      document.getElementById('new-report-btn').click();
-      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('new-report-btn')!.click();
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(false);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
-      document.getElementById('new-report-cancel').click();
+      document.getElementById('new-report-cancel')!.click();
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
@@ -1410,25 +1413,25 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.querySelector('.tree-item').click();
+      (document.querySelector('.tree-item') as HTMLElement).click();
       await flush();
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(false);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(true);
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
     });
 
     test('new report modal + sidebar open maintains view state correctly', async () => {
       init();
       await flush();
-      document.getElementById('toggle-sidebar').click();
+      document.getElementById('toggle-sidebar')!.click();
       expect(document.body.classList.contains('sidebar-open')).toBe(true);
-      document.getElementById('new-report-btn').click();
+      document.getElementById('new-report-btn')!.click();
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: false });
       api.setViewsVisible.mockClear();
-      document.getElementById('new-report-cancel').click();
+      document.getElementById('new-report-cancel')!.click();
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
       expect(document.body.classList.contains('sidebar-open')).toBe(true);
     });
@@ -1436,11 +1439,11 @@ describe('ui-controls', () => {
     test('capture during new report modal flow closes modal and performs capture', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
-      document.getElementById('report-test-name').value = 'my-test';
-      document.getElementById('new-report-capture').click();
+      document.getElementById('new-report-btn')!.click();
+      (document.getElementById('report-test-name') as HTMLInputElement).value = 'my-test';
+      document.getElementById('new-report-capture')!.click();
       await flush();
-      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'my-test' });
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
@@ -1455,24 +1458,24 @@ describe('ui-controls', () => {
       });
       init();
       await flush();
-      document.getElementById('settings-btn').click();
+      document.getElementById('settings-btn')!.click();
       await flush();
-      expect(document.getElementById('setting-matching-threshold').value).toBe('0.3');
-      expect(document.getElementById('setting-threshold-rate').value).toBe('0.2');
-      expect(document.getElementById('setting-snapshot-dir').value).toBe('/custom/path');
+      expect((document.getElementById('setting-matching-threshold') as HTMLInputElement).value).toBe('0.3');
+      expect((document.getElementById('setting-threshold-rate') as HTMLInputElement).value).toBe('0.2');
+      expect((document.getElementById('setting-snapshot-dir') as HTMLInputElement).value).toBe('/custom/path');
     });
 
     test('rapid open/close of settings modal maintains consistent state', async () => {
       init();
       await flush();
-      document.getElementById('settings-btn').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
-      document.getElementById('settings-cancel').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
-      document.getElementById('settings-btn').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
-      document.getElementById('settings-cancel').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(true);
+      document.getElementById('settings-btn')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(false);
+      document.getElementById('settings-cancel')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
+      document.getElementById('settings-btn')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(false);
+      document.getElementById('settings-cancel')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
     });
 
     test('capture result updates sidebar tree when folder is open', async () => {
@@ -1482,7 +1485,7 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
       expect(document.querySelectorAll('.tree-item').length).toBe(1);
       api.readDirectory.mockResolvedValue([
@@ -1503,7 +1506,7 @@ describe('ui-controls', () => {
       expect(api.captureAndCompare).toHaveBeenCalled();
       const settingsCb = api.onShortcutSettings.mock.calls[0][0];
       settingsCb();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(false);
     });
   });
 
@@ -1512,18 +1515,18 @@ describe('ui-controls', () => {
     test('sidebar toggle updates width correctly across multiple toggles', async () => {
       init();
       await flush();
-      document.getElementById('toggle-sidebar').click();
+      document.getElementById('toggle-sidebar')!.click();
       expect(api.setSidebarWidth).toHaveBeenCalledWith({ width: 250 });
-      document.getElementById('toggle-sidebar').click();
+      document.getElementById('toggle-sidebar')!.click();
       expect(api.setSidebarWidth).toHaveBeenCalledWith({ width: 0 });
-      document.getElementById('toggle-sidebar').click();
+      document.getElementById('toggle-sidebar')!.click();
       expect(api.setSidebarWidth).toHaveBeenLastCalledWith({ width: 250 });
     });
 
     test('sync toggle cycles through ON/OFF/ON correctly', async () => {
       init();
       await flush();
-      const btn = document.getElementById('toggle-sync');
+      const btn = document.getElementById('toggle-sync')!;
       expect(btn.classList.contains('sync-on')).toBe(true);
       btn.click();
       expect(api.setSyncEnabled).toHaveBeenCalledWith({ enabled: false });
@@ -1536,12 +1539,12 @@ describe('ui-controls', () => {
     test('zoom changes persist across preset changes', async () => {
       init();
       await flush();
-      document.getElementById('zoom-in-btn').click();
+      document.getElementById('zoom-in-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(1.1, 1) });
-      document.querySelector('.btn-preset[data-preset="0"]').click();
-      const preset = PRESET_LIST[0];
+      (document.querySelector('.btn-preset[data-preset="0"]') as HTMLElement).click();
+      const preset = _PRESET_LIST[0];
       expect(api.setDevicePreset).toHaveBeenCalledWith({ width: preset.width, height: preset.height });
-      document.getElementById('zoom-in-btn').click();
+      document.getElementById('zoom-in-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledTimes(2);
     });
 
@@ -1549,7 +1552,7 @@ describe('ui-controls', () => {
       init();
       await flush();
       for (let i = 0; i < 5; i++) {
-        document.querySelector(`.btn-preset[data-preset="${i}"]`).click();
+        (document.querySelector(`.btn-preset[data-preset="${i}"]`) as HTMLElement).click();
       }
       const presetBtns = document.querySelectorAll('.btn-preset');
       presetBtns.forEach((btn, idx) => {
@@ -1564,11 +1567,11 @@ describe('ui-controls', () => {
     test('capture result with report path enables report button', async () => {
       init();
       await flush();
-      document.getElementById('report-btn').click();
+      document.getElementById('report-btn')!.click();
       expect(api.openReport).not.toHaveBeenCalled();
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb({ summary: { passed: 1, failed: 0, new: 0, deleted: 0 }, reportPath: '/path/report.html' });
-      document.getElementById('report-btn').click();
+      document.getElementById('report-btn')!.click();
       expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/path/report.html' });
     });
 
@@ -1577,7 +1580,7 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb({ error: 'Capture failed' });
-      document.getElementById('report-btn').click();
+      document.getElementById('report-btn')!.click();
       expect(api.openReport).not.toHaveBeenCalled();
     });
 
@@ -1587,7 +1590,7 @@ describe('ui-controls', () => {
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb({ summary: { passed: 1, failed: 0, new: 0, deleted: 0 }, reportPath: '/first/report.html' });
       cb({ summary: { passed: 1, failed: 0, new: 0, deleted: 0 }, reportPath: '/second/report.html' });
-      document.getElementById('report-btn').click();
+      document.getElementById('report-btn')!.click();
       expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/second/report.html' });
     });
   });
@@ -1598,7 +1601,7 @@ describe('ui-controls', () => {
       api.getZoom.mockResolvedValue({ zoom: 2.9 });
       init();
       await flush();
-      document.getElementById('zoom-in-btn').click();
+      document.getElementById('zoom-in-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: 3.0 });
     });
 
@@ -1606,7 +1609,7 @@ describe('ui-controls', () => {
       api.getZoom.mockResolvedValue({ zoom: 0.35 });
       init();
       await flush();
-      document.getElementById('zoom-out-btn').click();
+      document.getElementById('zoom-out-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: expect.closeTo(0.25, 1) });
     });
 
@@ -1614,7 +1617,7 @@ describe('ui-controls', () => {
       api.getZoom.mockResolvedValue({ zoom: 2.5 });
       init();
       await flush();
-      document.getElementById('zoom-level-btn').click();
+      document.getElementById('zoom-level-btn')!.click();
       expect(api.setZoom).toHaveBeenCalledWith({ zoom: 1.0 });
     });
 
@@ -1623,10 +1626,10 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onZoomChanged.mock.calls[0][0];
       cb({ zoom: 0.5 });
-      expect(document.getElementById('zoom-level-btn').textContent).toBe('50%');
-      expect(document.getElementById('status-zoom').textContent).toBe('Zoom: 50%');
+      expect(document.getElementById('zoom-level-btn')!.textContent).toBe('50%');
+      expect(document.getElementById('status-zoom')!.textContent).toBe('Zoom: 50%');
       cb({ zoom: 2.0 });
-      expect(document.getElementById('zoom-level-btn').textContent).toBe('200%');
+      expect(document.getElementById('zoom-level-btn')!.textContent).toBe('200%');
     });
   });
 
@@ -1642,9 +1645,9 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const filesRadio = document.querySelector('input[name="sidebar-filter"][value="files"]');
+      const filesRadio = document.querySelector('input[name="sidebar-filter"][value="files"]') as HTMLInputElement;
       filesRadio.checked = true;
       filesRadio.dispatchEvent(new Event('change', { bubbles: true }));
       await flush();
@@ -1659,15 +1662,15 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.getElementById('sidebar-new-folder').click();
-      document.getElementById('sidebar-new-folder-name').value = 'new-folder';
-      document.getElementById('sidebar-new-folder-ok').click();
+      document.getElementById('sidebar-new-folder')!.click();
+      (document.getElementById('sidebar-new-folder-name') as HTMLInputElement).value = 'new-folder';
+      document.getElementById('sidebar-new-folder-ok')!.click();
       await flush();
       expect(api.createDirectory).toHaveBeenCalledWith({ dirPath: '/test/new-folder' });
       expect(api.saveSettings).toHaveBeenCalledWith({ settings: { snapshotDir: '/test/new-folder' } });
-      const output = document.getElementById('sidebar-output-dir');
+      const output = document.getElementById('sidebar-output-dir')!;
       expect(output.textContent).toBe('new-folder');
     });
 
@@ -1678,12 +1681,12 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const item = document.querySelector('.tree-item');
+      const item = document.querySelector('.tree-item')!;
       item.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
       await flush();
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(false);
     });
 
     test('Space key on HTML file opens report', async () => {
@@ -1693,9 +1696,9 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      const item = document.querySelector('.tree-item');
+      const item = document.querySelector('.tree-item')!;
       item.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
       await flush();
       expect(api.openReport).toHaveBeenCalledWith({ reportPath: '/test/report.html' });
@@ -1708,10 +1711,10 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.querySelector('.tree-item').click();
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      (document.querySelector('.tree-item') as HTMLElement).click();
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(false);
       await flush();
       expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/photo.webp' });
     });
@@ -1723,10 +1726,10 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.querySelector('.tree-item').click();
-      expect(document.getElementById('preview-modal').classList.contains('hidden')).toBe(false);
+      (document.querySelector('.tree-item') as HTMLElement).click();
+      expect(document.getElementById('preview-modal')!.classList.contains('hidden')).toBe(false);
       await flush();
       expect(api.readFileData).toHaveBeenCalledWith({ filePath: '/test/icon.svg' });
     });
@@ -1739,7 +1742,7 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb({ summary: { passed: 2, failed: 0, new: 3, deleted: 1 }, reportPath: '/tmp/r.html' });
-      const statusResult = document.getElementById('status-result');
+      const statusResult = document.getElementById('status-result')!;
       expect(statusResult.innerHTML).toContain('Passed: 2');
       expect(statusResult.innerHTML).toContain('New: 3');
       expect(statusResult.innerHTML).toContain('Deleted: 1');
@@ -1750,7 +1753,7 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onCaptureResult.mock.calls[0][0];
       cb({ summary: { passed: 1, failed: 3, new: 0, deleted: 0 }, reportPath: '/tmp/r.html' });
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('toast')!;
       expect(toast.textContent).toBe('Captured! 3 difference(s) found');
     });
   });
@@ -1764,10 +1767,10 @@ describe('ui-controls', () => {
       ]);
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.getElementById('new-report-btn').click();
-      const folderInfo = document.getElementById('new-report-folder-info');
+      document.getElementById('new-report-btn')!.click();
+      const folderInfo = document.getElementById('new-report-folder-info')!;
       expect(folderInfo.classList.contains('hidden')).toBe(false);
     });
 
@@ -1777,11 +1780,11 @@ describe('ui-controls', () => {
       api.createDirectory.mockRejectedValue(new Error('EEXIST'));
       init();
       await flush();
-      document.getElementById('sidebar-select-folder').click();
+      document.getElementById('sidebar-select-folder')!.click();
       await flush();
-      document.getElementById('new-report-btn').click();
-      document.getElementById('report-test-name').value = 'existing-dir';
-      document.getElementById('new-report-capture').click();
+      document.getElementById('new-report-btn')!.click();
+      (document.getElementById('report-test-name') as HTMLInputElement).value = 'existing-dir';
+      document.getElementById('new-report-capture')!.click();
       await flush();
       expect(api.captureAndCompare).toHaveBeenCalledWith({ pageName: 'existing-dir' });
     });
@@ -1792,7 +1795,7 @@ describe('ui-controls', () => {
     test('empty URL input triggers navigate with empty string on Enter', async () => {
       init();
       await flush();
-      const leftInput = document.getElementById('left-url');
+      const leftInput = document.getElementById('left-url') as HTMLInputElement;
       leftInput.value = '';
       leftInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
@@ -1802,7 +1805,7 @@ describe('ui-controls', () => {
     test('right URL Enter key triggers navigation for right target', async () => {
       init();
       await flush();
-      const rightInput = document.getElementById('right-url');
+      const rightInput = document.getElementById('right-url') as HTMLInputElement;
       rightInput.value = 'http://example.com';
       rightInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       await flush();
@@ -1815,15 +1818,15 @@ describe('ui-controls', () => {
     test('new report modal opens when button is clicked', async () => {
       init();
       await flush();
-      document.getElementById('new-report-btn').click();
-      expect(document.getElementById('new-report-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('new-report-btn')!.click();
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(false);
     });
 
     test('settings modal opens when button is clicked', async () => {
       init();
       await flush();
-      document.getElementById('settings-btn').click();
-      expect(document.getElementById('settings-modal').classList.contains('hidden')).toBe(false);
+      document.getElementById('settings-btn')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(false);
     });
 
     test('preset shortcut applies correct device', async () => {
@@ -1831,7 +1834,7 @@ describe('ui-controls', () => {
       await flush();
       const cb = api.onShortcutPreset.mock.calls[0][0];
       cb({ index: 2 });
-      const preset = PRESET_LIST[2];
+      const preset = _PRESET_LIST[2];
       expect(api.setDevicePreset).toHaveBeenCalledWith({ width: preset.width, height: preset.height });
     });
 

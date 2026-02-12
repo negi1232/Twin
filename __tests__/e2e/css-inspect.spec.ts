@@ -3,13 +3,13 @@
  *
  * CSS Scan ボタン・Inspect Mode トグル・ドロワーの基本動作を検証する。
  */
-const { test, expect } = require('@playwright/test');
-const { _electron: electron } = require('playwright');
-const path = require('path');
-const { startServers, stopServers } = require('../fixtures/mock-server/server');
+import { test, expect } from '@playwright/test';
+import { _electron as electron } from 'playwright';
+import path from 'path';
+import { startServers, stopServers } from '../fixtures/mock-server/server';
 
-let expectedServer;
-let actualServer;
+let expectedServer: any;
+let actualServer: any;
 
 test.beforeAll(async () => {
   const servers = await startServers();
@@ -30,7 +30,7 @@ async function launchApp() {
   }
   const app = await electron.launch({ args });
 
-  let page = null;
+  let page: any = null;
   for (let attempt = 0; attempt < 30; attempt++) {
     for (const w of app.windows()) {
       try {
@@ -49,17 +49,17 @@ async function launchApp() {
   return { app, page };
 }
 
-function jsClick(pg, sel) {
-  return pg.evaluate((s) => document.querySelector(s).click(), sel);
+function jsClick(pg: any, sel: string) {
+  return pg.evaluate((s: string) => document.querySelector(s)!.click(), sel);
 }
-function jsText(pg, sel) {
-  return pg.evaluate((s) => document.querySelector(s).textContent, sel);
+function jsText(pg: any, sel: string) {
+  return pg.evaluate((s: string) => document.querySelector(s)!.textContent, sel);
 }
-function jsClassList(pg, sel) {
-  return pg.evaluate((s) => document.querySelector(s).className, sel);
+function jsClassList(pg: any, sel: string) {
+  return pg.evaluate((s: string) => (document.querySelector(s) as HTMLElement).className, sel);
 }
 
-async function navigateToDemoServers(page) {
+async function navigateToDemoServers(page: any) {
   await page.evaluate(() => {
     const left = document.getElementById('left-url');
     left.value = 'http://127.0.0.1:3100';

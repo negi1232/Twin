@@ -1,8 +1,10 @@
+export {};
+
 const path = require('path');
 
 // ---------- Mocks ----------
 
-let mockToolbarListeners = {};
+let mockToolbarListeners: Record<string, any[]> = {};
 const mockToolbarWebContents = {
   on: jest.fn((event, cb) => {
     if (!mockToolbarListeners[event]) mockToolbarListeners[event] = [];
@@ -16,7 +18,7 @@ const mockToolbarWebContents = {
   isDestroyed: jest.fn(() => false),
 };
 
-let mockLeftListeners = {};
+let mockLeftListeners: Record<string, any[]> = {};
 const mockLeftWebContents = {
   loadURL: jest.fn().mockResolvedValue(undefined),
   on: jest.fn((event, cb) => {
@@ -30,7 +32,7 @@ const mockLeftWebContents = {
   isDestroyed: jest.fn(() => false),
 };
 
-let mockRightListeners = {};
+let mockRightListeners: Record<string, any[]> = {};
 const mockRightWebContents = {
   loadURL: jest.fn().mockResolvedValue(undefined),
   on: jest.fn((event, cb) => {
@@ -44,7 +46,7 @@ const mockRightWebContents = {
   isDestroyed: jest.fn(() => false),
 };
 
-let mainWindowListeners = {};
+let mainWindowListeners: Record<string, any[]> = {};
 const mockMainWindow = {
   loadFile: jest.fn(),
   webContents: mockToolbarWebContents,
@@ -66,11 +68,11 @@ const mockViews = [
   { webContents: mockRightWebContents, setBounds: jest.fn() },
 ];
 
-const menuItemsByAccelerator = {};
+const menuItemsByAccelerator: Record<string, any> = {};
 const mockMenu = {
   buildFromTemplate: jest.fn((template) => {
     // Extract accelerator-click pairs from the template for testing
-    function extract(items) {
+    function extract(items: any[]) {
       for (const item of items) {
         if (item.accelerator && item.click) {
           menuItemsByAccelerator[item.accelerator] = item.click;
@@ -96,8 +98,8 @@ const mockSyncManager = {
   resume: jest.fn(() => { mockSyncPaused = false; }),
 };
 
-let mockAppListeners = {};
-const mockBrowserWindowClass = jest.fn(() => mockMainWindow);
+let mockAppListeners: Record<string, any[]> = {};
+const mockBrowserWindowClass: any = jest.fn(() => mockMainWindow);
 mockBrowserWindowClass.getAllWindows = jest.fn(() => []);
 
 const mockDock = { setIcon: jest.fn() };
@@ -131,7 +133,7 @@ jest.mock('../../src/main/ipc-handlers', () => ({
 jest.mock('../../src/main/store', () => ({
   getStore: jest.fn(() => ({
     get: jest.fn((key) => {
-      const defaults = { leftUrl: 'http://localhost:3000', rightUrl: 'http://localhost:3001' };
+      const defaults: Record<string, string> = { leftUrl: 'http://localhost:3000', rightUrl: 'http://localhost:3001' };
       return defaults[key];
     }),
   })),
@@ -140,7 +142,7 @@ jest.mock('../../src/main/store', () => ({
 // ---------- Tests ----------
 
 describe('index.js', () => {
-  let indexModule;
+  let indexModule: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -495,9 +497,9 @@ describe('index.js', () => {
       Object.defineProperty(process, 'platform', { value: 'darwin' });
 
       const { app, session } = require('electron');
-      let readyCallback;
+      let readyCallback: any;
       app.whenReady.mockImplementation(() => ({
-        then: (cb) => { readyCallback = cb; },
+        then: (cb: any) => { readyCallback = cb; },
       }));
 
       require('../../src/main/index');
@@ -525,9 +527,9 @@ describe('index.js', () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
 
       const { app, session } = require('electron');
-      let readyCallback;
+      let readyCallback: any;
       app.whenReady.mockImplementation(() => ({
-        then: (cb) => { readyCallback = cb; },
+        then: (cb: any) => { readyCallback = cb; },
       }));
 
       require('../../src/main/index');
@@ -573,9 +575,9 @@ describe('index.js', () => {
 
       const { session } = require('electron');
       const { app } = require('electron');
-      let readyCallback;
+      let readyCallback: any;
       app.whenReady.mockImplementation(() => ({
-        then: (cb) => { readyCallback = cb; },
+        then: (cb: any) => { readyCallback = cb; },
       }));
 
       const originalPlatform = process.platform;
