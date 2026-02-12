@@ -7,7 +7,7 @@
 
 import * as path from 'node:path';
 import { app, BrowserWindow, Menu, session, WebContentsView } from 'electron';
-import { TOOLBAR_HEIGHT, STATUS_BAR_HEIGHT } from '../shared/constants';
+import { STATUS_BAR_HEIGHT, TOOLBAR_HEIGHT } from '../shared/constants';
 import { registerIpcHandlers } from './ipc-handlers';
 import { getStore } from './store';
 
