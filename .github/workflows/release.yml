@@ -43,6 +43,8 @@ jobs:
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: npm run build:mac -- --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: npm run build:linux -- --publish never
@@ -72,12 +74,16 @@ jobs:
           cp artifacts/build-ubuntu-latest/*.deb release-assets/ 2>/dev/null || true
           cp artifacts/build-ubuntu-latest/*.snap release-assets/ 2>/dev/null || true
           ls -la release-assets/
-      - name: Create Release
+      - name: Create or Update Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          gh release create "$TAG" \
-            --title "Twin $TAG" \
-            --generate-notes \
-            release-assets/*
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/* --clobber
+          else
+            gh release create "$TAG" \
+              --title "Twin $TAG" \
+              --generate-notes \
+              release-assets/*
+          fi

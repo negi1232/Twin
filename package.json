@@ -55,7 +55,8 @@
     "appId": "com.negi1232.twin",
     "productName": "Twin",
     "directories": {
-      "buildResources": "build"
+      "buildResources": "build",
+      "output": "dist-release"
     },
     "mac": {
       "icon": "build/icon.icns",
