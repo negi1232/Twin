@@ -1,3 +1,5 @@
+export {};
+
 jest.mock('child_process', () => ({
   execFile: jest.fn(),
 }));
@@ -26,7 +28,7 @@ describe('RegRunner Module', () => {
 
     fs.readFile.mockResolvedValue(JSON.stringify(mockRegOutput));
 
-    execFile.mockImplementation((_cmd, _args, callback) => {
+    execFile.mockImplementation((_cmd: any, _args: any, callback: any) => {
       callback(null, '', '');
     });
   });
@@ -133,7 +135,7 @@ describe('RegRunner Module', () => {
   });
 
   test('resolves even when execFile receives error (reg-cli exits non-zero on diffs)', async () => {
-    execFile.mockImplementation((_cmd, _args, callback) => {
+    execFile.mockImplementation((_cmd: any, _args: any, callback: any) => {
       callback(new Error('Process exited with code 1'), '', 'some stderr');
     });
 
@@ -148,7 +150,7 @@ describe('RegRunner Module', () => {
 
   test('rejects with stderr content in error message', async () => {
     fs.readFile.mockRejectedValue(new Error('ENOENT'));
-    execFile.mockImplementation((_cmd, _args, callback) => {
+    execFile.mockImplementation((_cmd: any, _args: any, callback: any) => {
       callback(null, '', 'warning: some stderr output');
     });
 
@@ -184,11 +186,11 @@ describe('RegRunner Module', () => {
     const args = execFile.mock.calls[0][1];
     // The first few args after reg-cli path are: actualDir, expectedDir, diffDir
     // Find them by checking path patterns
-    expect(args.some(a => typeof a === 'string' && a.includes('actual'))).toBe(true);
-    expect(args.some(a => typeof a === 'string' && a.includes('expected'))).toBe(true);
-    expect(args.some(a => typeof a === 'string' && a.includes('diff'))).toBe(true);
-    expect(args.some(a => typeof a === 'string' && a.includes('report.html'))).toBe(true);
-    expect(args.some(a => typeof a === 'string' && a.includes('reg.json'))).toBe(true);
+    expect(args.some((a: any) => typeof a === 'string' && a.includes('actual'))).toBe(true);
+    expect(args.some((a: any) => typeof a === 'string' && a.includes('expected'))).toBe(true);
+    expect(args.some((a: any) => typeof a === 'string' && a.includes('diff'))).toBe(true);
+    expect(args.some((a: any) => typeof a === 'string' && a.includes('report.html'))).toBe(true);
+    expect(args.some((a: any) => typeof a === 'string' && a.includes('reg.json'))).toBe(true);
   });
 
   test('matchingThreshold 0 is passed as string "0"', async () => {

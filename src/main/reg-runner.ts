@@ -5,19 +5,29 @@
  * HTML レポートと JSON サマリを生成する。
  */
 
-const { execFile } = require('child_process');
-const path = require('path');
-const fs = require('fs/promises');
+import { execFile } from 'node:child_process';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+
+interface RegCliOptions {
+  matchingThreshold?: number | null;
+  thresholdRate?: number | null;
+}
+
+interface RegCliRawJson {
+  passedItems: string[];
+  failedItems: string[];
+  newItems: string[];
+  deletedItems: string[];
+  [key: string]: unknown;
+}
 
 /**
  * reg-cli を実行して画像比較を行い、結果を返す。
- * @param {string} snapshotDir - actual / expected / diff を含むベースディレクトリ
- * @param {Object} [options={}] - 比較オプション
- * @param {number} [options.matchingThreshold] - ピクセル差分の感度 (0〜1)
- * @param {number} [options.thresholdRate] - 変更検知率のしきい値 (0〜1)
- * @returns {Promise<{summary: {passed: number, failed: number, new: number, deleted: number}, reportPath: string, jsonPath: string, raw: Object}>}
+ * @param snapshotDir - actual / expected / diff を含むベースディレクトリ
+ * @param options - 比較オプション
  */
-function runRegCli(snapshotDir, options = {}) {
+function runRegCli(snapshotDir: string, options: RegCliOptions = {}): Promise<RegCliResult> {
   return new Promise((resolve, reject) => {
     const actualDir = path.join(snapshotDir, 'actual');
     const expectedDir = path.join(snapshotDir, 'expected');
@@ -25,12 +35,14 @@ function runRegCli(snapshotDir, options = {}) {
     const reportPath = path.join(snapshotDir, 'report.html');
     const jsonPath = path.join(snapshotDir, 'reg.json');
 
-    const args = [
+    const args: string[] = [
       actualDir,
       expectedDir,
       diffDir,
-      '-R', reportPath,
-      '-J', jsonPath,
+      '-R',
+      reportPath,
+      '-J',
+      jsonPath,
       '-I', // ignoreChange: don't throw on diff detection
     ];
 
@@ -42,9 +54,9 @@ function runRegCli(snapshotDir, options = {}) {
     }
 
     const regCliPath = require.resolve('reg-cli/dist/cli.js');
-    execFile('node', [regCliPath, ...args], async (error, _stdout, stderr) => {
+    execFile('node', [regCliPath, ...args], async (execError, _stdout, stderr) => {
       try {
-        const json = JSON.parse(await fs.readFile(jsonPath, 'utf-8'));
+        const json: RegCliRawJson = JSON.parse(await fs.readFile(jsonPath, 'utf-8'));
         resolve({
           summary: {
             passed: json.passedItems.length,
@@ -57,12 +69,13 @@ function runRegCli(snapshotDir, options = {}) {
           raw: json,
         });
       } catch (parseError) {
-        reject(new Error(
-          `reg-cli output parse failed: ${parseError.message}\nstderr: ${stderr}`
-        ));
+        const parts = [`reg-cli output parse failed: ${(parseError as Error).message}`];
+        if (execError) parts.push(`execError: ${execError.message}`);
+        if (stderr) parts.push(`stderr: ${stderr}`);
+        reject(new Error(parts.join('\n')));
       }
     });
   });
 }
 
-module.exports = { runRegCli };
+export { runRegCli };
