@@ -24,7 +24,7 @@ test.afterAll(async () => {
 // ── ヘルパー ──
 
 async function launchApp() {
-  const args = [path.join(__dirname, '..', '..', 'src', 'main', 'index.js')];
+  const args = [path.join(__dirname, '..', '..', 'dist', 'main', 'index.js')];
   if (process.env.CI) {
     args.unshift('--no-sandbox');
   }

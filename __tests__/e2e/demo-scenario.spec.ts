@@ -35,7 +35,7 @@ async function launchApp() {
     '--no-sandbox',
     '--disable-gpu',
     '--disable-software-rasterizer',
-    path.join(__dirname, '..', '..', 'src', 'main', 'index.js'),
+    path.join(__dirname, '..', '..', 'dist', 'main', 'index.js'),
   ];
   const app = await electron.launch({ args });
 

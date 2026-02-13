@@ -19,7 +19,7 @@ test.afterAll(async () => {
 // ── ヘルパー ──
 
 async function launchApp() {
-  const args = [path.join(__dirname, '..', '..', 'src', 'main', 'index.js')];
+  const args = [path.join(__dirname, '..', '..', 'dist', 'main', 'index.js')];
   // CI Linux environments require --no-sandbox for Electron
   if (process.env.CI) {
     args.unshift('--no-sandbox');
