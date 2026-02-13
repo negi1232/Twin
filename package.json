@@ -54,6 +54,10 @@
   "build": {
     "appId": "com.negi1232.twin",
     "productName": "Twin",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
     "directories": {
       "buildResources": "build",
       "output": "dist-release"
