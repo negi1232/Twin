@@ -50,23 +50,5 @@
     "reg-cli": {
       "del": "^6.1.1"
     }
-  },
-  "build": {
-    "appId": "com.negi1232.twin",
-    "productName": "Twin",
-    "directories": {
-      "buildResources": "build",
-      "output": "dist-release"
-    },
-    "mac": {
-      "icon": "build/icon.icns",
-      "category": "public.app-category.developer-tools"
-    },
-    "win": {
-      "icon": "build/icon.ico"
-    },
-    "linux": {
-      "icon": "build/icon.png"
-    }
   }
 }
