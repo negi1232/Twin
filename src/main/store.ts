@@ -29,6 +29,10 @@ const schema = {
     type: 'string' as const,
     default: './snapshots',
   },
+  sidebarFolderPath: {
+    type: 'string' as const,
+    default: '',
+  },
   matchingThreshold: {
     type: 'number' as const,
     minimum: 0,
@@ -62,6 +66,7 @@ function getSettings(): AppSettings {
     leftUrl: s.get('leftUrl') as string,
     rightUrl: s.get('rightUrl') as string,
     snapshotDir: s.get('snapshotDir') as string,
+    sidebarFolderPath: s.get('sidebarFolderPath') as string,
     matchingThreshold: s.get('matchingThreshold') as number,
     thresholdRate: s.get('thresholdRate') as number,
   };

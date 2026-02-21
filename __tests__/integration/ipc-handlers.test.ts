@@ -96,6 +96,7 @@ jest.mock('../../src/main/store', () => ({
     leftUrl: 'http://localhost:3000',
     rightUrl: 'http://localhost:3001',
     snapshotDir: './snapshots',
+    sidebarFolderPath: '',
     matchingThreshold: 0,
     thresholdRate: 0,
   })),
@@ -106,6 +107,7 @@ jest.mock('../../src/main/store', () => ({
     get: jest.fn((key: string) => {
       const defaults: Record<string, any> = {
         snapshotDir: './snapshots',
+        sidebarFolderPath: '',
         matchingThreshold: 0,
         thresholdRate: 0,
         leftUrl: 'http://localhost:3000',
@@ -477,11 +479,12 @@ describe('ipc-handlers integration', () => {
 
   // ===== select-folder =====
   describe('select-folder', () => {
-    test('returns selected folder path without saving to store', async () => {
+    test('returns selected folder path and saves sidebarFolderPath to store', async () => {
       mockDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/my/folder'] });
       const result = await handlers['select-folder']({});
       expect(result).toBe('/my/folder');
       expect(mockStoreData.snapshotDir).toBeUndefined();
+      expect(mockStoreData.sidebarFolderPath).toBe('/my/folder');
     });
 
     test('returns null when dialog is canceled', async () => {
