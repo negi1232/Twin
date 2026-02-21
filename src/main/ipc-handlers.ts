@@ -79,6 +79,15 @@ function isPathUnderBase(targetPath: string, basePath: string): boolean {
 }
 
 /**
+ * targetPath の親ディレクトリが basePath 配下にあるか検証する。
+ * targetPath 自体が未作成でも、親が存在していれば検証できる。
+ */
+function isParentUnderBase(targetPath: string, basePath: string): boolean {
+  const parentDir = path.dirname(targetPath);
+  return isPathUnderBase(parentDir, basePath);
+}
+
+/**
  * すべての IPC ハンドラを登録し、SyncManager を初期化して返す。
  */
 function registerIpcHandlers({
@@ -255,6 +264,15 @@ function registerIpcHandlers({
   // Validate that a path is under a user-selected folder
   let allowedBasePath: string | null = null;
 
+  // Initialize allowedBasePath from stored snapshotDir so file tree works on restart
+  const storedSnapshotDir = getStore().get('snapshotDir') as string;
+  if (storedSnapshotDir && path.isAbsolute(storedSnapshotDir)) {
+    const parentDir = path.dirname(storedSnapshotDir);
+    if (fs.existsSync(parentDir)) {
+      allowedBasePath = parentDir;
+    }
+  }
+
   // Read directory contents (one level)
   ipcMain.handle('read-directory', async (_event: IpcMainInvokeEvent, { dirPath }: { dirPath: string }) => {
     const resolved = path.resolve(dirPath);
@@ -272,7 +290,8 @@ function registerIpcHandlers({
   // Create a new directory
   ipcMain.handle('create-directory', async (_event: IpcMainInvokeEvent, { dirPath }: { dirPath: string }) => {
     const resolved = path.resolve(dirPath);
-    if (!allowedBasePath || !isPathUnderBase(resolved, allowedBasePath)) {
+    // Use isParentUnderBase since the target directory does not exist yet
+    if (!allowedBasePath || !isParentUnderBase(resolved, allowedBasePath)) {
       throw new Error('Access denied: please select a folder first');
     }
     await fs.promises.mkdir(resolved, { recursive: true });
