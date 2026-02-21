@@ -104,6 +104,7 @@ function mockElectronAPI() {
       matchingThreshold: 0,
       thresholdRate: 0,
       snapshotDir: './snapshots',
+      sidebarFolderPath: '',
     }),
     saveSettings: jest.fn().mockResolvedValue(undefined),
     setSyncEnabled: jest.fn().mockResolvedValue(undefined),
