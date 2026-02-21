@@ -1,6 +1,6 @@
 {
   "name": "twin",
-  "version": "1.13.0",
+  "version": "1.13.1",
   "description": "CSS Comparison Tool - Compare Computed Styles across two localhost views in real time",
   "main": "dist/main/index.js",
   "scripts": {
