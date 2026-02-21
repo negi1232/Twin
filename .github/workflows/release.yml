@@ -30,7 +30,7 @@ jobs:
     needs: e2e-test
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -46,6 +46,9 @@ jobs:
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: npm run build:linux -- --publish never
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: npm run build:win -- --publish never
       - name: Upload artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
@@ -71,6 +74,7 @@ jobs:
           cp artifacts/build-ubuntu-latest/*.AppImage release-assets/ 2>/dev/null || true
           cp artifacts/build-ubuntu-latest/*.deb release-assets/ 2>/dev/null || true
           cp artifacts/build-ubuntu-latest/*.snap release-assets/ 2>/dev/null || true
+          cp artifacts/build-windows-latest/*.exe release-assets/ 2>/dev/null || true
           ls -la release-assets/
       - name: Create Release
         env:
