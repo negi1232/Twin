@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   lint:
-    name: Lint
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -21,6 +21,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
       - run: npm run lint
 
   unit-test:

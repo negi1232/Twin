@@ -1,16 +1,26 @@
-appId: com.twin.vrt
+appId: com.negi1232.twin
 productName: Twin
 directories:
-  output: dist
+  buildResources: build
+  output: dist-release
 files:
-  - src/**/*
+  - dist/**/*
   - package.json
 mac:
+  icon: build/icon.icns
   category: public.app-category.developer-tools
   target:
     - dmg
     - zip
+linux:
+  icon: build/icon.png
+  maintainer: negi1232
+  target:
+    - AppImage
+    - deb
+    - snap
 win:
+  icon: build/icon.ico
   target:
     - nsis
     - portable

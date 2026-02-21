@@ -1,10 +1,10 @@
-const { test, expect } = require('@playwright/test');
-const { _electron: electron } = require('playwright');
-const path = require('path');
-const { startServers, stopServers } = require('../fixtures/mock-server/server');
+import { test, expect } from '@playwright/test';
+import { _electron as electron } from 'playwright';
+import path from 'path';
+import { startServers, stopServers } from '../fixtures/mock-server/server';
 
-let expectedServer;
-let actualServer;
+let expectedServer: any;
+let actualServer: any;
 
 test.beforeAll(async () => {
   const servers = await startServers();
@@ -19,7 +19,7 @@ test.afterAll(async () => {
 // ── ヘルパー ──
 
 async function launchApp() {
-  const args = [path.join(__dirname, '..', '..', 'src', 'main', 'index.js')];
+  const args = [path.join(__dirname, '..', '..', 'dist', 'main', 'index.js')];
   // CI Linux environments require --no-sandbox for Electron
   if (process.env.CI) {
     args.unshift('--no-sandbox');
@@ -27,7 +27,7 @@ async function launchApp() {
   const app = await electron.launch({ args });
 
   // BrowserView ではなくメインウィンドウ (index.html) を取得
-  let page = null;
+  let page: any = null;
   for (let attempt = 0; attempt < 30; attempt++) {
     for (const w of app.windows()) {
       try {
@@ -46,20 +46,20 @@ async function launchApp() {
   return { app, page };
 }
 
-function jsClick(pg, sel) {
-  return pg.evaluate((s) => document.querySelector(s).click(), sel);
+function jsClick(pg: any, sel: string) {
+  return pg.evaluate((s: string) => document.querySelector(s)!.click(), sel);
 }
-function jsText(pg, sel) {
-  return pg.evaluate((s) => document.querySelector(s).textContent, sel);
+function jsText(pg: any, sel: string) {
+  return pg.evaluate((s: string) => document.querySelector(s)!.textContent, sel);
 }
-function jsClassList(pg, sel) {
-  return pg.evaluate((s) => document.querySelector(s).className, sel);
+function jsClassList(pg: any, sel: string) {
+  return pg.evaluate((s: string) => (document.querySelector(s) as HTMLElement).className, sel);
 }
-function jsValue(pg, sel) {
-  return pg.evaluate((s) => document.querySelector(s).value, sel);
+function jsValue(pg: any, sel: string) {
+  return pg.evaluate((s: string) => (document.querySelector(s) as HTMLInputElement).value, sel);
 }
 
-async function navigateToDemoServers(page) {
+async function navigateToDemoServers(page: any) {
   await page.evaluate(() => {
     const left = document.getElementById('left-url');
     left.value = 'http://127.0.0.1:3100';
@@ -74,11 +74,11 @@ async function navigateToDemoServers(page) {
 // ── テスト ──
 
 test.describe('アプリ起動', () => {
-  test('ウィンドウタイトルが「Twin - Visual Regression Testing」で表示される', async () => {
+  test('ウィンドウタイトルが「Twin - CSS Comparison Tool」で表示される', async () => {
     const { app, page } = await launchApp();
     try {
       const title = await page.title();
-      expect(title).toBe('Twin - Visual Regression Testing');
+      expect(title).toBe('Twin - CSS Comparison Tool');
     } finally {
       await app.close();
     }

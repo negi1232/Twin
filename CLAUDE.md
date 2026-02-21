@@ -1,23 +1,27 @@
-# Twin - Visual Regression Testing Desktop App
+# Twin - CSS Comparison Tool
 
 ## Project Overview
-Electron-based desktop app for comparing Git branches side by side with visual regression testing using reg-cli.
+Electron-based desktop app that compares CSS Computed Styles across two localhost views in real time, identifying what changed at the property level. Visual regression testing (screenshot + reg-cli) is available as a supplementary feature.
 
 ## Tech Stack
-- **Runtime**: Electron 28 (Chromium + Node.js)
-- **Image Comparison**: reg-cli (reg-viz/reg-cli)
+- **Language**: TypeScript (compiled to `dist/`)
+- **Runtime**: Electron 40 (Chromium + Node.js)
+- **CSS Comparison**: Custom engine (css-compare.ts) — Computed Style collection, element matching, diff categorization
+- **Image Comparison**: reg-cli (reg-viz/reg-cli) — supplementary pixel-diff
 - **Settings Storage**: electron-store
-- **Testing**: Jest (unit/integration), Playwright (E2E)
-- **Linting**: ESLint 9 (flat config)
+- **Testing**: Jest + ts-jest (unit/integration), Playwright (E2E)
+- **Linting/Formatting**: Biome
 - **Git Hooks**: Husky (pre-commit, pre-push)
-- **Build**: electron-builder
+- **Build**: TypeScript compiler + electron-builder
 - **CI/CD**: GitHub Actions
 
 ## Project Structure
 ```
-src/main/         - Electron main process (index.js, ipc-handlers, sync-manager, screenshot, reg-runner, preload, store)
-src/renderer/     - Renderer process (HTML, CSS, JS for UI)
+src/main/         - Electron main process (index.ts, ipc-handlers, sync-manager, css-compare, screenshot, reg-runner, preload, store)
+src/renderer/     - Renderer process (HTML, CSS, TS for UI)
 src/shared/       - Shared constants
+src/types/        - TypeScript type definitions (global.d.ts)
+dist/             - Compiled JS output (gitignored)
 __tests__/unit/   - Unit tests (Jest)
 __tests__/integration/ - Integration tests (Jest)
 __tests__/e2e/    - E2E tests (Playwright)
@@ -28,14 +32,19 @@ snapshots/        - Screenshot output (gitignored)
 
 ## Commands
 ```bash
-npm start          # Launch the app
-npm run dev        # Launch with DevTools
-npm test           # Run tests with coverage
-npm run test:watch # Watch mode
-npm run test:e2e   # E2E tests (Playwright)
-npm run lint       # ESLint check
-npm run build:mac  # Build for macOS
-npm run build:win  # Build for Windows
+npm start            # Build TS & launch the app
+npm run dev          # Build TS & launch with DevTools
+npm run build:ts     # Compile TypeScript to dist/
+npm test             # Run tests with coverage
+npm run test:watch   # Watch mode
+npm run test:e2e     # E2E tests (Playwright)
+npm run typecheck    # Type check (tsc --noEmit)
+npm run lint         # Biome lint check
+npm run lint:fix     # Biome lint auto-fix
+npm run format       # Biome format
+npm run build:mac    # Build for macOS
+npm run build:win    # Build for Windows
+npm run build:linux  # Build for Linux
 ```
 
 ## Git Workflow (Git Flow + PR-Based)
@@ -96,8 +105,8 @@ Test structure:
 - `__tests__/e2e/` - E2E tests (Playwright + Electron)
 
 ## Coding Guidelines
-- Use CommonJS (`require`/`module.exports`) throughout
+- Use TypeScript throughout (`src/**/*.ts`, compiled to `dist/`)
 - Follow Electron security best practices: contextIsolation: true, nodeIntegration: false
-- IPC communication via preload.js contextBridge only
+- IPC communication via preload.ts contextBridge only
 - Keep renderer code browser-compatible (no Node.js APIs)
 - Test: unit tests for pure logic, integration for IPC flows, E2E for critical paths only
