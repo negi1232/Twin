@@ -258,15 +258,19 @@ function registerIpcHandlers({
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     allowedBasePath = result.filePaths[0];
+    getStore().set('sidebarFolderPath', result.filePaths[0]);
     return result.filePaths[0];
   });
 
   // Validate that a path is under a user-selected folder
   let allowedBasePath: string | null = null;
 
-  // Initialize allowedBasePath from stored snapshotDir so file tree works on restart
+  // Initialize allowedBasePath from stored settings so file tree works on restart
+  const storedFolderPath = getStore().get('sidebarFolderPath') as string;
   const storedSnapshotDir = getStore().get('snapshotDir') as string;
-  if (storedSnapshotDir && path.isAbsolute(storedSnapshotDir)) {
+  if (storedFolderPath && path.isAbsolute(storedFolderPath) && fs.existsSync(storedFolderPath)) {
+    allowedBasePath = storedFolderPath;
+  } else if (storedSnapshotDir && path.isAbsolute(storedSnapshotDir)) {
     const parentDir = path.dirname(storedSnapshotDir);
     if (fs.existsSync(parentDir)) {
       allowedBasePath = parentDir;

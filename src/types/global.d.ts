@@ -10,6 +10,7 @@ interface AppSettings {
   leftUrl: string;
   rightUrl: string;
   snapshotDir: string;
+  sidebarFolderPath: string;
   matchingThreshold: number;
   thresholdRate: number;
 }

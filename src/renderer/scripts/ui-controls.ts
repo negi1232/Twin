@@ -617,9 +617,15 @@ function initUIControls(): void {
     rightUrlInput.value = settings.rightUrl || 'http://localhost:3001';
     currentSnapshotDir = settings.snapshotDir || null;
     updateSnapshotDirDisplay();
-    if (currentSnapshotDir?.startsWith('/')) {
+    // Use saved sidebarFolderPath if available, otherwise derive from snapshotDir
+    const savedFolder = settings.sidebarFolderPath || '';
+    if (savedFolder.startsWith('/')) {
+      currentFolderPath = savedFolder;
+    } else if (currentSnapshotDir?.startsWith('/')) {
       const parts = currentSnapshotDir.split('/');
       currentFolderPath = parts.length > 2 ? parts.slice(0, -1).join('/') : currentSnapshotDir;
+    }
+    if (currentFolderPath) {
       // Open sidebar automatically when a saved folder path exists
       if (!sidebarOpen) {
         sidebarOpen = true;
