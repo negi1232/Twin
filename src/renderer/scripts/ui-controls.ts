@@ -41,10 +41,12 @@ function initUIControls(): void {
   const settingsModal = document.getElementById('settings-modal') as HTMLElement;
   const settingsSaveBtn = document.getElementById('settings-save') as HTMLButtonElement;
   const settingsCancelBtn = document.getElementById('settings-cancel') as HTMLButtonElement;
+  const settingsCloseBtn = document.getElementById('settings-close') as HTMLButtonElement;
   const newReportBtn = document.getElementById('new-report-btn') as HTMLButtonElement;
   const newReportModal = document.getElementById('new-report-modal') as HTMLElement;
   const newReportCaptureBtn = document.getElementById('new-report-capture') as HTMLButtonElement;
   const newReportCancelBtn = document.getElementById('new-report-cancel') as HTMLButtonElement;
+  const newReportCloseBtn = document.getElementById('new-report-close') as HTMLButtonElement;
   const reportTestNameInput = document.getElementById('report-test-name') as HTMLInputElement;
   const toggleSidebarBtn = document.getElementById('toggle-sidebar') as HTMLButtonElement;
   const sidebar = document.getElementById('sidebar') as HTMLElement;
@@ -159,6 +161,11 @@ function initUIControls(): void {
   });
 
   newReportCancelBtn.addEventListener('click', () => {
+    newReportModal.classList.add('hidden');
+    window.electronAPI.setViewsVisible({ visible: true });
+  });
+
+  newReportCloseBtn.addEventListener('click', () => {
     newReportModal.classList.add('hidden');
     window.electronAPI.setViewsVisible({ visible: true });
   });
@@ -311,6 +318,11 @@ function initUIControls(): void {
   });
 
   settingsCancelBtn.addEventListener('click', () => {
+    settingsModal.classList.add('hidden');
+    window.electronAPI.setViewsVisible({ visible: true });
+  });
+
+  settingsCloseBtn.addEventListener('click', () => {
     settingsModal.classList.add('hidden');
     window.electronAPI.setViewsVisible({ visible: true });
   });

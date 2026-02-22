@@ -14,13 +14,13 @@
       <button id="toggle-sidebar" class="btn btn-icon" title="Toggle Sidebar">&#x2630;</button>
     </div>
     <div class="toolbar-section toolbar-left">
-      <label class="url-label">Expected</label>
+      <label class="url-label url-label-expected"><span class="url-dot"></span>Expected</label>
       <input type="text" id="left-url" class="url-input" placeholder="http://localhost:3000" />
       <button id="reload-left" class="btn btn-icon" title="Reload Left">&#x21bb;</button>
     </div>
 
     <div class="toolbar-section toolbar-center">
-      <div class="preset-buttons">
+      <div class="preset-buttons btn-group">
         <button class="btn btn-preset" data-preset="0">SE</button>
         <button class="btn btn-preset" data-preset="1">14P</button>
         <button class="btn btn-preset" data-preset="2">iPad</button>
@@ -35,17 +35,17 @@
           <button id="zoom-level-btn" class="btn btn-zoom-level" title="Reset Zoom (Cmd+0)">100%</button>
           <button id="zoom-in-btn" class="btn btn-icon" title="Zoom In (Cmd+=)">&#x2b;</button>
         </div>
-        <button id="css-scan-btn" class="btn btn-primary" title="CSS Full Scan (Cmd+Shift+C)">&#x1F3A8; CSS Scan</button>
-        <button id="css-inspect-btn" class="btn btn-primary" title="CSS Inspect Mode (Cmd+I)">&#x1F50D; Inspect</button>
-        <button id="new-report-btn" class="btn" title="New Report">&#x2795; New</button>
-        <button id="capture-btn" class="btn" title="Capture & Compare (Cmd+Shift+S)">&#x1F4F7; Capture</button>
-        <button id="report-btn" class="btn" title="Open Report (Cmd+Shift+O)">&#x1F4CB; Report</button>
+        <button id="css-scan-btn" class="btn btn-primary" title="CSS Full Scan (Cmd+Shift+C)">CSS Scan</button>
+        <button id="css-inspect-btn" class="btn btn-primary" title="CSS Inspect Mode (Cmd+I)">Inspect</button>
+        <button id="new-report-btn" class="btn" title="New Report">+ New</button>
+        <button id="capture-btn" class="btn" title="Capture & Compare (Cmd+Shift+S)">Capture</button>
+        <button id="report-btn" class="btn" title="Open Report (Cmd+Shift+O)">Report</button>
         <button id="settings-btn" class="btn btn-icon" title="Settings (Cmd+,)">&#x2699;</button>
       </div>
     </div>
 
     <div class="toolbar-section toolbar-right">
-      <label class="url-label">Actual</label>
+      <label class="url-label url-label-actual"><span class="url-dot"></span>Actual</label>
       <input type="text" id="right-url" class="url-input" placeholder="http://localhost:3001" />
       <button id="reload-right" class="btn btn-icon" title="Reload Right">&#x21bb;</button>
     </div>
@@ -94,7 +94,7 @@
     <span class="status-divider">|</span>
     <span id="status-zoom">Zoom: 100%</span>
     <span class="status-divider">|</span>
-    <span id="status-sync">Sync: ON</span>
+    <span id="status-sync"><span class="status-dot status-dot-on"></span>Sync: ON</span>
     <span class="status-divider">|</span>
     <span id="status-result">Ready</span>
   </div>
@@ -103,6 +103,7 @@
   <div id="settings-modal" class="modal hidden">
     <div class="modal-overlay"></div>
     <div class="modal-content">
+      <button class="btn btn-icon modal-close-btn" id="settings-close">&times;</button>
       <h2>Settings</h2>
       <div class="form-group">
         <label for="setting-matching-threshold">Matching Threshold (0-1)</label>
@@ -127,6 +128,7 @@
   <div id="new-report-modal" class="modal hidden">
     <div class="modal-overlay"></div>
     <div class="modal-content">
+      <button class="btn btn-icon modal-close-btn" id="new-report-close">&times;</button>
       <h2>New Report</h2>
       <div id="new-report-folder-info" class="form-info hidden">
         <span class="form-info-label">Save to</span>

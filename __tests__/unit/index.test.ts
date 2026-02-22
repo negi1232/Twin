@@ -430,10 +430,10 @@ describe('index.js', () => {
       indexModule.layoutViews();
       // With 1400 width, 0 sidebar: halfWidth = 700
       expect(mockViews[0].setBounds).toHaveBeenCalledWith({
-        x: 0, y: 52, width: 700, height: 900 - 52 - 28,
+        x: 0, y: 48, width: 700, height: 900 - 48 - 28,
       });
       expect(mockViews[1].setBounds).toHaveBeenCalledWith({
-        x: 700, y: 52, width: 700, height: 900 - 52 - 28,
+        x: 700, y: 48, width: 700, height: 900 - 48 - 28,
       });
     });
   });

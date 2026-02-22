@@ -368,24 +368,24 @@ describe('ipc-handlers integration', () => {
       mockGetSidebarWidth.mockReturnValue(250);
       handlers['set-device-preset']({}, { width: 375, height: 667 });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 250, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 250, y: 48, width: 375, height: 667 })
       );
       expect(mockRightView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 625, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 625, y: 48, width: 375, height: 667 })
       );
-      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(1000, 667 + 52 + 28);
+      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(1000, 667 + 48 + 28);
     });
 
     test('sets bounds without sidebar offset when sidebar is closed', () => {
       mockGetSidebarWidth.mockReturnValue(0);
       handlers['set-device-preset']({}, { width: 375, height: 667 });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 0, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 0, y: 48, width: 375, height: 667 })
       );
       expect(mockRightView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 375, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 375, y: 48, width: 375, height: 667 })
       );
-      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(750, 667 + 52 + 28);
+      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(750, 667 + 48 + 28);
     });
 
     test('skips null views and window gracefully', () => {
@@ -439,8 +439,8 @@ describe('ipc-handlers integration', () => {
   // ===== set-views-visible =====
   describe('set-views-visible', () => {
     test('hides views by moving offscreen while preserving size', () => {
-      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 52, width: 375, height: 667 });
-      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 52, width: 375, height: 667 });
+      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 48, width: 375, height: 667 });
+      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 48, width: 375, height: 667 });
 
       handlers['set-views-visible']({}, { visible: false });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: -9999, y: -9999, width: 375, height: 667 });
@@ -448,16 +448,16 @@ describe('ipc-handlers integration', () => {
     });
 
     test('restores views to saved bounds', () => {
-      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 52, width: 375, height: 667 });
-      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 52, width: 375, height: 667 });
+      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 48, width: 375, height: 667 });
+      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 48, width: 375, height: 667 });
 
       handlers['set-views-visible']({}, { visible: false });
       mockLeftView.setBounds.mockClear();
       mockRightView.setBounds.mockClear();
 
       handlers['set-views-visible']({}, { visible: true });
-      expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: 0, y: 52, width: 375, height: 667 });
-      expect(mockRightView.setBounds).toHaveBeenCalledWith({ x: 375, y: 52, width: 375, height: 667 });
+      expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: 0, y: 48, width: 375, height: 667 });
+      expect(mockRightView.setBounds).toHaveBeenCalledWith({ x: 375, y: 48, width: 375, height: 667 });
     });
 
     test('handles null views gracefully', () => {
@@ -1162,8 +1162,8 @@ describe('ipc-handlers integration', () => {
     });
 
     test('hide moves views off-screen', () => {
-      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 52, width: 600, height: 400 });
-      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 600, y: 52, width: 600, height: 400 });
+      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 48, width: 600, height: 400 });
+      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 600, y: 48, width: 600, height: 400 });
       handlers['set-views-visible']({}, { visible: false });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith(expect.objectContaining({ x: -9999 }));
       expect(mockRightView.setBounds).toHaveBeenCalledWith(expect.objectContaining({ x: -9999 }));
@@ -1239,7 +1239,7 @@ describe('ipc-handlers integration', () => {
       await handlers['set-device-preset']({}, { width: 375, height: 667 });
       expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(
         0 + 375 * 2,  // sidebarWidth(0) + width*2
-        667 + 52 + 28  // height + toolbar + statusbar
+        667 + 48 + 28  // height + toolbar + statusbar
       );
     });
 

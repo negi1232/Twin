@@ -31,7 +31,7 @@ function initCssCompare(): void {
       showToast(`CSS Scan failed: ${(err as Error).message}`, 'error');
     } finally {
       cssScanBtn.disabled = false;
-      cssScanBtn.textContent = '\u{1F3A8} CSS Scan';
+      cssScanBtn.textContent = 'CSS Scan';
     }
   }
 

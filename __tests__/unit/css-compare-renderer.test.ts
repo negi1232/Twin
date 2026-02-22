@@ -5,8 +5,8 @@ export {};
 
 function buildDOM() {
   document.body.innerHTML = `
-    <button id="css-scan-btn">\u{1F3A8} CSS Scan</button>
-    <button id="css-inspect-btn">\u{1F50D} Inspect</button>
+    <button id="css-scan-btn">CSS Scan</button>
+    <button id="css-inspect-btn">Inspect</button>
     <div id="css-inspect-drawer" class="hidden">
       <button id="css-inspect-drawer-close"></button>
       <div id="css-inspect-drawer-handle"></div>
