@@ -816,3 +816,758 @@ describe('buildHighlightScript edge cases', () => {
     expect(script).toContain('return true');
   });
 });
+
+// ========== NEW EDGE CASE TESTS ==========
+
+// ---------- compareStyles: 同一スタイルの詳細なエッジケース ----------
+describe('compareStyles: 同一スタイルの詳細テスト', () => {
+  test('同一オブジェクト参照を渡した場合、差分なし', () => {
+    const styles = { color: 'red', display: 'block', 'font-size': '16px' };
+    const diffs = compareStyles(styles, styles);
+    expect(diffs).toEqual([]);
+  });
+
+  test('同一内容だが別オブジェクトの場合、差分なし', () => {
+    const left = { color: 'rgb(255, 0, 0)', display: 'flex', 'font-size': '16px', opacity: '1' };
+    const right = { color: 'rgb(255, 0, 0)', display: 'flex', 'font-size': '16px', opacity: '1' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toEqual([]);
+  });
+
+  test('プロパティの順序が異なっても同一内容なら差分なし', () => {
+    const left = { 'z-index': 'auto', color: 'red', display: 'block' };
+    const right = { display: 'block', 'z-index': 'auto', color: 'red' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toEqual([]);
+  });
+
+  test('値が空文字列同士の場合、差分なし', () => {
+    const left = { color: '', display: '', 'font-size': '' };
+    const right = { color: '', display: '', 'font-size': '' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toEqual([]);
+  });
+});
+
+// ---------- compareStyles: 片側が空の場合 ----------
+describe('compareStyles: 片側が空のスタイルの場合', () => {
+  test('左側が空で右側に複数プロパティがある場合、すべて added', () => {
+    const right = { display: 'flex', color: 'red', opacity: '0.5', 'font-size': '14px' };
+    const diffs = compareStyles({}, right);
+    expect(diffs).toHaveLength(4);
+    for (const d of diffs) {
+      expect(d.type).toBe('added');
+      expect(d.expected).toBe('');
+      expect(d.actual).toBe(right[d.property as keyof typeof right]);
+    }
+  });
+
+  test('右側が空で左側に複数プロパティがある場合、すべて deleted', () => {
+    const left = { display: 'block', color: 'blue', opacity: '1', 'font-size': '16px' };
+    const diffs = compareStyles(left, {});
+    expect(diffs).toHaveLength(4);
+    for (const d of diffs) {
+      expect(d.type).toBe('deleted');
+      expect(d.expected).toBe(left[d.property as keyof typeof left]);
+      expect(d.actual).toBe('');
+    }
+  });
+
+  test('added プロパティの expected は空文字列', () => {
+    const diffs = compareStyles({}, { 'background-color': '#fff' });
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].expected).toBe('');
+    expect(diffs[0].actual).toBe('#fff');
+    expect(diffs[0].type).toBe('added');
+    expect(diffs[0].category).toBe('visual');
+  });
+
+  test('deleted プロパティの actual は空文字列', () => {
+    const diffs = compareStyles({ 'background-color': '#000' }, {});
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].expected).toBe('#000');
+    expect(diffs[0].actual).toBe('');
+    expect(diffs[0].type).toBe('deleted');
+    expect(diffs[0].category).toBe('visual');
+  });
+});
+
+// ---------- compareStyles: 大量プロパティのテスト ----------
+describe('compareStyles: 大量プロパティのテスト', () => {
+  test('200プロパティすべて同一の場合、差分なし', () => {
+    const styles: Record<string, string> = {};
+    for (let i = 0; i < 200; i++) {
+      styles[`prop-${i}`] = `value-${i}`;
+    }
+    const diffs = compareStyles({ ...styles }, { ...styles });
+    expect(diffs).toHaveLength(0);
+  });
+
+  test('200プロパティすべて異なる場合、200件の差分', () => {
+    const left: Record<string, string> = {};
+    const right: Record<string, string> = {};
+    for (let i = 0; i < 200; i++) {
+      left[`prop-${i}`] = `left-${i}`;
+      right[`prop-${i}`] = `right-${i}`;
+    }
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(200);
+    for (const d of diffs) {
+      expect(d.type).toBe('changed');
+    }
+  });
+
+  test('100プロパティが追加され50プロパティが削除される混合ケース', () => {
+    const left: Record<string, string> = {};
+    const right: Record<string, string> = {};
+    // 50 deleted (left only)
+    for (let i = 0; i < 50; i++) {
+      left[`deleted-${i}`] = `val-${i}`;
+    }
+    // 100 added (right only)
+    for (let i = 0; i < 100; i++) {
+      right[`added-${i}`] = `val-${i}`;
+    }
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(150);
+    const addedCount = diffs.filter((d: any) => d.type === 'added').length;
+    const deletedCount = diffs.filter((d: any) => d.type === 'deleted').length;
+    expect(addedCount).toBe(100);
+    expect(deletedCount).toBe(50);
+  });
+
+  test('変更・追加・削除が混在する場合の正確なカウント', () => {
+    const left: Record<string, string> = {
+      shared1: 'a', shared2: 'b', shared3: 'c', // changed
+      deleted1: 'x', deleted2: 'y',               // deleted
+    };
+    const right: Record<string, string> = {
+      shared1: 'A', shared2: 'B', shared3: 'C',   // changed
+      added1: 'p', added2: 'q', added3: 'r',      // added
+    };
+    const diffs = compareStyles(left, right);
+    const changed = diffs.filter((d: any) => d.type === 'changed');
+    const added = diffs.filter((d: any) => d.type === 'added');
+    const deleted = diffs.filter((d: any) => d.type === 'deleted');
+    expect(changed).toHaveLength(3);
+    expect(added).toHaveLength(3);
+    expect(deleted).toHaveLength(2);
+    expect(diffs).toHaveLength(8);
+  });
+});
+
+// ---------- compareStyles: 特殊な値のテスト ----------
+describe('compareStyles: 特殊な値のテスト', () => {
+  test('値に特殊文字を含むプロパティの差分検出', () => {
+    const left = { content: '"Hello World"' };
+    const right = { content: '"Goodbye World"' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].expected).toBe('"Hello World"');
+    expect(diffs[0].actual).toBe('"Goodbye World"');
+  });
+
+  test('値が非常に長い文字列でも正しく比較', () => {
+    const longVal = 'a'.repeat(10000);
+    const left = { color: longVal };
+    const right = { color: longVal + 'b' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].type).toBe('changed');
+  });
+
+  test('rgba値の微妙な差分を検出', () => {
+    const left = { 'background-color': 'rgba(255, 0, 0, 0.5)' };
+    const right = { 'background-color': 'rgba(255, 0, 0, 0.50001)' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].type).toBe('changed');
+  });
+
+  test('数値文字列の先頭ゼロの違いを検出', () => {
+    const left = { 'z-index': '01' };
+    const right = { 'z-index': '1' };
+    const diffs = compareStyles(left, right);
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0].type).toBe('changed');
+  });
+});
+
+// ---------- generateScanReportHTML: 空結果の詳細テスト ----------
+describe('generateScanReportHTML: 空結果の詳細テスト', () => {
+  test('要素数ゼロ・差分ゼロの完全空スキャン結果', () => {
+    const scanResult = {
+      leftCount: 0, rightCount: 0, scannedElements: 0,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('<html lang="ja">');
+    expect(html).toContain('CSS Scan Report');
+    // Summary values should be 0
+    expect(html).toContain('"changedElements":0');
+    expect(html).toContain('"addedElements":0');
+    expect(html).toContain('"deletedElements":0');
+    expect(html).toContain('"totalDiffProperties":0');
+  });
+
+  test('要素はあるが差分がない場合のレポート', () => {
+    const scanResult = {
+      leftCount: 50, rightCount: 50, scannedElements: 100,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('"leftCount":50');
+    expect(html).toContain('"rightCount":50');
+    expect(html).toContain('"scannedElements":100');
+    // No difference text in the renderResults logic
+    expect(html).toContain('No differences found');
+  });
+
+  test('added のみのレポートに正しいサマリーが含まれる', () => {
+    const scanResult = {
+      leftCount: 0, rightCount: 3, scannedElements: 3,
+      changed: [],
+      added: [
+        { tag: 'div', key: '#a', method: 'id', type: 'added' },
+        { tag: 'span', key: '#b', method: 'id', type: 'added' },
+        { tag: 'p', key: '.c', method: 'unique-class', type: 'added' },
+      ],
+      deleted: [],
+      summary: { changedElements: 0, addedElements: 3, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('"addedElements":3');
+    expect(html).toContain('#a');
+    expect(html).toContain('#b');
+    expect(html).toContain('.c');
+  });
+
+  test('deleted のみのレポートに正しいサマリーが含まれる', () => {
+    const scanResult = {
+      leftCount: 2, rightCount: 0, scannedElements: 2,
+      changed: [],
+      added: [],
+      deleted: [
+        { tag: 'div', key: '#x', method: 'id', type: 'deleted' },
+        { tag: 'nav', key: '.nav', method: 'unique-class', type: 'deleted' },
+      ],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 2, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('"deletedElements":2');
+    expect(html).toContain('#x');
+    expect(html).toContain('.nav');
+  });
+});
+
+// ---------- generateScanReportHTML: データエスケープのテスト ----------
+describe('generateScanReportHTML: データエスケープのテスト', () => {
+  test('< と > が \\u003c と \\u003e にエスケープされる', () => {
+    const scanResult = {
+      leftCount: 1, rightCount: 1, scannedElements: 2,
+      changed: [{
+        tag: 'div', key: '#test', method: 'id', type: 'changed', diffCount: 1,
+        diffs: [{ property: 'content', expected: '<script>alert("xss")</script>', actual: '""', category: 'other', type: 'changed' }],
+      }],
+      added: [], deleted: [],
+      summary: { changedElements: 1, addedElements: 0, deletedElements: 0, totalDiffProperties: 1 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    // Raw < and > should not appear in the embedded JSON data
+    // They should be escaped as \u003c and \u003e
+    const dataSection = html.split('var data = ')[1].split(';')[0];
+    expect(dataSection).not.toContain('<script>');
+    expect(dataSection).toContain('\\u003c');
+    expect(dataSection).toContain('\\u003e');
+  });
+
+  test('Unicode行区切り文字がエスケープされる', () => {
+    const scanResult = {
+      leftCount: 1, rightCount: 1, scannedElements: 2,
+      changed: [{
+        tag: 'div', key: '#test', method: 'id', type: 'changed', diffCount: 1,
+        diffs: [{ property: 'content', expected: 'line\u2028separator', actual: 'para\u2029separator', category: 'other', type: 'changed' }],
+      }],
+      added: [], deleted: [],
+      summary: { changedElements: 1, addedElements: 0, deletedElements: 0, totalDiffProperties: 1 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    // Raw U+2028 / U+2029 should be escaped in the embedded JSON
+    const dataSection = html.split('var data = ')[1].split(';')[0];
+    expect(dataSection).not.toContain('\u2028');
+    expect(dataSection).not.toContain('\u2029');
+  });
+
+  test('大量の changed 要素を含むレポートが正しく生成される', () => {
+    const changed = Array.from({ length: 50 }, (_, i) => ({
+      tag: 'div', key: `#el-${i}`, method: 'id', type: 'changed', diffCount: 2,
+      diffs: [
+        { property: 'color', expected: 'red', actual: 'blue', category: 'text', type: 'changed' },
+        { property: 'display', expected: 'block', actual: 'flex', category: 'layout', type: 'changed' },
+      ],
+    }));
+    const scanResult = {
+      leftCount: 50, rightCount: 50, scannedElements: 100,
+      changed, added: [], deleted: [],
+      summary: { changedElements: 50, addedElements: 0, deletedElements: 0, totalDiffProperties: 100 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('"changedElements":50');
+    expect(html).toContain('"totalDiffProperties":100');
+    // Verify the HTML is well-formed (contains closing tags)
+    expect(html).toContain('</html>');
+    expect(html).toContain('</body>');
+  });
+});
+
+// ---------- generateScanReportHTML: 構造テスト ----------
+describe('generateScanReportHTML: HTML構造のテスト', () => {
+  test('レポートにはサマリー・フィルター・結果セクションが含まれる', () => {
+    const scanResult = {
+      leftCount: 1, rightCount: 1, scannedElements: 2,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('id="summary"');
+    expect(html).toContain('id="filters"');
+    expect(html).toContain('id="results"');
+  });
+
+  test('レポートに renderSummary / renderFilters / renderResults 関数が含まれる', () => {
+    const scanResult = {
+      leftCount: 0, rightCount: 0, scannedElements: 0,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('function renderSummary()');
+    expect(html).toContain('function renderFilters()');
+    expect(html).toContain('function renderResults()');
+    expect(html).toContain('function init()');
+  });
+
+  test('レポートの style セクションに CSS 変数が含まれる', () => {
+    const scanResult = {
+      leftCount: 0, rightCount: 0, scannedElements: 0,
+      changed: [], added: [], deleted: [],
+      summary: { changedElements: 0, addedElements: 0, deletedElements: 0, totalDiffProperties: 0 },
+    };
+    const html = generateScanReportHTML(scanResult);
+    expect(html).toContain('--bg-primary');
+    expect(html).toContain('--accent-blue');
+    expect(html).toContain('--status-passed');
+    expect(html).toContain('--status-failed');
+  });
+});
+
+// ---------- buildHighlightScript: 追加エッジケーステスト ----------
+describe('buildHighlightScript: 追加エッジケーステスト', () => {
+  test('キーにバックスラッシュを含む場合、JSONエスケープされる', () => {
+    const script = buildHighlightScript('.class\\:name');
+    // JSON.stringify should escape the backslash
+    expect(script).toContain('class');
+    expect(script).toContain('querySelector');
+  });
+
+  test('キーに改行文字を含む場合、安全にエスケープされる', () => {
+    const script = buildHighlightScript('#test\ninjection');
+    // JSON.stringify converts \n to \\n
+    expect(script).not.toContain('\n#test');
+    expect(script).toContain('querySelector');
+  });
+
+  test('キーに Unicode 文字を含む場合、正しく埋め込まれる', () => {
+    const script = buildHighlightScript('#日本語テスト');
+    expect(script).toContain('日本語テスト');
+    expect(script).toContain('querySelector');
+  });
+
+  test('空のキーでもスクリプトは生成される', () => {
+    const script = buildHighlightScript('');
+    expect(script).toContain('querySelector');
+    expect(script).toContain('__twin_right_highlight');
+  });
+
+  test('スクリプトには getBoundingClientRect 呼び出しが含まれる', () => {
+    const script = buildHighlightScript('#el');
+    expect(script).toContain('getBoundingClientRect');
+  });
+
+  test('スクリプトにはオーバーレイの appendChild が含まれる', () => {
+    const script = buildHighlightScript('#el');
+    expect(script).toContain('appendChild');
+  });
+});
+
+// ---------- buildGetElementStylesScript: 追加エッジケーステスト ----------
+describe('buildGetElementStylesScript: 追加エッジケーステスト', () => {
+  test('method が id の場合、getElementById が使用される', () => {
+    const script = buildGetElementStylesScript('#my-id', 'id');
+    expect(script).toContain('getElementById');
+    expect(script).toContain("method === 'id'");
+  });
+
+  test('method が id 以外の場合、querySelector が使用される', () => {
+    const script = buildGetElementStylesScript('.my-class', 'unique-class');
+    expect(script).toContain('querySelector');
+  });
+
+  test('キーにバックスラッシュが含まれる場合、JSONエスケープされる', () => {
+    const script = buildGetElementStylesScript('.class\\:special', 'unique-class');
+    expect(script).toContain('class');
+  });
+
+  test('キーに改行文字が含まれる場合、安全にエスケープされる', () => {
+    const script = buildGetElementStylesScript('#test\ninjection', 'id');
+    // JSON.stringify escapes the newline as \\n inside the string
+    expect(script).not.toMatch(/\ninjection/);
+  });
+
+  test('空のキーでもスクリプトは生成される', () => {
+    const script = buildGetElementStylesScript('', 'dom-path');
+    expect(script).toContain('querySelector');
+    expect(script).toContain('getComputedStyle');
+  });
+
+  test('空の method でもスクリプトは生成される', () => {
+    const script = buildGetElementStylesScript('#test', '');
+    expect(script).toContain('querySelector');
+    expect(script).toContain('getComputedStyle');
+  });
+
+  test('method が dom-path の場合、querySelector 経由でアクセス', () => {
+    const script = buildGetElementStylesScript('body > div > span:nth-of-type(3)', 'dom-path');
+    expect(script).toContain('querySelector');
+    expect(script).toContain('body');
+    expect(script).toContain('nth-of-type(3)');
+  });
+
+  test('スクリプトには try-catch による安全なエラーハンドリングが含まれる', () => {
+    const script = buildGetElementStylesScript('#test', 'id');
+    expect(script).toContain('try');
+    expect(script).toContain('catch');
+    expect(script).toContain('return null');
+  });
+
+  test('スクリプトは tagName を小文字で返す', () => {
+    const script = buildGetElementStylesScript('#test', 'id');
+    expect(script).toContain('tagName.toLowerCase()');
+  });
+});
+
+// ---------- runFullScan: 追加エラーシナリオテスト ----------
+describe('runFullScan: 追加エラーシナリオテスト', () => {
+  test('rightView の executeJavaScript が拒否された場合にエラーをスロー', async () => {
+    const mockLeft = {
+      webContents: {
+        isDestroyed: () => false,
+        executeJavaScript: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const mockRight = {
+      webContents: {
+        isDestroyed: () => false,
+        executeJavaScript: jest.fn().mockRejectedValue(new Error('Right script failed')),
+      },
+    };
+    await expect(runFullScan(mockLeft, mockRight)).rejects.toThrow('Right script failed');
+  });
+
+  test('両方の view が空の要素を返す場合、差分なし', async () => {
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([]) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([]) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.scannedElements).toBe(0);
+    expect(result.leftCount).toBe(0);
+    expect(result.rightCount).toBe(0);
+    expect(result.changed).toHaveLength(0);
+    expect(result.added).toHaveLength(0);
+    expect(result.deleted).toHaveLength(0);
+    expect(result.summary.changedElements).toBe(0);
+    expect(result.summary.addedElements).toBe(0);
+    expect(result.summary.deletedElements).toBe(0);
+    expect(result.summary.totalDiffProperties).toBe(0);
+  });
+
+  test('leftView のみに多数の要素がある場合、すべて deleted として報告', async () => {
+    const leftElements = Array.from({ length: 10 }, (_, i) => ({
+      tag: 'div', key: `#el-${i}`, method: 'id', styles: { color: 'red' },
+    }));
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue(leftElements) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([]) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.deleted).toHaveLength(10);
+    expect(result.added).toHaveLength(0);
+    expect(result.changed).toHaveLength(0);
+    expect(result.summary.deletedElements).toBe(10);
+    for (const del of result.deleted) {
+      expect(del.type).toBe('deleted');
+    }
+  });
+
+  test('rightView のみに多数の要素がある場合、すべて added として報告', async () => {
+    const rightElements = Array.from({ length: 10 }, (_, i) => ({
+      tag: 'span', key: `#new-${i}`, method: 'id', styles: { display: 'flex' },
+    }));
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([]) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue(rightElements) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.added).toHaveLength(10);
+    expect(result.deleted).toHaveLength(0);
+    expect(result.changed).toHaveLength(0);
+    expect(result.summary.addedElements).toBe(10);
+    for (const add of result.added) {
+      expect(add.type).toBe('added');
+    }
+  });
+
+  test('changed 要素に正しい tag / key / method / type が設定される', async () => {
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'button', key: '[data-testid="submit"]', method: 'data-testid', styles: { color: 'red' } },
+      ]) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'button', key: '[data-testid="submit"]', method: 'data-testid', styles: { color: 'green' } },
+      ]) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.changed).toHaveLength(1);
+    expect(result.changed[0].tag).toBe('button');
+    expect(result.changed[0].key).toBe('[data-testid="submit"]');
+    expect(result.changed[0].method).toBe('data-testid');
+    expect(result.changed[0].type).toBe('changed');
+  });
+
+  test('同じ diffCount の要素が複数ある場合、ソート順が安定', async () => {
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'div', key: '#a', method: 'id', styles: { color: 'red' } },
+        { tag: 'div', key: '#b', method: 'id', styles: { color: 'red' } },
+        { tag: 'div', key: '#c', method: 'id', styles: { color: 'red' } },
+      ]) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'div', key: '#a', method: 'id', styles: { color: 'blue' } },
+        { tag: 'div', key: '#b', method: 'id', styles: { color: 'blue' } },
+        { tag: 'div', key: '#c', method: 'id', styles: { color: 'blue' } },
+      ]) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.changed).toHaveLength(3);
+    // All have diffCount 1
+    for (const c of result.changed) {
+      expect(c.diffCount).toBe(1);
+    }
+  });
+
+  test('スキャン結果のsummary.totalDiffPropertiesがゼロの場合', async () => {
+    const elements = [
+      { tag: 'div', key: '#a', method: 'id', styles: { color: 'red', display: 'block' } },
+    ];
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue(elements) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue(elements) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.summary.totalDiffProperties).toBe(0);
+  });
+
+  test('added / deleted 要素の type フィールドが正しく設定される', async () => {
+    const mockLeft = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'div', key: '#left-only', method: 'id', styles: {} },
+      ]) },
+    };
+    const mockRight = {
+      webContents: { isDestroyed: () => false, executeJavaScript: jest.fn().mockResolvedValue([
+        { tag: 'span', key: '#right-only', method: 'id', styles: {} },
+      ]) },
+    };
+    const result = await runFullScan(mockLeft, mockRight);
+    expect(result.deleted).toHaveLength(1);
+    expect(result.deleted[0].type).toBe('deleted');
+    expect(result.deleted[0].tag).toBe('div');
+    expect(result.deleted[0].key).toBe('#left-only');
+    expect(result.deleted[0].method).toBe('id');
+    expect(result.added).toHaveLength(1);
+    expect(result.added[0].type).toBe('added');
+    expect(result.added[0].tag).toBe('span');
+    expect(result.added[0].key).toBe('#right-only');
+    expect(result.added[0].method).toBe('id');
+  });
+});
+
+// ---------- matchElements: 追加マッチング境界テスト ----------
+describe('matchElements: マッチング境界テスト', () => {
+  test('完全に異なるキーセットの場合、全要素が added/deleted', () => {
+    const left = [
+      { key: '#a', tag: 'div', method: 'id', styles: {} },
+      { key: '#b', tag: 'div', method: 'id', styles: {} },
+      { key: '#c', tag: 'div', method: 'id', styles: {} },
+    ];
+    const right = [
+      { key: '#x', tag: 'div', method: 'id', styles: {} },
+      { key: '#y', tag: 'div', method: 'id', styles: {} },
+    ];
+    const result = matchElements(left, right);
+    expect(result.matched).toHaveLength(0);
+    expect(result.deleted).toHaveLength(3);
+    expect(result.added).toHaveLength(2);
+  });
+
+  test('キーが同一で tag/method が異なる要素もマッチする', () => {
+    const left = [{ key: '#same', tag: 'div', method: 'id', styles: {} }];
+    const right = [{ key: '#same', tag: 'span', method: 'dom-path', styles: {} }];
+    const result = matchElements(left, right);
+    // matchElements はキーだけでマッチするので、tag/method が違ってもマッチ
+    expect(result.matched).toHaveLength(1);
+    expect(result.matched[0].left.tag).toBe('div');
+    expect(result.matched[0].right.tag).toBe('span');
+  });
+
+  test('右側に重複キーがある場合、最後の要素がマッチに使われる', () => {
+    const left = [{ key: '#dup', tag: 'div', method: 'id', styles: {} }];
+    const right = [
+      { key: '#dup', tag: 'span', method: 'id', styles: { color: 'first' } },
+      { key: '#dup', tag: 'p', method: 'id', styles: { color: 'second' } },
+    ];
+    const result = matchElements(left, right);
+    expect(result.matched).toHaveLength(1);
+    // Map overwrites with the last entry, so the second element should be matched
+    expect(result.matched[0].right.tag).toBe('p');
+    expect(result.matched[0].right.styles).toEqual({ color: 'second' });
+  });
+
+  test('500要素の左右で完全マッチ', () => {
+    const count = 500;
+    const left = Array.from({ length: count }, (_, i) => ({
+      key: `.el-${i}`, tag: 'div', method: 'unique-class', styles: {},
+    }));
+    const right = Array.from({ length: count }, (_, i) => ({
+      key: `.el-${i}`, tag: 'div', method: 'unique-class', styles: {},
+    }));
+    const result = matchElements(left, right);
+    expect(result.matched).toHaveLength(count);
+    expect(result.added).toHaveLength(0);
+    expect(result.deleted).toHaveLength(0);
+  });
+});
+
+// ---------- CSS_COLLECTION_SCRIPT: 構造テスト ----------
+describe('CSS_COLLECTION_SCRIPT: 構造テスト', () => {
+  test('IIFE として構成されている', () => {
+    expect(CSS_COLLECTION_SCRIPT).toMatch(/^\(function\(\)/);
+    expect(CSS_COLLECTION_SCRIPT).toMatch(/\}\)\(\)$/);
+  });
+
+  test('META_TAGS フィルタが含まれる', () => {
+    expect(CSS_COLLECTION_SCRIPT).toContain('META_TAGS');
+    expect(CSS_COLLECTION_SCRIPT).toContain('SCRIPT');
+    expect(CSS_COLLECTION_SCRIPT).toContain('STYLE');
+    expect(CSS_COLLECTION_SCRIPT).toContain('NOSCRIPT');
+  });
+
+  test('display:none 要素をスキップするロジックが含まれる', () => {
+    expect(CSS_COLLECTION_SCRIPT).toContain("display === 'none'");
+  });
+
+  test('getDomPath 関数が含まれる', () => {
+    expect(CSS_COLLECTION_SCRIPT).toContain('function getDomPath');
+  });
+
+  test('getMatchKey 関数が含まれる', () => {
+    expect(CSS_COLLECTION_SCRIPT).toContain('function getMatchKey');
+  });
+
+  test('id / data-testid / unique-class / dom-path のマッチング手法が含まれる', () => {
+    expect(CSS_COLLECTION_SCRIPT).toContain("method: 'id'");
+    expect(CSS_COLLECTION_SCRIPT).toContain("method: 'data-testid'");
+    expect(CSS_COLLECTION_SCRIPT).toContain("method: 'unique-class'");
+    expect(CSS_COLLECTION_SCRIPT).toContain("method: 'dom-path'");
+  });
+});
+
+// ---------- CSS_INSPECT_SCRIPT: 構造テスト ----------
+describe('CSS_INSPECT_SCRIPT: 構造テスト', () => {
+  test('IIFE として構成されている', () => {
+    expect(CSS_INSPECT_SCRIPT).toMatch(/^\(function\(\)/);
+    expect(CSS_INSPECT_SCRIPT).toMatch(/\}\)\(\)$/);
+  });
+
+  test('二重実行防止のガードが含まれる', () => {
+    expect(CSS_INSPECT_SCRIPT).toContain('if (window.__twinCssInspectActive) return');
+  });
+
+  test('オーバーレイ要素の作成が含まれる', () => {
+    expect(CSS_INSPECT_SCRIPT).toContain('__twin_inspect_overlay');
+  });
+
+  test('ツールチップ要素の作成が含まれる', () => {
+    expect(CSS_INSPECT_SCRIPT).toContain('__twin_inspect_tooltip');
+  });
+
+  test('mousemove と click イベントリスナーの登録が含まれる', () => {
+    expect(CSS_INSPECT_SCRIPT).toContain("addEventListener('mousemove'");
+    expect(CSS_INSPECT_SCRIPT).toContain("addEventListener('click'");
+  });
+
+  test('クリーンアップ関数が含まれる', () => {
+    expect(CSS_INSPECT_SCRIPT).toContain('__twinCssInspectCleanup');
+    expect(CSS_INSPECT_SCRIPT).toContain('removeEventListener');
+  });
+
+  test('inspect-click イベント送信が含まれる', () => {
+    expect(CSS_INSPECT_SCRIPT).toContain("send('inspect-click'");
+  });
+
+  test('PREFIX を使った console.log 送信ロジックが含まれる', () => {
+    expect(CSS_INSPECT_SCRIPT).toContain('PREFIX');
+    expect(CSS_INSPECT_SCRIPT).toContain('JSON.stringify');
+    expect(CSS_INSPECT_SCRIPT).toContain('console.log');
+  });
+});
+
+// ---------- CSS_INSPECT_CLEANUP_SCRIPT: 構造テスト ----------
+describe('CSS_INSPECT_CLEANUP_SCRIPT: 構造テスト', () => {
+  test('IIFE として構成されている', () => {
+    expect(CSS_INSPECT_CLEANUP_SCRIPT).toMatch(/^\(function\(\)/);
+    expect(CSS_INSPECT_CLEANUP_SCRIPT).toMatch(/\}\)\(\)$/);
+  });
+
+  test('typeof チェックで安全にクリーンアップ関数を呼び出す', () => {
+    expect(CSS_INSPECT_CLEANUP_SCRIPT).toContain("typeof window.__twinCssInspectCleanup === 'function'");
+  });
+});
+
+// ---------- CLEAR_HIGHLIGHT_SCRIPT: 構造テスト ----------
+describe('CLEAR_HIGHLIGHT_SCRIPT: 構造テスト', () => {
+  test('IIFE として構成されている', () => {
+    expect(CLEAR_HIGHLIGHT_SCRIPT).toMatch(/^\(function\(\)/);
+    expect(CLEAR_HIGHLIGHT_SCRIPT).toMatch(/\}\)\(\)$/);
+  });
+
+  test('getElementById でハイライト要素を取得する', () => {
+    expect(CLEAR_HIGHLIGHT_SCRIPT).toContain("getElementById('__twin_right_highlight')");
+  });
+});
