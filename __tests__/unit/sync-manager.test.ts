@@ -930,6 +930,21 @@ describe('SyncManager edge cases', () => {
     expect(script).toContain('#field');
   });
 
+  test('inputvalue でvalueもtextContentも未定義の場合、空文字にフォールバックする', () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'inputvalue',
+      data: { selector: '#empty-field' },
+    });
+    manager._handleMessage(null, 0, msg);
+    expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    const script = rightView.webContents.executeJavaScript.mock.calls[0][0];
+    expect(script).toContain('#empty-field');
+    // textContent is undefined, so it should take the value ?? '' branch (value is also undefined, so falls back to '')
+    expect(script).not.toContain('textContent');
+    // Should use the nativeSetter/value path (not the textContent path)
+    expect(script).toContain('nativeSetter');
+  });
+
   test('inputvalue with empty textContent for contenteditable', () => {
     const msg = SYNC_PREFIX + JSON.stringify({
       type: 'inputvalue',

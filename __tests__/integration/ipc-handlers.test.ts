@@ -1489,4 +1489,96 @@ describe('ipc-handlers integration', () => {
         .rejects.toThrow('Access denied');
     });
   });
+
+  // ===== set-device-preset バリデーション (line 168) =====
+  describe('set-device-preset バリデーション', () => {
+    test('NaN の width を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: NaN, height: 667 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('NaN の height を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: 375, height: NaN }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('width が 0 の場合エラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: 0, height: 667 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('height が負の値の場合エラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: 375, height: -100 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('Infinity の width を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: Infinity, height: 667 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+  });
+
+  // ===== set-zoom NaN バリデーション (line 326) =====
+  describe('set-zoom NaN バリデーション', () => {
+    test('NaN を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-zoom']({}, { zoom: NaN }))
+        .toThrow('Invalid zoom value');
+    });
+
+    test('Infinity を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-zoom']({}, { zoom: Infinity }))
+        .toThrow('Invalid zoom value');
+    });
+
+    test('-Infinity を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-zoom']({}, { zoom: -Infinity }))
+        .toThrow('Invalid zoom value');
+    });
+  });
+
+  // ===== css-inspect-toggle executeJavaScript 失敗パス (lines 381, 388, 394) =====
+  describe('css-inspect-toggle executeJavaScript 失敗パス', () => {
+    test('有効化時に CSS_INSPECT_SCRIPT の注入が失敗しても正常に返る (line 381)', async () => {
+      mockLeftWebContents.executeJavaScript.mockRejectedValueOnce(new Error('injection failed'));
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: true });
+      expect(result).toEqual({ enabled: true });
+    });
+
+    test('無効化時に CSS_INSPECT_CLEANUP_SCRIPT の実行が失敗しても正常に返る (line 388)', async () => {
+      // まず有効化する
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+
+      // 無効化時に左ビューのクリーンアップが失敗するようモックを設定
+      mockLeftWebContents.executeJavaScript.mockRejectedValueOnce(new Error('cleanup failed'));
+      mockRightView.webContents.executeJavaScript.mockResolvedValueOnce(undefined);
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: false });
+      expect(result).toEqual({ enabled: false });
+    });
+
+    test('無効化時に CLEAR_HIGHLIGHT_SCRIPT の実行が失敗しても正常に返る (line 394)', async () => {
+      // まず有効化する
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+
+      // 無効化時に左ビューのクリーンアップは成功するが、右ビューのハイライト解除が失敗
+      mockLeftWebContents.executeJavaScript.mockResolvedValueOnce(undefined);
+      mockRightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('clear highlight failed'));
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: false });
+      expect(result).toEqual({ enabled: false });
+    });
+
+    test('無効化時に両方の executeJavaScript が失敗しても正常に返る', async () => {
+      // まず有効化する
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+
+      // 両方のスクリプト実行が失敗
+      mockLeftWebContents.executeJavaScript.mockRejectedValueOnce(new Error('cleanup failed'));
+      mockRightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('clear failed'));
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: false });
+      expect(result).toEqual({ enabled: false });
+    });
+  });
 });

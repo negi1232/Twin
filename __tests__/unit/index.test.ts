@@ -201,6 +201,13 @@ describe('index.js', () => {
       mockRightWebContents.isFocused.mockReturnValue(true);
       expect(indexModule.isAppFocused()).toBe(false);
     });
+
+    test('mainWindow が null のとき false を返す', () => {
+      // closed ハンドラを呼んで mainWindow を null にする
+      const closedHandler = mainWindowListeners['closed'][0];
+      closedHandler();
+      expect(indexModule.isAppFocused()).toBe(false);
+    });
   });
 
   // ===== Menu accelerator shortcuts =====
@@ -273,6 +280,75 @@ describe('index.js', () => {
       expect(mockMenu.buildFromTemplate).toHaveBeenCalled();
       expect(mockMenu.setApplicationMenu).toHaveBeenCalled();
     });
+
+    // ----- mainWindow が null のときショートカットが何もしない -----
+    describe('mainWindow が null のときショートカットは何もしない', () => {
+      beforeEach(() => {
+        // closed ハンドラで mainWindow/views を null にする
+        const closedHandler = mainWindowListeners['closed'][0];
+        closedHandler();
+        mockToolbarWebContents.send.mockClear();
+        mockLeftWebContents.reload.mockClear();
+        mockRightWebContents.reload.mockClear();
+      });
+
+      test('Cmd+, (settings) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+,']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+= (zoom-in) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+=']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+- (zoom-out) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+-']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+0 (zoom-reset) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+0']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+1 (preset) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+1']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+Shift+S (capture) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+Shift+S']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+Shift+O (open-report) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+Shift+O']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+Shift+C (css-scan) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+Shift+C']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+I (css-inspect) は mainWindow が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+I']();
+        expect(mockToolbarWebContents.send).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+R (reload both) は leftView/rightView が null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+R']();
+        expect(mockLeftWebContents.reload).not.toHaveBeenCalled();
+        expect(mockRightWebContents.reload).not.toHaveBeenCalled();
+      });
+
+      test('Cmd+Shift+R (reload active) は leftView が null で rightView も null なら何もしない', () => {
+        menuItemsByAccelerator['CommandOrControl+Shift+R']();
+        expect(mockLeftWebContents.reload).not.toHaveBeenCalled();
+        expect(mockRightWebContents.reload).not.toHaveBeenCalled();
+      });
+    });
   });
 
   // ===== Focus/Blur handlers =====
@@ -337,6 +413,27 @@ describe('index.js', () => {
       closedHandler();
       jest.advanceTimersByTime(150);
       expect(mockSyncManager.pause).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    test('closed ハンドラは blurTimeout が null のときもエラーなく動作する', () => {
+      // blurTimeout が null の状態で closed を呼ぶ（blur を先に呼ばない）
+      const closedHandler = mainWindowListeners['closed'][0];
+      expect(() => closedHandler()).not.toThrow();
+    });
+
+    test('blur ハンドラが連続で呼ばれたとき既存タイムアウトをクリアする', () => {
+      jest.useFakeTimers();
+      const blurHandler = mainWindowListeners['blur'][0];
+
+      // 最初の blur
+      blurHandler();
+      // 2回目の blur（既存タイマーをクリアして新しいタイマーを設定）
+      blurHandler();
+
+      jest.advanceTimersByTime(150);
+      // pause は1回だけ呼ばれるべき
+      expect(mockSyncManager.pause).toHaveBeenCalledTimes(1);
       jest.useRealTimers();
     });
   });
@@ -435,6 +532,17 @@ describe('index.js', () => {
       expect(mockViews[1].setBounds).toHaveBeenCalledWith({
         x: 700, y: 48, width: 700, height: 900 - 48 - 28,
       });
+    });
+
+    test('mainWindow が null のとき早期リターンする', () => {
+      // closed ハンドラで mainWindow を null にする
+      const closedHandler = mainWindowListeners['closed'][0];
+      closedHandler();
+      mockViews[0].setBounds.mockClear();
+      mockViews[1].setBounds.mockClear();
+      indexModule.layoutViews();
+      expect(mockViews[0].setBounds).not.toHaveBeenCalled();
+      expect(mockViews[1].setBounds).not.toHaveBeenCalled();
     });
   });
 
@@ -592,6 +700,57 @@ describe('index.js', () => {
       expect(callback).toHaveBeenCalledWith(false);
 
       Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+  });
+
+  // ===== loadURL の失敗時にエラーログを出力する =====
+  describe('loadURL の catch ハンドラ', () => {
+    test('leftView の loadURL が失敗したときコンソールにエラーを出力する', async () => {
+      jest.resetModules();
+      mainWindowListeners = {};
+      mockToolbarListeners = {};
+      mockLeftListeners = {};
+      mockRightListeners = {};
+      mockAppListeners = {};
+      Object.keys(menuItemsByAccelerator).forEach((k) => delete menuItemsByAccelerator[k]);
+      mockViewIndex = 0;
+
+      const loadError = new Error('net::ERR_CONNECTION_REFUSED');
+      mockLeftWebContents.loadURL.mockRejectedValueOnce(loadError);
+
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const mod = require('../../src/main/index');
+      mod.createWindow();
+
+      // catch ハンドラが呼ばれるまで待つ
+      await new Promise(process.nextTick);
+
+      expect(spy).toHaveBeenCalledWith('Failed to load left URL:', loadError.message);
+      spy.mockRestore();
+    });
+
+    test('rightView の loadURL が失敗したときコンソールにエラーを出力する', async () => {
+      jest.resetModules();
+      mainWindowListeners = {};
+      mockToolbarListeners = {};
+      mockLeftListeners = {};
+      mockRightListeners = {};
+      mockAppListeners = {};
+      Object.keys(menuItemsByAccelerator).forEach((k) => delete menuItemsByAccelerator[k]);
+      mockViewIndex = 0;
+
+      const loadError = new Error('net::ERR_CONNECTION_REFUSED');
+      mockRightWebContents.loadURL.mockRejectedValueOnce(loadError);
+
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const mod = require('../../src/main/index');
+      mod.createWindow();
+
+      // catch ハンドラが呼ばれるまで待つ
+      await new Promise(process.nextTick);
+
+      expect(spy).toHaveBeenCalledWith('Failed to load right URL:', loadError.message);
+      spy.mockRestore();
     });
   });
 

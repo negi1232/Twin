@@ -367,6 +367,16 @@ describe('ui-controls', () => {
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
+    test('閉じるボタンでモーダルを閉じてBrowserViewsを復元する', async () => {
+      init();
+      await flush();
+      document.getElementById('new-report-btn')!.click();
+      api.setViewsVisible.mockClear();
+      document.getElementById('new-report-close')!.click();
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(true);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
     test('Enter key in test name input triggers capture', async () => {
       init();
       await flush();
@@ -577,6 +587,18 @@ describe('ui-controls', () => {
       await flush();
       api.setViewsVisible.mockClear();
       document.getElementById('settings-cancel')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+      expect(api.saveSettings).not.toHaveBeenCalled();
+    });
+
+    test('閉じるボタンで設定モーダルを閉じてBrowserViewsを復元する（保存なし）', async () => {
+      init();
+      await flush();
+      document.getElementById('settings-btn')!.click();
+      await flush();
+      api.setViewsVisible.mockClear();
+      document.getElementById('settings-close')!.click();
       expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
       expect(api.saveSettings).not.toHaveBeenCalled();
@@ -955,6 +977,21 @@ describe('ui-controls', () => {
       const outputDisplay = document.getElementById('sidebar-output-dir')!;
       expect(outputDisplay.textContent).toBe('snapshots');
       expect(outputDisplay.title).toBe('/home/user/snapshots');
+    });
+
+    test('snapshotDirが未設定の場合、出力ディレクトリ表示が「Not set」になる', async () => {
+      api.getSettings.mockResolvedValue({
+        leftUrl: 'http://localhost:3000',
+        rightUrl: 'http://localhost:3001',
+        matchingThreshold: 0,
+        thresholdRate: 0,
+        snapshotDir: '',
+      });
+      init();
+      await flush();
+      const outputDisplay = document.getElementById('sidebar-output-dir')!;
+      expect(outputDisplay.textContent).toBe('Not set');
+      expect(outputDisplay.title).toBe('');
     });
 
     test('relative snapshotDir does not auto-load tree', async () => {

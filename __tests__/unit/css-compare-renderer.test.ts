@@ -182,6 +182,46 @@ describe('renderer/css-compare', () => {
       // Should not call toggle when not active
       expect(api.cssInspectToggle).not.toHaveBeenCalled();
     });
+
+    test('toggleInspectMode でオフに切り替えるとドロワーを非表示にする', async () => {
+      init();
+      const btn = document.getElementById('css-inspect-btn')!;
+      const drawer = document.getElementById('css-inspect-drawer')!;
+      // Enable inspect
+      btn.click();
+      await flush();
+      // Show drawer via inspect result
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#test', method: 'id', styles: {} },
+        right: { tag: 'div', key: '#test', method: 'id', styles: {} },
+        diffs: [],
+        error: null,
+      });
+      expect(drawer.classList.contains('hidden')).toBe(false);
+      // Toggle off
+      btn.click();
+      await flush();
+      expect(drawer.classList.contains('hidden')).toBe(true);
+    });
+
+    test('disableInspectMode の catch パスでエラーログを出力する', async () => {
+      init();
+      const btn = document.getElementById('css-inspect-btn')!;
+      // Enable inspect
+      btn.click();
+      await flush();
+      // Make the next cssInspectToggle call reject
+      api.cssInspectToggle.mockRejectedValue(new Error('IPC error'));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      // Trigger disableInspectMode via Escape
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await flush();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to disable inspect mode:',
+        'IPC error',
+      );
+      consoleSpy.mockRestore();
+    });
   });
 
   // ===== Inspect Drawer =====
@@ -222,6 +262,18 @@ describe('renderer/css-compare', () => {
       await flush();
       expect(btn.textContent).not.toContain('Inspect ON');
     });
+
+    test('modeDisabled でインスペクトが非アクティブの場合、早期リターンする', async () => {
+      init();
+      const btn = document.getElementById('css-inspect-btn')!;
+      // inspect is NOT active (default state)
+      // modeDisabled triggers disableInspectMode, which hits early return
+      callbacks['css-inspect-result']({ modeDisabled: true });
+      await flush();
+      // Should not have called cssInspectToggle since inspect was not active
+      expect(api.cssInspectToggle).not.toHaveBeenCalled();
+      expect(btn.textContent).not.toContain('Inspect ON');
+    });
   });
 
   // ===== Drawer Resize =====
@@ -254,6 +306,15 @@ describe('renderer/css-compare', () => {
       const drawer = document.getElementById('css-inspect-drawer')!;
       document.dispatchEvent(new MouseEvent('mousemove', { clientY: 400, bubbles: true }));
       expect(drawer.style.height).toBe('');
+    });
+
+    test('mouseup はドラッグ中でなければ何もしない', () => {
+      init();
+      // Just mouseup without prior mousedown
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      // body cursor should remain default
+      expect(document.body.style.cursor).toBe('');
+      expect(document.body.style.userSelect).toBe('');
     });
   });
 
@@ -288,6 +349,49 @@ describe('renderer/css-compare', () => {
       expect(header.innerHTML).toContain('2 differences');
       expect(header.innerHTML).toContain('div');
       expect(header.innerHTML).toContain('#main');
+    });
+
+    test('エラー時に left が null の場合、タグに "?" キーに "" を表示する', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: null,
+        right: null,
+        diffs: [],
+        error: 'No matching element',
+      });
+      const header = document.getElementById('css-inspect-header-info')!;
+      expect(header.innerHTML).toContain('?');
+      expect(header.innerHTML).toContain('css-inspect-error');
+      expect(header.innerHTML).toContain('No matching element');
+    });
+
+    test('diffs が null の場合、差分カウントを 0 にする', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'p', key: '.text', method: 'class', styles: {} },
+        right: { tag: 'p', key: '.text', method: 'class', styles: {} },
+        diffs: null,
+        error: null,
+      });
+      const header = document.getElementById('css-inspect-header-info')!;
+      expect(header.innerHTML).toContain('0 differences');
+    });
+
+    test('diffs に added と deleted タイプが含まれる場合もカウントされる', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#box', method: 'id', styles: { color: 'red' } },
+        right: { tag: 'div', key: '#box', method: 'id', styles: { display: 'flex' } },
+        diffs: [
+          { property: 'color', expected: 'red', actual: '', category: 'text', type: 'deleted' },
+          { property: 'display', expected: '', actual: 'flex', category: 'layout', type: 'added' },
+          { property: 'font-size', expected: '14px', actual: '14px', category: 'text', type: 'unchanged' },
+        ],
+        error: null,
+      });
+      const header = document.getElementById('css-inspect-header-info')!;
+      // deleted + added = 2, unchanged is not counted
+      expect(header.innerHTML).toContain('2 differences');
     });
   });
 
@@ -348,6 +452,63 @@ describe('renderer/css-compare', () => {
       });
       const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('Right panel not available');
+    });
+
+    test('currentInspectData が null の場合、ガイドテキストを表示する', () => {
+      init();
+      // renderInspectDiffs is called when filter buttons are clicked,
+      // but currentInspectData is null initially.
+      // We need to trigger renderInspectDiffs with null data.
+      // The guide text path (branch 16 loc[1]) is shown when currentInspectData is null.
+      // First show a result, then close the drawer (which sets currentInspectData to null),
+      // then trigger a filter click - but filter click calls renderInspectDiffs which checks currentInspectData.
+      // Actually, closing the drawer sets currentInspectData = null.
+      // Then clicking a filter button calls renderInspectDiffs with null data -> guide text.
+
+      // Show some data first
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#test', method: 'id', styles: {} },
+        right: { tag: 'div', key: '#test', method: 'id', styles: {} },
+        diffs: [],
+        error: null,
+      });
+      // Close the drawer (sets currentInspectData = null)
+      document.getElementById('css-inspect-drawer-close')!.click();
+      // Now click the filter button to trigger renderInspectDiffs with null data
+      document.getElementById('css-inspect-filter-diff')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('CSS Inspect Mode');
+      expect(body.innerHTML).toContain('css-inspect-guide-title');
+    });
+
+    test('isDiff が未定義の行は diff 行として扱う', () => {
+      init();
+      // rows from diffs array have type but no isDiff -> isDiff defaults to true (line 243)
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#t', method: 'id', styles: { color: 'red' } },
+        right: { tag: 'div', key: '#t', method: 'id', styles: { color: 'blue' } },
+        diffs: [{ property: 'color', expected: 'red', actual: 'blue', category: 'text', type: 'changed' }],
+        error: null,
+      });
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('css-diff-row');
+      // The "≠" icon for diff rows
+      expect(body.textContent).toContain('\u2260');
+    });
+
+    test('isDiff が false の行はチェックマークアイコンを表示する', () => {
+      init();
+      // Use "All" filter to show non-diff rows with isDiff: false
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#t', method: 'id', styles: { color: 'red', display: 'block' } },
+        right: { tag: 'div', key: '#t', method: 'id', styles: { color: 'blue', display: 'block' } },
+        diffs: [{ property: 'color', expected: 'red', actual: 'blue', category: 'text', type: 'changed' }],
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      // "display" is same on both sides, so isDiff = false -> shows ✓
+      expect(body.textContent).toContain('\u2713');
     });
   });
 
@@ -426,6 +587,162 @@ describe('renderer/css-compare', () => {
       (document.querySelector('.css-inspect-cat-btn[data-cat="other"]') as HTMLElement).click();
       const body = document.getElementById('css-inspect-drawer-body')!;
       expect(body.innerHTML).toContain('No matching properties');
+    });
+
+    test('カテゴリボタンに data-cat が無い場合 "all" にフォールバックする', () => {
+      // Build DOM with a category button that has no data-cat attribute
+      document.body.innerHTML = `
+        <button id="css-scan-btn">CSS Scan</button>
+        <button id="css-inspect-btn">Inspect</button>
+        <div id="css-inspect-drawer" class="hidden">
+          <button id="css-inspect-drawer-close"></button>
+          <div id="css-inspect-drawer-handle"></div>
+          <div id="css-inspect-header-info"></div>
+          <button id="css-inspect-filter-diff" class="active"></button>
+          <button id="css-inspect-filter-all"></button>
+          <button class="css-inspect-cat-btn"></button>
+          <div id="css-inspect-drawer-body"></div>
+        </div>
+        <div id="toast" class="toast hidden"></div>
+      `;
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: { color: 'red' } },
+        right: { tag: 'div', key: '#x', method: 'id', styles: { color: 'blue' } },
+        diffs: [{ property: 'color', expected: 'red', actual: 'blue', category: 'text', type: 'changed' }],
+        error: null,
+      });
+      // Click the button with no data-cat (falls back to 'all')
+      (document.querySelector('.css-inspect-cat-btn') as HTMLElement).click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      // 'all' filter shows everything, so color should be visible
+      expect(body.innerHTML).toContain('color');
+    });
+
+    test('"Diff" フィルターで active クラスを正しく切り替える', () => {
+      setupWithData();
+      const diffBtn = document.getElementById('css-inspect-filter-diff')!;
+      const allBtn = document.getElementById('css-inspect-filter-all')!;
+      // Switch to all
+      allBtn.click();
+      expect(allBtn.classList.contains('active')).toBe(true);
+      expect(diffBtn.classList.contains('active')).toBe(false);
+      // Switch back to diff
+      diffBtn.click();
+      expect(diffBtn.classList.contains('active')).toBe(true);
+      expect(allBtn.classList.contains('active')).toBe(false);
+    });
+
+    test('カテゴリボタンクリックで他のボタンの active を外す', () => {
+      setupWithData();
+      const allCatBtn = document.querySelector('.css-inspect-cat-btn[data-cat="all"]') as HTMLElement;
+      const textCatBtn = document.querySelector('.css-inspect-cat-btn[data-cat="text"]') as HTMLElement;
+      const layoutCatBtn = document.querySelector('.css-inspect-cat-btn[data-cat="layout"]') as HTMLElement;
+      // Click text
+      textCatBtn.click();
+      expect(textCatBtn.classList.contains('active')).toBe(true);
+      expect(allCatBtn.classList.contains('active')).toBe(false);
+      expect(layoutCatBtn.classList.contains('active')).toBe(false);
+      // Click layout
+      layoutCatBtn.click();
+      expect(layoutCatBtn.classList.contains('active')).toBe(true);
+      expect(textCatBtn.classList.contains('active')).toBe(false);
+    });
+  });
+
+  // ===== "All" filter with missing data =====
+  describe('All フィルターのエッジケース', () => {
+    test('left.styles が null の場合でもプロパティ一覧を構築する', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: null },
+        right: { tag: 'div', key: '#x', method: 'id', styles: { display: 'flex' } },
+        diffs: [],
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('display');
+    });
+
+    test('right.styles が null の場合でもプロパティ一覧を構築する', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: { color: 'red' } },
+        right: { tag: 'div', key: '#x', method: 'id', styles: null },
+        diffs: [],
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('color');
+    });
+
+    test('left と right 両方の styles が null の場合、空メッセージを表示する', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: null },
+        right: { tag: 'div', key: '#x', method: 'id', styles: null },
+        diffs: null,
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('No matching properties');
+    });
+
+    test('diffs が null で "All" フィルターの場合、空配列にフォールバックする', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: { color: 'red' } },
+        right: { tag: 'div', key: '#x', method: 'id', styles: { color: 'red' } },
+        diffs: null,
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      // color exists in styles but not in diffs, so isDiff = false
+      expect(body.innerHTML).toContain('color');
+      expect(body.textContent).toContain('\u2713');
+    });
+
+    test('left が null で "All" フィルターの場合、right のプロパティのみ表示する', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: null,
+        right: { tag: 'div', key: '#x', method: 'id', styles: { display: 'block' } },
+        diffs: [],
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('display');
+    });
+
+    test('right が null で "All" フィルターの場合、left のプロパティのみ表示する', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: { color: 'red' } },
+        right: null,
+        diffs: [],
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('color');
+    });
+
+    test('styles のプロパティ値が空文字の場合、空文字にフォールバックする', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: { color: '' } },
+        right: { tag: 'div', key: '#x', method: 'id', styles: { color: '' } },
+        diffs: [],
+        error: null,
+      });
+      document.getElementById('css-inspect-filter-all')!.click();
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      expect(body.innerHTML).toContain('color');
     });
   });
 
@@ -525,6 +842,30 @@ describe('renderer/css-compare', () => {
       const toast = document.getElementById('toast')!;
       expect(toast.className).toContain('toast-error');
       expect(toast.textContent).toContain('timeout');
+    });
+  });
+
+  // ===== Diff-only フィルターで diffs が null の場合 =====
+  describe('Diff フィルターのエッジケース', () => {
+    test('diffs が null で diff-only フィルターの場合、空メッセージを表示する', () => {
+      init();
+      callbacks['css-inspect-result']({
+        left: { tag: 'div', key: '#x', method: 'id', styles: { color: 'red' } },
+        right: { tag: 'div', key: '#x', method: 'id', styles: { color: 'red' } },
+        diffs: null,
+        error: null,
+      });
+      const body = document.getElementById('css-inspect-drawer-body')!;
+      // diffs is null → rows = [] → "No matching properties"
+      expect(body.innerHTML).toContain('No matching properties');
+    });
+  });
+
+  // ===== module.exports 分岐 =====
+  describe('module.exports', () => {
+    test('module が定義されている場合 initCssCompare をエクスポートする', () => {
+      const { initCssCompare } = require('../../src/renderer/scripts/css-compare');
+      expect(typeof initCssCompare).toBe('function');
     });
   });
 });

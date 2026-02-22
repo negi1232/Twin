@@ -201,4 +201,54 @@ describe('RegRunner Module', () => {
     expect(mIndex).toBeGreaterThan(-1);
     expect(args[mIndex + 1]).toBe('0');
   });
+
+  test('JSONパース失敗時にexecErrorがあればエラーメッセージに含める', async () => {
+    fs.readFile.mockRejectedValue(new Error('ENOENT'));
+    execFile.mockImplementation((_cmd: any, _args: any, callback: any) => {
+      callback(new Error('Process exited with code 2'), '', '');
+    });
+
+    await expect(runRegCli('/tmp/snapshots')).rejects.toThrow('execError: Process exited with code 2');
+  });
+
+  test('JSONパース失敗時にexecErrorとstderrの両方があればエラーメッセージに両方含める', async () => {
+    fs.readFile.mockRejectedValue(new Error('ENOENT'));
+    execFile.mockImplementation((_cmd: any, _args: any, callback: any) => {
+      callback(new Error('Process crashed'), '', 'fatal error output');
+    });
+
+    const promise = runRegCli('/tmp/snapshots');
+    await expect(promise).rejects.toThrow('reg-cli output parse failed');
+    await expect(runRegCli('/tmp/snapshots')).rejects.toThrow('execError: Process crashed');
+
+    // 再度実行してstderrも含まれることを確認
+    try {
+      await runRegCli('/tmp/snapshots');
+    } catch (e: any) {
+      expect(e.message).toContain('reg-cli output parse failed');
+      expect(e.message).toContain('execError: Process crashed');
+      expect(e.message).toContain('stderr: fatal error output');
+    }
+  });
+
+  test('JSONパース失敗時にexecErrorもstderrもなければparse failedのみ', async () => {
+    fs.readFile.mockRejectedValue(new Error('ENOENT'));
+    execFile.mockImplementation((_cmd: any, _args: any, callback: any) => {
+      callback(null, '', '');
+    });
+
+    try {
+      await runRegCli('/tmp/snapshots');
+    } catch (e: any) {
+      expect(e.message).toBe('reg-cli output parse failed: ENOENT');
+      expect(e.message).not.toContain('execError');
+      expect(e.message).not.toContain('stderr');
+    }
+  });
+
+  test('不正なJSONが返された場合にパースエラーで拒否される', async () => {
+    fs.readFile.mockResolvedValue('this is not valid json');
+
+    await expect(runRegCli('/tmp/snapshots')).rejects.toThrow('reg-cli output parse failed');
+  });
 });
