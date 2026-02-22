@@ -5,7 +5,7 @@
  */
 
 /** ツールバーの高さ (px) */
-export const TOOLBAR_HEIGHT: number = 52;
+export const TOOLBAR_HEIGHT: number = 48;
 /** ステータスバーの高さ (px) */
 export const STATUS_BAR_HEIGHT: number = 28;
 /** サイドバーの幅 (px) */

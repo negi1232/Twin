@@ -368,24 +368,24 @@ describe('ipc-handlers integration', () => {
       mockGetSidebarWidth.mockReturnValue(250);
       handlers['set-device-preset']({}, { width: 375, height: 667 });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 250, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 250, y: 48, width: 375, height: 667 })
       );
       expect(mockRightView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 625, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 625, y: 48, width: 375, height: 667 })
       );
-      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(1000, 667 + 52 + 28);
+      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(1000, 667 + 48 + 28);
     });
 
     test('sets bounds without sidebar offset when sidebar is closed', () => {
       mockGetSidebarWidth.mockReturnValue(0);
       handlers['set-device-preset']({}, { width: 375, height: 667 });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 0, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 0, y: 48, width: 375, height: 667 })
       );
       expect(mockRightView.setBounds).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 375, y: 52, width: 375, height: 667 })
+        expect.objectContaining({ x: 375, y: 48, width: 375, height: 667 })
       );
-      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(750, 667 + 52 + 28);
+      expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(750, 667 + 48 + 28);
     });
 
     test('skips null views and window gracefully', () => {
@@ -439,8 +439,8 @@ describe('ipc-handlers integration', () => {
   // ===== set-views-visible =====
   describe('set-views-visible', () => {
     test('hides views by moving offscreen while preserving size', () => {
-      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 52, width: 375, height: 667 });
-      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 52, width: 375, height: 667 });
+      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 48, width: 375, height: 667 });
+      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 48, width: 375, height: 667 });
 
       handlers['set-views-visible']({}, { visible: false });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: -9999, y: -9999, width: 375, height: 667 });
@@ -448,16 +448,16 @@ describe('ipc-handlers integration', () => {
     });
 
     test('restores views to saved bounds', () => {
-      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 52, width: 375, height: 667 });
-      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 52, width: 375, height: 667 });
+      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 48, width: 375, height: 667 });
+      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 375, y: 48, width: 375, height: 667 });
 
       handlers['set-views-visible']({}, { visible: false });
       mockLeftView.setBounds.mockClear();
       mockRightView.setBounds.mockClear();
 
       handlers['set-views-visible']({}, { visible: true });
-      expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: 0, y: 52, width: 375, height: 667 });
-      expect(mockRightView.setBounds).toHaveBeenCalledWith({ x: 375, y: 52, width: 375, height: 667 });
+      expect(mockLeftView.setBounds).toHaveBeenCalledWith({ x: 0, y: 48, width: 375, height: 667 });
+      expect(mockRightView.setBounds).toHaveBeenCalledWith({ x: 375, y: 48, width: 375, height: 667 });
     });
 
     test('handles null views gracefully', () => {
@@ -1162,8 +1162,8 @@ describe('ipc-handlers integration', () => {
     });
 
     test('hide moves views off-screen', () => {
-      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 52, width: 600, height: 400 });
-      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 600, y: 52, width: 600, height: 400 });
+      mockLeftView.getBounds = jest.fn().mockReturnValue({ x: 0, y: 48, width: 600, height: 400 });
+      mockRightView.getBounds = jest.fn().mockReturnValue({ x: 600, y: 48, width: 600, height: 400 });
       handlers['set-views-visible']({}, { visible: false });
       expect(mockLeftView.setBounds).toHaveBeenCalledWith(expect.objectContaining({ x: -9999 }));
       expect(mockRightView.setBounds).toHaveBeenCalledWith(expect.objectContaining({ x: -9999 }));
@@ -1239,7 +1239,7 @@ describe('ipc-handlers integration', () => {
       await handlers['set-device-preset']({}, { width: 375, height: 667 });
       expect(mockMainWindow.setContentSize).toHaveBeenCalledWith(
         0 + 375 * 2,  // sidebarWidth(0) + width*2
-        667 + 52 + 28  // height + toolbar + statusbar
+        667 + 48 + 28  // height + toolbar + statusbar
       );
     });
 
@@ -1487,6 +1487,98 @@ describe('ipc-handlers integration', () => {
       });
       await expect(handlers['create-directory']({}, { dirPath: '/some/path' }))
         .rejects.toThrow('Access denied');
+    });
+  });
+
+  // ===== set-device-preset バリデーション (line 168) =====
+  describe('set-device-preset バリデーション', () => {
+    test('NaN の width を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: NaN, height: 667 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('NaN の height を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: 375, height: NaN }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('width が 0 の場合エラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: 0, height: 667 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('height が負の値の場合エラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: 375, height: -100 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+
+    test('Infinity の width を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-device-preset']({}, { width: Infinity, height: 667 }))
+        .toThrow('Invalid device preset dimensions');
+    });
+  });
+
+  // ===== set-zoom NaN バリデーション (line 326) =====
+  describe('set-zoom NaN バリデーション', () => {
+    test('NaN を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-zoom']({}, { zoom: NaN }))
+        .toThrow('Invalid zoom value');
+    });
+
+    test('Infinity を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-zoom']({}, { zoom: Infinity }))
+        .toThrow('Invalid zoom value');
+    });
+
+    test('-Infinity を渡すとエラーをスローする', () => {
+      expect(() => handlers['set-zoom']({}, { zoom: -Infinity }))
+        .toThrow('Invalid zoom value');
+    });
+  });
+
+  // ===== css-inspect-toggle executeJavaScript 失敗パス (lines 381, 388, 394) =====
+  describe('css-inspect-toggle executeJavaScript 失敗パス', () => {
+    test('有効化時に CSS_INSPECT_SCRIPT の注入が失敗しても正常に返る (line 381)', async () => {
+      mockLeftWebContents.executeJavaScript.mockRejectedValueOnce(new Error('injection failed'));
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: true });
+      expect(result).toEqual({ enabled: true });
+    });
+
+    test('無効化時に CSS_INSPECT_CLEANUP_SCRIPT の実行が失敗しても正常に返る (line 388)', async () => {
+      // まず有効化する
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+
+      // 無効化時に左ビューのクリーンアップが失敗するようモックを設定
+      mockLeftWebContents.executeJavaScript.mockRejectedValueOnce(new Error('cleanup failed'));
+      mockRightView.webContents.executeJavaScript.mockResolvedValueOnce(undefined);
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: false });
+      expect(result).toEqual({ enabled: false });
+    });
+
+    test('無効化時に CLEAR_HIGHLIGHT_SCRIPT の実行が失敗しても正常に返る (line 394)', async () => {
+      // まず有効化する
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+
+      // 無効化時に左ビューのクリーンアップは成功するが、右ビューのハイライト解除が失敗
+      mockLeftWebContents.executeJavaScript.mockResolvedValueOnce(undefined);
+      mockRightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('clear highlight failed'));
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: false });
+      expect(result).toEqual({ enabled: false });
+    });
+
+    test('無効化時に両方の executeJavaScript が失敗しても正常に返る', async () => {
+      // まず有効化する
+      await handlers['css-inspect-toggle']({}, { enabled: true });
+
+      // 両方のスクリプト実行が失敗
+      mockLeftWebContents.executeJavaScript.mockRejectedValueOnce(new Error('cleanup failed'));
+      mockRightView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('clear failed'));
+
+      const result = await handlers['css-inspect-toggle']({}, { enabled: false });
+      expect(result).toEqual({ enabled: false });
     });
   });
 });

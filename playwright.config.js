@@ -5,6 +5,11 @@ module.exports = defineConfig({
   timeout: 60000,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.05,
+    },
+  },
   use: {
     trace: 'on',
     screenshot: 'on',

@@ -9,7 +9,9 @@ const _PRESET_LIST = devicePresets.PRESET_LIST;
 function buildDOM() {
   document.body.innerHTML = `
     <button id="toggle-sidebar"></button>
+    <label class="url-label url-label-expected"><span class="url-dot"></span>Expected</label>
     <input type="text" id="left-url" />
+    <label class="url-label url-label-actual"><span class="url-dot"></span>Actual</label>
     <input type="text" id="right-url" />
     <button id="reload-left"></button>
     <button id="reload-right"></button>
@@ -43,6 +45,7 @@ function buildDOM() {
       <div id="sidebar-tree" class="sidebar-tree"></div>
     </div>
     <div id="settings-modal" class="modal hidden">
+      <button class="btn btn-icon modal-close-btn" id="settings-close">&times;</button>
       <input id="setting-matching-threshold" value="0" />
       <input id="setting-threshold-rate" value="0" />
       <input id="setting-snapshot-dir" value="./snapshots" />
@@ -51,6 +54,7 @@ function buildDOM() {
     </div>
     <button id="new-report-btn"></button>
     <div id="new-report-modal" class="modal hidden">
+      <button class="btn btn-icon modal-close-btn" id="new-report-close">&times;</button>
       <div id="new-report-folder-info" class="form-info hidden">
         <span class="form-info-label">Save to</span>
         <span id="new-report-folder-path" class="form-info-value"></span>
@@ -66,7 +70,7 @@ function buildDOM() {
     </div>
     <span id="status-size">-- x --</span>
     <span id="status-zoom">Zoom: 100%</span>
-    <span id="status-sync">Sync: ON</span>
+    <span id="status-sync"><span class="status-dot status-dot-on"></span>Sync: ON</span>
     <span id="status-result">Ready</span>
     <div id="preview-modal" class="modal hidden">
       <div class="modal-overlay" id="preview-overlay"></div>
@@ -363,6 +367,16 @@ describe('ui-controls', () => {
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
     });
 
+    test('閉じるボタンでモーダルを閉じてBrowserViewsを復元する', async () => {
+      init();
+      await flush();
+      document.getElementById('new-report-btn')!.click();
+      api.setViewsVisible.mockClear();
+      document.getElementById('new-report-close')!.click();
+      expect(document.getElementById('new-report-modal')!.classList.contains('hidden')).toBe(true);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+    });
+
     test('Enter key in test name input triggers capture', async () => {
       init();
       await flush();
@@ -573,6 +587,18 @@ describe('ui-controls', () => {
       await flush();
       api.setViewsVisible.mockClear();
       document.getElementById('settings-cancel')!.click();
+      expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
+      expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
+      expect(api.saveSettings).not.toHaveBeenCalled();
+    });
+
+    test('閉じるボタンで設定モーダルを閉じてBrowserViewsを復元する（保存なし）', async () => {
+      init();
+      await flush();
+      document.getElementById('settings-btn')!.click();
+      await flush();
+      api.setViewsVisible.mockClear();
+      document.getElementById('settings-close')!.click();
       expect(document.getElementById('settings-modal')!.classList.contains('hidden')).toBe(true);
       expect(api.setViewsVisible).toHaveBeenCalledWith({ visible: true });
       expect(api.saveSettings).not.toHaveBeenCalled();
@@ -951,6 +977,21 @@ describe('ui-controls', () => {
       const outputDisplay = document.getElementById('sidebar-output-dir')!;
       expect(outputDisplay.textContent).toBe('snapshots');
       expect(outputDisplay.title).toBe('/home/user/snapshots');
+    });
+
+    test('snapshotDirが未設定の場合、出力ディレクトリ表示が「Not set」になる', async () => {
+      api.getSettings.mockResolvedValue({
+        leftUrl: 'http://localhost:3000',
+        rightUrl: 'http://localhost:3001',
+        matchingThreshold: 0,
+        thresholdRate: 0,
+        snapshotDir: '',
+      });
+      init();
+      await flush();
+      const outputDisplay = document.getElementById('sidebar-output-dir')!;
+      expect(outputDisplay.textContent).toBe('Not set');
+      expect(outputDisplay.title).toBe('');
     });
 
     test('relative snapshotDir does not auto-load tree', async () => {
