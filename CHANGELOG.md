@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.2] - 2026-02-22
+
+### Added
+- E2E テスト拡充（サイドバー、レポート、ズーム、モーダル操作）
+
+### Changed
+- レンダラー UI をモダンダークテーマに刷新
+
+### Fixed
+- Windows ビルド用アイコンサイズの修正、リリースマトリクスに `fail-fast: false` を追加
+
+## [1.13.1] - 2026-02-22
+
+### Fixed
+- リリースワークフローの CI/CD パイプラインを包括的に修正
+- electron-builder の出力ディレクトリを `dist-release` に変更
+- リリースワークフローの E2E テスト前に TypeScript ビルドステップを追加
+
+## [1.13.0] - 2026-02-13
+
+### Added
+- レンダラーのテストカバレッジを追加し、テストギャップを補完
+
+### Changed
+- コードベースを JavaScript から TypeScript に移行
+- テストファイルをすべて TypeScript に移行
+- ESLint から Biome へリンター・フォーマッターを移行
+- レンダラー UI を CSS 比較機能を主軸とした構成に変更
+- アプリタイトルを「Twin - CSS Comparison Tool」に統一
+
+### Fixed
+- 非 null アサーション（`!`）を型安全なガードに置き換え
+- ts-jest のカバレッジマッピング修正（ベース tsconfig を使用）
+- E2E テストのエントリポイントを `src/` から `dist/` に更新
+
+### Refactored
+- 定数の DRY 化、再エクスポートの整理、サイレント catch の修正
+- モジュール重複の排除、デッドコード削除、エラーハンドリング改善
+- コードレビュー指摘に基づく品質改善（main, renderer, shared）
+
+## [1.12.0] - 2026-02-12
+
+### Changed
+- CSS 比較レポート UI の改善
+
+## [1.11.0] - 2026-02-12
+
+### Added
+- CSS 比較機能の追加（Computed Style 収集・差分検出）
+- Playwright デモ動画シナリオの追加
+- コードベース全体の包括的テストを追加
+
+### Fixed
+- CSS スキャンレポートの XSS 防止とセレクタエスケープの改善
+
 ## [1.10.0] - 2026-02-11
 
 ### Added
