@@ -13,6 +13,9 @@ import type { WebContentsView } from 'electron';
 /** 同期メッセージの識別プレフィックス */
 const SYNC_PREFIX: string = '__twin_sync__';
 
+/** ヘルスチェック間隔（ミリ秒） */
+const HEALTH_CHECK_INTERVAL = 3000;
+
 interface ScrollData {
   scrollX: number;
   scrollY: number;
@@ -49,6 +52,11 @@ interface KeyData {
   meta: boolean;
 }
 
+interface NavigateData {
+  url: string;
+  pathname: string;
+}
+
 type SyncMessage =
   | { type: 'scroll'; data: ScrollData }
   | { type: 'elementscroll'; data: ElementScrollData }
@@ -56,7 +64,8 @@ type SyncMessage =
   | { type: 'click'; data: ClickData }
   | { type: 'inputvalue'; data: InputValueData }
   | { type: 'keydown'; data: KeyData }
-  | { type: 'keyup'; data: KeyData };
+  | { type: 'keyup'; data: KeyData }
+  | { type: 'navigate'; data: NavigateData };
 
 export interface SyncManager {
   start(): void;
@@ -76,6 +85,7 @@ export interface SyncManager {
   _replayClick(data: ClickData): void;
   _replayInputValue(data: InputValueData): void;
   _replayKey(type: string, data: KeyData): void;
+  _replayNavigate(data: NavigateData): void;
 }
 
 /**
@@ -235,6 +245,34 @@ const INJECTION_SCRIPT: string = `
       meta: e.metaKey,
     });
   }, true);
+
+  // --- SPA navigation detection (pushState / replaceState / popstate) ---
+  var lastSentHref = location.href;
+  function notifyNavigation() {
+    var href = location.href;
+    if (href !== lastSentHref) {
+      lastSentHref = href;
+      send('navigate', { url: href, pathname: location.pathname });
+    }
+  }
+
+  var origPushState = history.pushState;
+  history.pushState = function() {
+    var result = origPushState.apply(this, arguments);
+    notifyNavigation();
+    return result;
+  };
+
+  var origReplaceState = history.replaceState;
+  history.replaceState = function() {
+    var result = origReplaceState.apply(this, arguments);
+    notifyNavigation();
+    return result;
+  };
+
+  window.addEventListener('popstate', function() {
+    notifyNavigation();
+  });
 })();
 `;
 
@@ -314,6 +352,9 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
         break;
       case 'keyup':
         replayKey('keyUp', parsed.data);
+        break;
+      case 'navigate':
+        replayNavigate(parsed.data);
         break;
     }
   }
@@ -456,11 +497,53 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
     }
   }
 
+  function replayNavigate(data: NavigateData): void {
+    if (navSyncSuppressed) return;
+    try {
+      const rightUrl = new URL(rightView.webContents.getURL());
+      const leftUrl = new URL(data.url);
+      rightUrl.pathname = leftUrl.pathname;
+      rightUrl.search = leftUrl.search;
+      rightUrl.hash = leftUrl.hash;
+      rightView.webContents
+        .loadURL(rightUrl.toString())
+        .catch((err: Error) => console.error('Sync navigate failed:', err.message));
+    } catch {
+      console.error('Sync navigate failed: invalid URL');
+    }
+  }
+
   function inject(): void {
     if (!leftView || leftView.webContents.isDestroyed()) return;
     leftView.webContents
       .executeJavaScript(INJECTION_SCRIPT)
       .catch((err: Error) => console.error('Sync replay failed:', err.message));
+  }
+
+  let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startHealthCheck(): void {
+    if (healthCheckTimer) return;
+    healthCheckTimer = setInterval(() => {
+      if (!leftView || leftView.webContents.isDestroyed()) return;
+      leftView.webContents
+        .executeJavaScript('!!window.__twinSyncInjected')
+        .then((alive: boolean) => {
+          if (!alive) {
+            inject();
+          }
+        })
+        .catch(() => {
+          // View may be navigating, ignore
+        });
+    }, HEALTH_CHECK_INTERVAL);
+  }
+
+  function stopHealthCheck(): void {
+    if (healthCheckTimer) {
+      clearInterval(healthCheckTimer);
+      healthCheckTimer = null;
+    }
   }
 
   function start(): void {
@@ -474,9 +557,12 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
 
     // Inject immediately in case page is already loaded
     inject();
+
+    startHealthCheck();
   }
 
   function stop(): void {
+    stopHealthCheck();
     if (!leftView || leftView.webContents.isDestroyed()) return;
     leftView.webContents.removeListener('did-finish-load', inject);
     leftView.webContents.removeListener('console-message', handleMessage);
@@ -501,7 +587,8 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
     _replayClick: replayClick,
     _replayInputValue: replayInputValue,
     _replayKey: replayKey,
+    _replayNavigate: replayNavigate,
   };
 }
 
-export { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, escapeForScript };
+export { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, HEALTH_CHECK_INTERVAL, escapeForScript };
