@@ -1,17 +1,22 @@
 {
   "name": "twin",
-  "version": "1.12.0",
-  "description": "Visual Regression Testing Desktop App - Compare Git branches side by side",
-  "main": "src/main/index.js",
+  "version": "1.13.2",
+  "description": "CSS Comparison Tool - Compare Computed Styles across two localhost views in real time",
+  "main": "dist/main/index.js",
   "scripts": {
-    "start": "electron src/main/index.js",
-    "dev": "electron src/main/index.js --dev",
+    "build:ts": "rm -rf dist && tsc && cp src/renderer/index.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/",
+    "start": "npm run build:ts && electron dist/main/index.js",
+    "dev": "npm run build:ts && electron dist/main/index.js --dev",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
-    "lint": "eslint src/",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/",
+    "build:mac": "npm run build:ts && electron-builder --mac",
+    "build:win": "npm run build:ts && electron-builder --win",
+    "build:linux": "npm run build:ts && electron-builder --linux",
     "prepare": "husky"
   },
   "dependencies": {
@@ -19,13 +24,17 @@
     "reg-cli": "^0.18.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.14",
     "@playwright/test": "^1.40.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.3",
     "electron": "^40.2.1",
     "electron-builder": "^26.7.0",
-    "eslint": "^10.0.0",
     "husky": "^9.1.7",
     "jest": "^30.2.0",
-    "jest-environment-jsdom": "^30.2.0"
+    "jest-environment-jsdom": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
   },
   "author": "negi1232",
   "license": "MIT",
@@ -40,23 +49,6 @@
   "overrides": {
     "reg-cli": {
       "del": "^6.1.1"
-    }
-  },
-  "build": {
-    "appId": "com.negi1232.twin",
-    "productName": "Twin",
-    "directories": {
-      "buildResources": "build"
-    },
-    "mac": {
-      "icon": "build/icon.icns",
-      "category": "public.app-category.developer-tools"
-    },
-    "win": {
-      "icon": "build/icon.ico"
-    },
-    "linux": {
-      "icon": "build/icon.png"
     }
   }
 }

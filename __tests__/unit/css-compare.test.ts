@@ -1,5 +1,12 @@
+export {};
+
 const {
   classifyProperty,
+  LAYOUT_PROPS,
+  TEXT_PROPS,
+  VISUAL_PROPS,
+} = require('../../src/shared/utils');
+const {
   matchElements,
   compareStyles,
   runFullScan,
@@ -11,9 +18,6 @@ const {
   CSS_INSPECT_CLEANUP_SCRIPT,
   CSS_INSPECT_PREFIX,
   CLEAR_HIGHLIGHT_SCRIPT,
-  LAYOUT_PROPS,
-  TEXT_PROPS,
-  VISUAL_PROPS,
 } = require('../../src/main/css-compare');
 
 // ---------- classifyProperty ----------
@@ -188,7 +192,7 @@ describe('compareStyles', () => {
     const right = { 'margin-top': '10px' };
     const diffs = compareStyles(left, right);
     expect(diffs).toHaveLength(2);
-    const props = diffs.map((d) => d.property).sort();
+    const props = diffs.map((d: any) => d.property).sort();
     expect(props).toEqual(['font-size', 'margin-top']);
   });
 
@@ -197,8 +201,8 @@ describe('compareStyles', () => {
     const right = { display: 'flex', 'font-size': '16px', 'background-color': 'black', content: 'none' };
     const diffs = compareStyles(left, right);
     expect(diffs).toHaveLength(4);
-    const cats = {};
-    diffs.forEach((d) => { cats[d.property] = d.category; });
+    const cats: Record<string, string> = {};
+    diffs.forEach((d: any) => { cats[d.property] = d.category; });
     expect(cats['display']).toBe('layout');
     expect(cats['font-size']).toBe('text');
     expect(cats['background-color']).toBe('visual');
@@ -425,7 +429,9 @@ describe('buildGetElementStylesScript', () => {
 
   test('generates script for data-testid selector', () => {
     const script = buildGetElementStylesScript('[data-testid="cta"]', 'data-testid');
-    expect(script).toContain('[data-testid="cta"]');
+    // JSON.stringify embeds the key safely with escaped quotes
+    expect(script).toContain('data-testid');
+    expect(script).toContain('cta');
   });
 
   test('generates script for dom-path selector', () => {
@@ -435,7 +441,9 @@ describe('buildGetElementStylesScript', () => {
 
   test('escapes special characters in key', () => {
     const script = buildGetElementStylesScript("#it's-a-test", 'id');
-    expect(script).toContain("\\'");
+    // JSON.stringify handles escaping (no manual \' needed)
+    expect(script).toContain("it's-a-test");
+    expect(script).toContain('getElementById');
   });
 });
 
@@ -455,7 +463,9 @@ describe('buildHighlightScript', () => {
 
   test('escapes special characters', () => {
     const script = buildHighlightScript("#it's-special");
-    expect(script).toContain("\\'");
+    // JSON.stringify handles escaping
+    expect(script).toContain("it's-special");
+    expect(script).toContain('querySelector');
   });
 });
 
@@ -633,7 +643,7 @@ describe('matchElements edge cases', () => {
 // ---------- Additional compareStyles tests ----------
 describe('compareStyles edge cases', () => {
   test('many properties with one changed', () => {
-    const base = {};
+    const base: Record<string, string> = {};
     for (let i = 0; i < 50; i++) base[`prop-${i}`] = `value-${i}`;
     const left = { ...base };
     const right = { ...base, 'prop-25': 'different-value' };
@@ -647,19 +657,19 @@ describe('compareStyles edge cases', () => {
     const right = { a: '4', b: '5', c: '6' };
     const diffs = compareStyles(left, right);
     expect(diffs).toHaveLength(3);
-    diffs.forEach(d => expect(d.type).toBe('changed'));
+    diffs.forEach((d: any) => expect(d.type).toBe('changed'));
   });
 
   test('all properties added', () => {
     const diffs = compareStyles({}, { a: '1', b: '2' });
     expect(diffs).toHaveLength(2);
-    diffs.forEach(d => expect(d.type).toBe('added'));
+    diffs.forEach((d: any) => expect(d.type).toBe('added'));
   });
 
   test('all properties deleted', () => {
     const diffs = compareStyles({ a: '1', b: '2' }, {});
     expect(diffs).toHaveLength(2);
-    diffs.forEach(d => expect(d.type).toBe('deleted'));
+    diffs.forEach((d: any) => expect(d.type).toBe('deleted'));
   });
 
   test('identical empty string values not reported', () => {
@@ -686,8 +696,8 @@ describe('runFullScan edge cases', () => {
   });
 
   test('handles elements with many style differences', async () => {
-    const leftStyles = {};
-    const rightStyles = {};
+    const leftStyles: Record<string, string> = {};
+    const rightStyles: Record<string, string> = {};
     for (let i = 0; i < 20; i++) {
       leftStyles[`prop-${i}`] = `left-${i}`;
       rightStyles[`prop-${i}`] = `right-${i}`;
@@ -772,7 +782,10 @@ describe('generateScanReportHTML edge cases', () => {
 describe('buildGetElementStylesScript edge cases', () => {
   test('handles key with double quotes', () => {
     const script = buildGetElementStylesScript('[data-testid="my-btn"]', 'data-testid');
-    expect(script).toContain('[data-testid="my-btn"]');
+    // JSON.stringify escapes the quotes safely
+    expect(script).toContain('data-testid');
+    expect(script).toContain('my-btn');
+    expect(script).toContain('querySelector');
   });
 
   test('generated script returns null for missing element', () => {

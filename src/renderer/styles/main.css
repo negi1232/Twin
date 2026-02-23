@@ -55,7 +55,8 @@ body {
   justify-content: space-between;
   height: 52px;
   padding: 0 12px;
-  padding-left: 12px;
+  padding-left: 48px;
+  position: relative;
   background: var(--bg-elevated);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -271,7 +272,11 @@ body.sidebar-open #status-bar {
    Sidebar Toggle Button
    ============================================ */
 .toolbar-toggle {
-  flex: 0 0 auto;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
 }
 
 /* ============================================

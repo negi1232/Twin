@@ -1,16 +1,18 @@
+export {};
+
 const { createSyncManager, SYNC_PREFIX, escapeForScript } = require('../../src/main/sync-manager');
 
 function createMockView() {
-  const listeners = {};
+  const listeners: Record<string, any[]> = {};
   return {
     webContents: {
-      on: jest.fn((event, cb) => {
+      on: jest.fn((event: any, cb: any) => {
         if (!listeners[event]) listeners[event] = [];
         listeners[event].push(cb);
       }),
-      removeListener: jest.fn((event, cb) => {
+      removeListener: jest.fn((event: any, cb: any) => {
         if (listeners[event]) {
-          listeners[event] = listeners[event].filter((l) => l !== cb);
+          listeners[event] = listeners[event].filter((l: any) => l !== cb);
         }
       }),
       executeJavaScript: jest.fn().mockResolvedValue(undefined),
@@ -19,14 +21,16 @@ function createMockView() {
       getZoomFactor: jest.fn(() => 1.0),
     },
     _listeners: listeners,
-    _emit(event, ...args) {
-      (listeners[event] || []).forEach((cb) => cb(...args));
+    _emit(event: any, ...args: any[]) {
+      (listeners[event] || []).forEach((cb: any) => cb(...args));
     },
   };
 }
 
 describe('SyncManager', () => {
-  let leftView, rightView, manager;
+  let leftView: any;
+  let rightView: any;
+  let manager: any;
 
   beforeEach(() => {
     leftView = createMockView();
@@ -764,19 +768,21 @@ describe('escapeForScript', () => {
 
 // --- Additional SyncManager edge case tests ---
 describe('SyncManager edge cases', () => {
-  let leftView, rightView, manager;
+  let leftView: any;
+  let rightView: any;
+  let manager: any;
 
   function createMockView2() {
-    const listeners = {};
+    const listeners: Record<string, any[]> = {};
     return {
       webContents: {
-        on: jest.fn((event, cb) => {
+        on: jest.fn((event: any, cb: any) => {
           if (!listeners[event]) listeners[event] = [];
           listeners[event].push(cb);
         }),
-        removeListener: jest.fn((event, cb) => {
+        removeListener: jest.fn((event: any, cb: any) => {
           if (listeners[event]) {
-            listeners[event] = listeners[event].filter((l) => l !== cb);
+            listeners[event] = listeners[event].filter((l: any) => l !== cb);
           }
         }),
         executeJavaScript: jest.fn().mockResolvedValue(undefined),
@@ -785,8 +791,8 @@ describe('SyncManager edge cases', () => {
         getZoomFactor: jest.fn(() => 1.0),
       },
       _listeners: listeners,
-      _emit(event, ...args) {
-        (listeners[event] || []).forEach((cb) => cb(...args));
+      _emit(event: any, ...args: any[]) {
+        (listeners[event] || []).forEach((cb: any) => cb(...args));
       },
     };
   }

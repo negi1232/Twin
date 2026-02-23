@@ -1,3 +1,5 @@
+export {};
+
 const {
   isSyncEnabled,
   toggleSync,
@@ -83,10 +85,10 @@ describe('Sync Module', () => {
   });
 
   test('extractPathFromUrl returns / for null', () => {
-    expect(extractPathFromUrl(null)).toBe('/');
+    expect(extractPathFromUrl(null as any)).toBe('/');
   });
 
   test('extractPathFromUrl returns / for undefined', () => {
-    expect(extractPathFromUrl(undefined)).toBe('/');
+    expect(extractPathFromUrl(undefined as any)).toBe('/');
   });
 });

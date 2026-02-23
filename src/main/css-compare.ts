@@ -1,54 +1,59 @@
-// CSS property category sets
-const LAYOUT_PROPS = new Set([
-  'display', 'position', 'top', 'right', 'bottom', 'left',
-  'float', 'clear', 'z-index', 'overflow', 'overflow-x', 'overflow-y',
-  'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-  'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-  'border-width', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
-  'flex', 'flex-grow', 'flex-shrink', 'flex-basis', 'flex-direction', 'flex-wrap',
-  'justify-content', 'align-items', 'align-self', 'align-content',
-  'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
-  'gap', 'row-gap', 'column-gap',
-  'box-sizing', 'vertical-align',
-]);
+import { classifyProperty } from '../shared/utils';
 
-const TEXT_PROPS = new Set([
-  'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
-  'line-height', 'letter-spacing', 'word-spacing', 'text-align', 'text-decoration',
-  'text-transform', 'text-indent', 'text-shadow', 'white-space', 'word-break',
-  'word-wrap', 'overflow-wrap', 'color', 'direction', 'unicode-bidi',
-  'writing-mode',
-]);
-
-const VISUAL_PROPS = new Set([
-  'background', 'background-color', 'background-image', 'background-position',
-  'background-size', 'background-repeat',
-  'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-  'border-style', 'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
-  'border-radius', 'border-top-left-radius', 'border-top-right-radius',
-  'border-bottom-left-radius', 'border-bottom-right-radius',
-  'box-shadow', 'opacity', 'visibility',
-  'outline', 'outline-color', 'outline-style', 'outline-width',
-  'transform', 'transition', 'animation',
-  'cursor', 'filter', 'backdrop-filter',
-]);
-
-/**
- * Classify a CSS property into a category.
- */
-function classifyProperty(prop) {
-  if (LAYOUT_PROPS.has(prop)) return 'layout';
-  if (TEXT_PROPS.has(prop)) return 'text';
-  if (VISUAL_PROPS.has(prop)) return 'visual';
-  return 'other';
+export interface CssElement {
+  tag: string;
+  key: string;
+  method: string;
+  styles: Record<string, string>;
 }
+
+export interface CssDiff {
+  property: string;
+  expected: string;
+  actual: string;
+  category: string;
+  type: string;
+}
+
+interface CssChangedElement {
+  tag: string;
+  key: string;
+  method: string;
+  type: string;
+  diffCount: number;
+  diffs: CssDiff[];
+}
+
+interface CssElementInfo {
+  tag: string;
+  key: string;
+  method: string;
+  type: string;
+}
+
+interface MatchResult {
+  matched: Array<{ left: CssElement; right: CssElement }>;
+  added: CssElement[];
+  deleted: CssElement[];
+}
+
+export interface CssScanResult {
+  scannedElements: number;
+  leftCount: number;
+  rightCount: number;
+  changed: CssChangedElement[];
+  added: CssElementInfo[];
+  deleted: CssElementInfo[];
+  summary: ScanSummary;
+}
+
+import type { WebContentsView } from 'electron';
 
 /**
  * JavaScript to inject into BrowserViews to collect computed styles of all visible elements.
  * Returns an array of { tag, key, method, styles }.
  */
-const CSS_COLLECTION_SCRIPT = `(function() {
+const CSS_COLLECTION_SCRIPT: string = `(function() {
   var META_TAGS = ['SCRIPT', 'STYLE', 'META', 'LINK', 'TITLE', 'HEAD', 'BR', 'HR', 'NOSCRIPT', 'BASE'];
 
   function getDomPath(el) {
@@ -107,7 +112,7 @@ const CSS_COLLECTION_SCRIPT = `(function() {
  * JavaScript to inject into left BrowserView for inspect mode.
  * Adds hover highlights and click interception.
  */
-const CSS_INSPECT_SCRIPT = `(function() {
+const CSS_INSPECT_SCRIPT: string = `(function() {
   if (window.__twinCssInspectActive) return;
   window.__twinCssInspectActive = true;
 
@@ -220,7 +225,7 @@ const CSS_INSPECT_SCRIPT = `(function() {
   };
 })()`;
 
-const CSS_INSPECT_CLEANUP_SCRIPT = `(function() {
+const CSS_INSPECT_CLEANUP_SCRIPT: string = `(function() {
   if (typeof window.__twinCssInspectCleanup === 'function') {
     window.__twinCssInspectCleanup();
   }
@@ -229,16 +234,19 @@ const CSS_INSPECT_CLEANUP_SCRIPT = `(function() {
 /**
  * Build a script to get computed styles for a single element by its match key.
  */
-function buildGetElementStylesScript(key, method) {
-  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+function buildGetElementStylesScript(key: string, method: string): string {
+  // Use JSON.stringify for safe string embedding (handles all special chars)
+  const safeKey = JSON.stringify(key);
+  const safeMethod = JSON.stringify(method);
   return `(function() {
+    var key = ${safeKey};
+    var method = ${safeMethod};
     var el;
     try {
-      if ('${method}' === 'dom-path') {
-        // For dom-path, use the key as a CSS selector directly
-        el = document.querySelector('${escapedKey}');
+      if (method === 'id') {
+        el = document.getElementById(key.replace(/^#/, ''));
       } else {
-        el = document.querySelector('${escapedKey}');
+        el = document.querySelector(key);
       }
     } catch(e) { return null; }
     if (!el) return null;
@@ -255,15 +263,15 @@ function buildGetElementStylesScript(key, method) {
 /**
  * Build a script to highlight an element in the right view with an orange border.
  */
-function buildHighlightScript(key) {
-  const escapedKey = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+function buildHighlightScript(key: string): string {
+  const safeKey = JSON.stringify(key);
   return `(function() {
     // Remove previous highlight
     var prev = document.getElementById('__twin_right_highlight');
     if (prev) prev.parentNode.removeChild(prev);
 
     var el;
-    try { el = document.querySelector('${escapedKey}'); } catch(e) { return false; }
+    try { el = document.querySelector(${safeKey}); } catch(e) { return false; }
     if (!el) return false;
 
     var rect = el.getBoundingClientRect();
@@ -279,25 +287,25 @@ function buildHighlightScript(key) {
   })()`;
 }
 
-const CLEAR_HIGHLIGHT_SCRIPT = `(function() {
+const CLEAR_HIGHLIGHT_SCRIPT: string = `(function() {
   var prev = document.getElementById('__twin_right_highlight');
   if (prev) prev.parentNode.removeChild(prev);
 })()`;
 
-const CSS_INSPECT_PREFIX = '__twin_css__';
+const CSS_INSPECT_PREFIX: string = '__twin_css__';
 
 /**
  * Match elements between left and right by their keys.
  */
-function matchElements(leftElements, rightElements) {
-  const rightByKey = new Map();
+function matchElements(leftElements: CssElement[], rightElements: CssElement[]): MatchResult {
+  const rightByKey = new Map<string, CssElement>();
   for (const el of rightElements) {
     rightByKey.set(el.key, el);
   }
 
-  const matched = [];
-  const deleted = [];
-  const rightMatched = new Set();
+  const matched: Array<{ left: CssElement; right: CssElement }> = [];
+  const deleted: CssElement[] = [];
+  const rightMatched = new Set<string>();
 
   for (const leftEl of leftElements) {
     const rightEl = rightByKey.get(leftEl.key);
@@ -309,7 +317,7 @@ function matchElements(leftElements, rightElements) {
     }
   }
 
-  const added = [];
+  const added: CssElement[] = [];
   for (const rightEl of rightElements) {
     if (!rightMatched.has(rightEl.key)) {
       added.push(rightEl);
@@ -322,15 +330,15 @@ function matchElements(leftElements, rightElements) {
 /**
  * Compare computed styles and return only the differences.
  */
-function compareStyles(leftStyles, rightStyles) {
-  const diffs = [];
+function compareStyles(leftStyles: Record<string, string>, rightStyles: Record<string, string>): CssDiff[] {
+  const diffs: CssDiff[] = [];
   const allProps = new Set([...Object.keys(leftStyles), ...Object.keys(rightStyles)]);
 
   for (const prop of allProps) {
     const leftVal = leftStyles[prop];
     const rightVal = rightStyles[prop];
     if (leftVal !== rightVal) {
-      let type;
+      let type: string;
       if (leftVal === undefined) {
         type = 'added';
       } else if (rightVal === undefined) {
@@ -354,7 +362,7 @@ function compareStyles(leftStyles, rightStyles) {
 /**
  * Run full scan: collect styles from both views, match elements, compare styles.
  */
-async function runFullScan(leftView, rightView) {
+async function runFullScan(leftView: WebContentsView, rightView: WebContentsView): Promise<CssScanResult> {
   if (!leftView || leftView.webContents.isDestroyed()) {
     throw new Error('Left view is not available');
   }
@@ -362,14 +370,14 @@ async function runFullScan(leftView, rightView) {
     throw new Error('Right view is not available');
   }
 
-  const [leftElements, rightElements] = await Promise.all([
+  const [leftElements, rightElements]: [CssElement[], CssElement[]] = await Promise.all([
     leftView.webContents.executeJavaScript(CSS_COLLECTION_SCRIPT),
     rightView.webContents.executeJavaScript(CSS_COLLECTION_SCRIPT),
   ]);
 
   const { matched, added, deleted } = matchElements(leftElements, rightElements);
 
-  const results = [];
+  const results: CssChangedElement[] = [];
   for (const pair of matched) {
     const diffs = compareStyles(pair.left.styles, pair.right.styles);
     if (diffs.length > 0) {
@@ -406,8 +414,13 @@ async function runFullScan(leftView, rightView) {
 /**
  * Generate self-contained HTML for the scan results window.
  */
-function generateScanReportHTML(scanResult) {
-  const dataJson = JSON.stringify(scanResult).replace(/<\//g, '<\\/');
+function generateScanReportHTML(scanResult: CssScanResult): string {
+  // Escape for safe embedding inside <script>: prevent </script> injection and line terminators
+  const dataJson = JSON.stringify(scanResult)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -598,7 +611,8 @@ function renderFilters() {
 }
 
 function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function filterDiffs(diffs) {
@@ -710,8 +724,7 @@ init();
 </html>`;
 }
 
-module.exports = {
-  classifyProperty,
+export {
   matchElements,
   compareStyles,
   runFullScan,
@@ -723,7 +736,4 @@ module.exports = {
   CSS_INSPECT_CLEANUP_SCRIPT,
   CSS_INSPECT_PREFIX,
   CLEAR_HIGHLIGHT_SCRIPT,
-  LAYOUT_PROPS,
-  TEXT_PROPS,
-  VISUAL_PROPS,
 };

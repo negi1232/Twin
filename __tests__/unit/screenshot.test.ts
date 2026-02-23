@@ -1,3 +1,5 @@
+export {};
+
 jest.mock('fs/promises', () => ({
   mkdir: jest.fn().mockResolvedValue(undefined),
   writeFile: jest.fn().mockResolvedValue(undefined),
@@ -58,10 +60,10 @@ describe('Screenshot Module', () => {
     await captureScreenshots(mockLeftView, mockRightView, '/tmp/snapshots', 'page');
 
     const writeCalls = writeFile.mock.calls;
-    const paths = writeCalls.map(call => call[0]);
+    const paths = writeCalls.map((call: any) => call[0]);
 
-    expect(paths.some(p => p.includes('expected'))).toBe(true);
-    expect(paths.some(p => p.includes('actual'))).toBe(true);
+    expect(paths.some((p: any) => p.includes('expected'))).toBe(true);
+    expect(paths.some((p: any) => p.includes('actual'))).toBe(true);
   });
 
   test('generates unique filenames on successive calls', async () => {
@@ -77,7 +79,7 @@ describe('Screenshot Module', () => {
     await captureScreenshots(mockLeftView, mockRightView, '/tmp/snapshots', 'test');
 
     const writeCalls = writeFile.mock.calls;
-    writeCalls.forEach(call => {
+    writeCalls.forEach((call: any) => {
       expect(Buffer.isBuffer(call[1])).toBe(true);
     });
   });
@@ -86,8 +88,8 @@ describe('Screenshot Module', () => {
     await captureScreenshots(mockLeftView, mockRightView, '/snapshots/custom', 'page');
 
     const writeCalls = writeFile.mock.calls;
-    const paths = writeCalls.map(call => call[0]);
-    paths.forEach(p => {
+    const paths = writeCalls.map((call: any) => call[0]);
+    paths.forEach((p: any) => {
       expect(p).toContain('/snapshots/custom');
     });
   });
@@ -100,7 +102,7 @@ describe('Screenshot Module', () => {
   test('both mkdir calls use recursive: true', async () => {
     await captureScreenshots(mockLeftView, mockRightView, '/tmp/snapshots', 'test');
     expect(mkdir).toHaveBeenCalledTimes(2);
-    mkdir.mock.calls.forEach(call => {
+    mkdir.mock.calls.forEach((call: any) => {
       expect(call[1]).toEqual({ recursive: true });
     });
   });

@@ -1,3 +1,5 @@
+export {};
+
 const { PRESETS, PRESET_LIST, getPresetByIndex } = require('../../src/renderer/scripts/device-presets');
 
 describe('Device Presets', () => {
@@ -10,7 +12,7 @@ describe('Device Presets', () => {
   });
 
   test('each preset has width and height', () => {
-    for (const [name, preset] of Object.entries(PRESETS)) {
+    for (const [name, preset] of Object.entries(PRESETS) as [string, any][]) {
       expect(preset).toHaveProperty('width');
       expect(preset).toHaveProperty('height');
       expect(typeof preset.width).toBe('number');
@@ -58,7 +60,7 @@ describe('Device Presets', () => {
   });
 
   test('PRESET_LIST items have name, width, and height', () => {
-    PRESET_LIST.forEach((preset) => {
+    PRESET_LIST.forEach((preset: any) => {
       expect(preset).toHaveProperty('name');
       expect(preset).toHaveProperty('width');
       expect(preset).toHaveProperty('height');
@@ -77,7 +79,7 @@ describe('Device Presets', () => {
   });
 
   test('PRESET_LIST order matches PRESETS keys', () => {
-    const names = PRESET_LIST.map((p) => p.name);
+    const names = PRESET_LIST.map((p: any) => p.name);
     expect(names).toEqual(['iPhone SE', 'iPhone 14 Pro', 'iPad', 'Desktop', 'Full HD']);
   });
 
@@ -90,14 +92,14 @@ describe('Device Presets', () => {
   });
 
   test('all preset widths are positive integers', () => {
-    PRESET_LIST.forEach((preset) => {
+    PRESET_LIST.forEach((preset: any) => {
       expect(Number.isInteger(preset.width)).toBe(true);
       expect(preset.width).toBeGreaterThan(0);
     });
   });
 
   test('all preset heights are positive integers', () => {
-    PRESET_LIST.forEach((preset) => {
+    PRESET_LIST.forEach((preset: any) => {
       expect(Number.isInteger(preset.height)).toBe(true);
       expect(preset.height).toBeGreaterThan(0);
     });

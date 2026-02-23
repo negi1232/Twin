@@ -1,10 +1,12 @@
+export {};
+
 jest.mock('electron-store', () => {
   return jest.fn().mockImplementation(() => {
-    const data = {};
+    const data: Record<string, any> = {};
     return {
-      get: jest.fn((key, defaultValue) => data[key] !== undefined ? data[key] : defaultValue),
-      set: jest.fn((key, value) => { data[key] = value; }),
-      delete: jest.fn((key) => { delete data[key]; }),
+      get: jest.fn((key: string, defaultValue: any) => data[key] !== undefined ? data[key] : defaultValue),
+      set: jest.fn((key: string, value: any) => { data[key] = value; }),
+      delete: jest.fn((key: string) => { delete data[key]; }),
     };
   });
 });
@@ -78,11 +80,11 @@ describe('Store Module', () => {
     expect(store.set).toHaveBeenCalledWith('leftUrl', 'http://x.com');
   });
 
-  test('getSettings returns all five expected keys', () => {
+  test('getSettings returns all expected keys', () => {
     const settings = getSettings();
     const keys = Object.keys(settings);
     expect(keys.sort()).toEqual([
-      'leftUrl', 'matchingThreshold', 'rightUrl', 'snapshotDir', 'thresholdRate',
+      'leftUrl', 'matchingThreshold', 'rightUrl', 'sidebarFolderPath', 'snapshotDir', 'thresholdRate',
     ]);
   });
 

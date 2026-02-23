@@ -20,6 +20,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run build:ts
       - run: npx playwright install --with-deps chromium
       - run: xvfb-run --auto-servernum npm run test:e2e
 
@@ -28,8 +29,9 @@ jobs:
     if: github.event.pull_request.merged == true || startsWith(github.ref, 'refs/tags/v')
     needs: e2e-test
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -44,12 +46,15 @@ jobs:
         run: npm run build:mac -- --publish never
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npx electron-builder --linux --publish never
+        run: npm run build:linux -- --publish never
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: npm run build:win -- --publish never
       - name: Upload artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: build-${{ matrix.os }}
-          path: dist/
+          path: dist-release/
 
   release:
     name: Create GitHub Release
@@ -70,6 +75,7 @@ jobs:
           cp artifacts/build-ubuntu-latest/*.AppImage release-assets/ 2>/dev/null || true
           cp artifacts/build-ubuntu-latest/*.deb release-assets/ 2>/dev/null || true
           cp artifacts/build-ubuntu-latest/*.snap release-assets/ 2>/dev/null || true
+          cp artifacts/build-windows-latest/*.exe release-assets/ 2>/dev/null || true
           ls -la release-assets/
       - name: Create Release
         env:

@@ -2,13 +2,18 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/__tests__'],
   testMatch: [
-    '**/__tests__/unit/**/*.test.js',
-    '**/__tests__/integration/**/*.test.js',
+    '**/__tests__/unit/**/*.test.ts',
+    '**/__tests__/integration/**/*.test.ts',
   ],
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { diagnostics: false }],
+  },
   collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/main/preload.js',
-    '!src/renderer/**',
+    'src/**/*.ts',
+    '!src/main/preload.ts',
+    '!src/renderer/scripts/app.ts',
+    '!src/types/**',
   ],
   coverageThreshold: {
     global: {

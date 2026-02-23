@@ -6,6 +6,7 @@ snapshots/
 
 # Build output
 dist/
+dist-release/
 out/
 
 # OS files
