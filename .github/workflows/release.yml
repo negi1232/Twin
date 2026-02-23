@@ -29,6 +29,7 @@ jobs:
     if: github.event.pull_request.merged == true || startsWith(github.ref, 'refs/tags/v')
     needs: e2e-test
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
