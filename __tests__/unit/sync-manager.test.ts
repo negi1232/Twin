@@ -1,6 +1,6 @@
 export {};
 
-const { createSyncManager, SYNC_PREFIX, escapeForScript } = require('../../src/main/sync-manager');
+const { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, HEALTH_CHECK_INTERVAL, escapeForScript } = require('../../src/main/sync-manager');
 
 function createMockView() {
   const listeners: Record<string, any[]> = {};
@@ -19,6 +19,8 @@ function createMockView() {
       sendInputEvent: jest.fn(),
       isDestroyed: jest.fn(() => false),
       getZoomFactor: jest.fn(() => 1.0),
+      getURL: jest.fn(() => 'http://localhost:3001/'),
+      loadURL: jest.fn().mockResolvedValue(undefined),
     },
     _listeners: listeners,
     _emit(event: any, ...args: any[]) {
@@ -524,6 +526,86 @@ describe('SyncManager', () => {
     expect(manager.isNavSyncSuppressed()).toBe(true);
   });
 
+  // --- Navigate sync (SPA navigation) ---
+  test('navigate message replays loadURL on right view with updated pathname', () => {
+    rightView.webContents.getURL.mockReturnValue('http://localhost:3001/');
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'navigate',
+      data: { url: 'http://localhost:3000/about', pathname: '/about' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.loadURL).toHaveBeenCalledWith('http://localhost:3001/about');
+  });
+
+  test('navigate message preserves search and hash from left URL', () => {
+    rightView.webContents.getURL.mockReturnValue('http://localhost:3001/');
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'navigate',
+      data: { url: 'http://localhost:3000/page?q=test#section', pathname: '/page' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.loadURL).toHaveBeenCalledWith('http://localhost:3001/page?q=test#section');
+  });
+
+  test('navigate is suppressed when navSyncSuppressed is true', () => {
+    manager.suppressNavSync();
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'navigate',
+      data: { url: 'http://localhost:3000/about', pathname: '/about' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.loadURL).not.toHaveBeenCalled();
+  });
+
+  test('navigate does not replay when disabled', () => {
+    manager.setEnabled(false);
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'navigate',
+      data: { url: 'http://localhost:3000/about', pathname: '/about' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.loadURL).not.toHaveBeenCalled();
+  });
+
+  test('navigate does not replay when paused', () => {
+    manager.pause();
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'navigate',
+      data: { url: 'http://localhost:3000/about', pathname: '/about' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.loadURL).not.toHaveBeenCalled();
+  });
+
+  test('navigate handles loadURL rejection gracefully', async () => {
+    rightView.webContents.getURL.mockReturnValue('http://localhost:3001/');
+    rightView.webContents.loadURL.mockRejectedValueOnce(new Error('load failed'));
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'navigate',
+      data: { url: 'http://localhost:3000/about', pathname: '/about' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.loadURL).toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  test('navigate handles invalid URL gracefully', () => {
+    rightView.webContents.getURL.mockReturnValue('not-a-valid-url');
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'navigate',
+      data: { url: 'also-not-valid', pathname: '/about' },
+    });
+    manager._handleMessage(null, 0, msg);
+
+    expect(rightView.webContents.loadURL).not.toHaveBeenCalled();
+  });
+
   test('nav sync suppression expires after timeout', () => {
     jest.useFakeTimers();
     rightView.webContents.executeJavaScript.mockResolvedValueOnce({ x: 10, y: 20 });
@@ -711,6 +793,111 @@ describe('SyncManager', () => {
     expect(leftView.webContents.executeJavaScript).toHaveBeenCalled();
     await new Promise((r) => setTimeout(r, 0));
   });
+
+  // --- Health check ---
+  test('health check runs periodically after start', () => {
+    jest.useFakeTimers();
+    manager.start();
+    leftView.webContents.executeJavaScript.mockClear();
+
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL);
+    expect(leftView.webContents.executeJavaScript).toHaveBeenCalledWith('!!window.__twinSyncInjected');
+    jest.useRealTimers();
+  });
+
+  test('health check re-injects when script is not alive', async () => {
+    jest.useFakeTimers();
+    manager.start();
+    leftView.webContents.executeJavaScript.mockClear();
+
+    // Health check returns false (script not injected)
+    leftView.webContents.executeJavaScript.mockResolvedValueOnce(false);
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL);
+
+    // Flush the promise
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Second call should be the re-injection (INJECTION_SCRIPT)
+    expect(leftView.webContents.executeJavaScript).toHaveBeenCalledTimes(2);
+    jest.useRealTimers();
+  });
+
+  test('health check skips re-inject when script is alive', async () => {
+    jest.useFakeTimers();
+    manager.start();
+    leftView.webContents.executeJavaScript.mockClear();
+
+    // Health check returns true (script is alive)
+    leftView.webContents.executeJavaScript.mockResolvedValueOnce(true);
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Only the health check call, no re-injection
+    expect(leftView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  test('health check skips when leftView is destroyed', () => {
+    jest.useFakeTimers();
+    manager.start();
+    leftView.webContents.executeJavaScript.mockClear();
+
+    leftView.webContents.isDestroyed.mockReturnValue(true);
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL);
+
+    expect(leftView.webContents.executeJavaScript).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  test('stop clears health check interval', () => {
+    jest.useFakeTimers();
+    manager.start();
+    manager.stop();
+    leftView.webContents.executeJavaScript.mockClear();
+
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL * 3);
+    expect(leftView.webContents.executeJavaScript).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  test('health check handles executeJavaScript rejection gracefully', () => {
+    jest.useFakeTimers();
+    manager.start();
+    leftView.webContents.executeJavaScript.mockClear();
+
+    leftView.webContents.executeJavaScript.mockRejectedValueOnce(new Error('navigating'));
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL);
+
+    // Should not throw
+    expect(leftView.webContents.executeJavaScript).toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  test('health check does not start duplicate intervals', () => {
+    jest.useFakeTimers();
+    manager.start();
+    manager.start(); // second call should not create another interval
+    leftView.webContents.executeJavaScript.mockClear();
+
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL);
+    // Only one health check call (not two)
+    expect(leftView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  test('health check does not start when leftView is null', () => {
+    jest.useFakeTimers();
+    const nullManager = createSyncManager(null, rightView);
+    nullManager.start();
+
+    jest.advanceTimersByTime(HEALTH_CHECK_INTERVAL * 3);
+    // No health check calls since start() returned early
+    expect(leftView.webContents.executeJavaScript).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
 });
 
 describe('escapeForScript', () => {
@@ -789,6 +976,8 @@ describe('SyncManager edge cases', () => {
         sendInputEvent: jest.fn(),
         isDestroyed: jest.fn(() => false),
         getZoomFactor: jest.fn(() => 1.0),
+        getURL: jest.fn(() => 'http://localhost:3001/'),
+        loadURL: jest.fn().mockResolvedValue(undefined),
       },
       _listeners: listeners,
       _emit(event: any, ...args: any[]) {
@@ -963,10 +1152,21 @@ describe('SyncManager edge cases', () => {
   });
 
   test('INJECTION_SCRIPT contains sync prefix', () => {
-    const { INJECTION_SCRIPT } = require('../../src/main/sync-manager');
     expect(typeof INJECTION_SCRIPT).toBe('string');
     expect(INJECTION_SCRIPT.length).toBeGreaterThan(0);
     expect(INJECTION_SCRIPT).toContain(SYNC_PREFIX);
+  });
+
+  test('INJECTION_SCRIPT contains history.pushState monkey-patch', () => {
+    expect(INJECTION_SCRIPT).toContain('history.pushState');
+    expect(INJECTION_SCRIPT).toContain('history.replaceState');
+    expect(INJECTION_SCRIPT).toContain('origPushState');
+    expect(INJECTION_SCRIPT).toContain('origReplaceState');
+  });
+
+  test('INJECTION_SCRIPT contains popstate listener', () => {
+    expect(INJECTION_SCRIPT).toContain('popstate');
+    expect(INJECTION_SCRIPT).toContain('notifyNavigation');
   });
 
   test('SYNC_PREFIX value is correct', () => {
