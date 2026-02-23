@@ -80,11 +80,11 @@ describe('Store Module', () => {
     expect(store.set).toHaveBeenCalledWith('leftUrl', 'http://x.com');
   });
 
-  test('getSettings returns all five expected keys', () => {
+  test('getSettings returns all expected keys', () => {
     const settings = getSettings();
     const keys = Object.keys(settings);
     expect(keys.sort()).toEqual([
-      'leftUrl', 'matchingThreshold', 'rightUrl', 'snapshotDir', 'thresholdRate',
+      'leftUrl', 'matchingThreshold', 'rightUrl', 'sidebarFolderPath', 'snapshotDir', 'thresholdRate',
     ]);
   });
 
