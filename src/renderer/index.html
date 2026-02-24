@@ -37,6 +37,7 @@
         </div>
         <button id="css-scan-btn" class="btn" title="CSS Full Scan (Cmd+Shift+C)">&#x1F3A8; CSS Scan</button>
         <button id="css-inspect-btn" class="btn" title="CSS Inspect Mode (Cmd+I)">&#x1F50D; Inspect</button>
+        <button id="api-capture-btn" class="btn" title="API Mock Capture">&#x1F4E1; API Capture</button>
         <button id="new-report-btn" class="btn" title="New Report">&#x2795; New</button>
         <button id="capture-btn" class="btn" title="Capture & Compare (Cmd+Shift+S)">&#x1F4F7; Capture</button>
         <button id="report-btn" class="btn" title="Open Report (Cmd+Shift+O)">&#x1F4CB; Report</button>
@@ -95,6 +96,8 @@
     <span id="status-zoom">Zoom: 100%</span>
     <span class="status-divider">|</span>
     <span id="status-sync">Sync: ON</span>
+    <span class="status-divider">|</span>
+    <span id="status-api-mock">API: OFF</span>
     <span class="status-divider">|</span>
     <span id="status-result">Ready</span>
   </div>
@@ -215,6 +218,7 @@
   <script src="scripts/device-presets.js"></script>
   <script src="scripts/sync.js"></script>
   <script src="scripts/css-compare.js"></script>
+  <script src="scripts/api-mock-capture.js"></script>
   <script src="scripts/ui-controls.js"></script>
   <script src="scripts/app.js"></script>
 </body>

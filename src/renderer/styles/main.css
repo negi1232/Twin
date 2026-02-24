@@ -1261,3 +1261,18 @@ body.sidebar-open .css-inspect-drawer {
   font-size: 11px;
   color: var(--text-tertiary, #8b949e);
 }
+
+/* ============================================
+   API Mock Capture Button Active State
+   ============================================ */
+#api-capture-btn.api-capture-active {
+  background: rgba(63, 185, 80, 0.15);
+  border-color: rgba(63, 185, 80, 0.4);
+  color: #3fb950;
+}
+
+#api-capture-btn.api-capture-active:hover {
+  background: rgba(63, 185, 80, 0.25);
+  border-color: rgba(63, 185, 80, 0.6);
+}
+

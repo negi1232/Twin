@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload Sync Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      transition: background 0.3s;
+    }
+
+    body.no-file { background: #f0f0f0; }
+    body.has-file { background: #d4edda; }
+
+    #status-banner {
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 32px;
+      font-size: 18px;
+      font-weight: 700;
+      transition: all 0.3s;
+    }
+
+    #status-banner.waiting {
+      background: #fff3cd;
+      color: #856404;
+      border: 2px solid #ffc107;
+    }
+
+    #status-banner.uploaded {
+      background: #28a745;
+      color: #fff;
+      border: 2px solid #1e7e34;
+      font-size: 22px;
+      padding: 24px;
+    }
+
+    #file-display {
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      margin-bottom: 32px;
+      display: none;
+    }
+
+    #file-display.visible { display: block; }
+
+    #file-name-box {
+      background: #fff;
+      border: 3px solid #28a745;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 12px;
+    }
+
+    #file-name-text {
+      font-size: 28px;
+      font-weight: 800;
+      color: #155724;
+      word-break: break-all;
+    }
+
+    #file-meta-text {
+      font-size: 14px;
+      color: #666;
+      margin-top: 8px;
+    }
+
+    .dropzone {
+      width: 100%;
+      max-width: 500px;
+      border: 3px dashed #007bff;
+      border-radius: 16px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      background: #fff;
+    }
+
+    .dropzone:hover {
+      background: #e8f0fe;
+      border-color: #0056b3;
+    }
+
+    .dropzone.has-file {
+      border-color: #28a745;
+      border-style: solid;
+      background: #f0fff4;
+    }
+
+    .dropzone input[type="file"] { display: none; }
+
+    .dropzone-icon { font-size: 48px; margin-bottom: 12px; }
+    .dropzone-label {
+      font-size: 18px;
+      font-weight: 600;
+      color: #007bff;
+    }
+    .dropzone.has-file .dropzone-label { color: #28a745; }
+
+    .dropzone-sub {
+      font-size: 13px;
+      color: #999;
+      margin-top: 8px;
+    }
+
+    .standard-section {
+      width: 100%;
+      max-width: 500px;
+      margin-top: 24px;
+      text-align: center;
+    }
+
+    .standard-section label {
+      display: inline-block;
+      padding: 12px 24px;
+      background: #6c757d;
+      color: #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .standard-section label:hover { background: #545b62; }
+    .standard-section input[type="file"] { display: none; }
+
+    .section-title {
+      font-size: 13px;
+      color: #999;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body class="no-file">
+
+  <div id="status-banner" class="waiting">
+    ファイル未選択
+  </div>
+
+  <div id="file-display">
+    <div id="file-name-box">
+      <div id="file-name-text"></div>
+      <div id="file-meta-text"></div>
+    </div>
+  </div>
+
+  <div class="section-title">react-dropzone パターン</div>
+  <div class="dropzone" id="dropzone1" role="button" tabindex="0">
+    <input type="file" id="file-input-1">
+    <div class="dropzone-icon">+</div>
+    <div class="dropzone-label">ここをクリックしてファイルを選択</div>
+    <div class="dropzone-sub">hidden input + wrapper onClick (react-dropzone と同じ構造)</div>
+  </div>
+
+  <div class="standard-section">
+    <div class="section-title">標準 HTML パターン</div>
+    <label for="file-input-2">
+      ファイルを選択
+      <input type="file" id="file-input-2">
+    </label>
+  </div>
+
+  <script>
+    var statusBanner = document.getElementById('status-banner');
+    var fileDisplay = document.getElementById('file-display');
+    var fileNameText = document.getElementById('file-name-text');
+    var fileMetaText = document.getElementById('file-meta-text');
+    var dropzone1 = document.getElementById('dropzone1');
+    var fileInput1 = document.getElementById('file-input-1');
+    var fileInput2 = document.getElementById('file-input-2');
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      var k = 1024;
+      var sizes = ['B', 'KB', 'MB', 'GB'];
+      var i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function showFile(file) {
+      document.body.className = 'has-file';
+      statusBanner.className = 'uploaded';
+      statusBanner.textContent = 'ファイル選択済み';
+      fileNameText.textContent = file.name;
+      fileMetaText.textContent = formatBytes(file.size) + ' / ' + (file.type || '不明な種類');
+      fileDisplay.className = 'visible';
+      dropzone1.classList.add('has-file');
+    }
+
+    // --- Pattern 1: react-dropzone style ---
+    // CRITICAL: stopPropagation on the file input click to prevent
+    // the click from bubbling back to the dropzone wrapper.
+    // react-dropzone does the same thing — without this, input.click()
+    // triggers a click event that bubbles to the wrapper, which calls
+    // input.click() again, creating an infinite loop.
+    // With CDP interception the dialog doesn't block JS, making the loop fatal.
+    fileInput1.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+
+    dropzone1.addEventListener('click', function() {
+      fileInput1.click();
+    });
+
+    fileInput1.addEventListener('change', function() {
+      if (this.files && this.files[0]) showFile(this.files[0]);
+    });
+
+    // --- Pattern 2: Standard HTML ---
+    fileInput2.addEventListener('change', function() {
+      if (this.files && this.files[0]) showFile(this.files[0]);
+    });
+
+    // --- Polling: detect files set via CDP (DOM.setFileInputFiles) ---
+    var lastKnown = '';
+    setInterval(function() {
+      var f1 = fileInput1.files && fileInput1.files[0];
+      var f2 = fileInput2.files && fileInput2.files[0];
+      var file = f1 || f2;
+      if (file && file.name !== lastKnown) {
+        lastKnown = file.name;
+        showFile(file);
+      }
+    }, 500);
+  </script>
+</body>
+</html>

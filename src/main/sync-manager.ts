@@ -42,6 +42,12 @@ interface InputValueData {
   textContent?: string;
 }
 
+interface FileChangeData {
+  selector: string;
+  paths: string[];
+  names: string[];
+}
+
 interface KeyData {
   key: string;
   code: string;
@@ -63,6 +69,7 @@ type SyncMessage =
   | { type: 'hover'; data: HoverData }
   | { type: 'click'; data: ClickData }
   | { type: 'inputvalue'; data: InputValueData }
+  | { type: 'filechange'; data: FileChangeData }
   | { type: 'keydown'; data: KeyData }
   | { type: 'keyup'; data: KeyData }
   | { type: 'navigate'; data: NavigateData };
@@ -84,8 +91,10 @@ export interface SyncManager {
   _replayHover(data: HoverData): void;
   _replayClick(data: ClickData): void;
   _replayInputValue(data: InputValueData): void;
+  _replayFileChange(data: FileChangeData): Promise<void>;
   _replayKey(type: string, data: KeyData): void;
   _replayNavigate(data: NavigateData): void;
+  _handleCDPEvent(event: unknown, method: string, params: Record<string, unknown>): Promise<void>;
 }
 
 /**
@@ -111,6 +120,10 @@ const INJECTION_SCRIPT: string = `
 (function() {
   if (window.__twinSyncInjected) return;
   window.__twinSyncInjected = true;
+
+  // Disable File System Access API so libraries like react-dropzone
+  // fall back to <input type="file">, which CDP can intercept for file sync.
+  window.showOpenFilePicker = undefined;
 
   function send(type, data) {
     console.log('${SYNC_PREFIX}' + JSON.stringify({ type, data }));
@@ -199,6 +212,16 @@ const INJECTION_SCRIPT: string = `
   window.addEventListener('click', function(e) {
     var el = document.elementFromPoint(e.clientX, e.clientY);
     if (el) {
+      // Skip file inputs — synthetic clicks cannot open file dialogs
+      if (el.tagName === 'INPUT' && el.type === 'file') return;
+      // Skip wrapper elements containing file inputs (e.g. react-dropzone)
+      if (el.querySelector && el.querySelector('input[type="file"]')) return;
+      // Walk up ancestors to catch clicks inside file upload wrappers
+      var ancestor = el.parentElement;
+      for (var ai = 0; ai < 5 && ancestor; ai++) {
+        if (ancestor.querySelector && ancestor.querySelector('input[type="file"]')) return;
+        ancestor = ancestor.parentElement;
+      }
       send('click', {
         selector: getSelector(el),
         button: e.button === 0 ? 'left' : e.button === 1 ? 'middle' : 'right',
@@ -216,6 +239,25 @@ const INJECTION_SCRIPT: string = `
     } else {
       send('inputvalue', { selector: selector, value: el.value });
     }
+  }, true);
+
+  // --- File input sync ---
+  document.addEventListener('change', function(e) {
+    var el = e.target;
+    if (!el || el.tagName !== 'INPUT' || el.type !== 'file') return;
+    var files = el.files;
+    if (!files || files.length === 0) return;
+    var paths = [];
+    var names = [];
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].path) paths.push(files[i].path);
+      names.push(files[i].name);
+    }
+    send('filechange', {
+      selector: getSelector(el),
+      paths: paths,
+      names: names,
+    });
   }, true);
 
   // --- Key sync (for non-form elements: shortcuts, navigation, etc.) ---
@@ -278,12 +320,20 @@ const INJECTION_SCRIPT: string = `
 
 /**
  * SyncManager を生成する。左ビューの操作イベントを右ビューに同期する。
+ * @param showOpenDialog テスト用 DI。省略時は electron.dialog.showOpenDialog を使用。
  */
-function createSyncManager(leftView: WebContentsView, rightView: WebContentsView): SyncManager {
+function createSyncManager(
+  leftView: WebContentsView,
+  rightView: WebContentsView,
+  showOpenDialog?: (options: { properties: string[] }) => Promise<{ canceled: boolean; filePaths: string[] }>,
+): SyncManager {
   let enabled = true;
   let paused = false;
   let navSyncSuppressed = false;
   let navSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingFilePaths: string[] = [];
+  let fileChooserHandling = false;
+  let skipNextFileChangeMessage = false;
 
   function isEnabled(): boolean {
     return enabled;
@@ -346,6 +396,13 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
         break;
       case 'inputvalue':
         replayInputValue(parsed.data);
+        break;
+      case 'filechange':
+        if (skipNextFileChangeMessage) {
+          skipNextFileChangeMessage = false;
+          break;
+        }
+        replayFileChange(parsed.data);
         break;
       case 'keydown':
         replayKey('keyDown', parsed.data);
@@ -513,11 +570,179 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
     }
   }
 
+  async function replayFileChange({ selector, paths }: FileChangeData): Promise<void> {
+    const messagePaths = paths ? paths.filter((p) => typeof p === 'string' && p.length > 0) : [];
+    const effectivePaths = messagePaths.length > 0 ? messagePaths : [...pendingFilePaths];
+    pendingFilePaths = [];
+    if (effectivePaths.length === 0) return;
+
+    const dbg = rightView.webContents.debugger;
+    try {
+      dbg.attach('1.3');
+      const { root } = await dbg.sendCommand('DOM.getDocument');
+      const { nodeId } = await dbg.sendCommand('DOM.querySelector', {
+        nodeId: root.nodeId,
+        selector,
+      });
+      if (nodeId === 0) return;
+      await dbg.sendCommand('DOM.setFileInputFiles', {
+        nodeId,
+        files: effectivePaths,
+      });
+      // DOM.setFileInputFiles fires native change + input events automatically
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Sync file replay failed:', message);
+    } finally {
+      try {
+        dbg.detach();
+      } catch {
+        // already detached
+      }
+    }
+  }
+
+  /** 左ビューのファイルダイアログを CDP でインターセプトする */
+  function setupFileChooserInterception(): void {
+    if (!leftView || leftView.webContents.isDestroyed()) return;
+    const dbg = leftView.webContents.debugger;
+    try {
+      if (!dbg.isAttached()) {
+        dbg.attach('1.3');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('File chooser interception setup failed:', message);
+      return;
+    }
+    dbg
+      .sendCommand('Page.enable')
+      .catch(() => {
+        /* Page.enable may fail in some contexts; continue regardless */
+      })
+      .then(() => dbg.sendCommand('Page.setInterceptFileChooserDialog', { enabled: true }))
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('File chooser interception setup failed:', message);
+      });
+  }
+
+  function teardownFileChooserInterception(): void {
+    if (!leftView || leftView.webContents.isDestroyed()) return;
+    const dbg = leftView.webContents.debugger;
+    try {
+      if (dbg.isAttached()) {
+        dbg.sendCommand('Page.setInterceptFileChooserDialog', { enabled: false }).catch(() => {
+          /* shutting down, ignore */
+        });
+        dbg.detach();
+      }
+    } catch {
+      // already detached
+    }
+  }
+
+  /**
+   * CDP イベントハンドラ。Page.fileChooserOpened を処理する。
+   *
+   * Page.setInterceptFileChooserDialog でインターセプトが有効な場合、
+   * ネイティブダイアログは自動的に抑制される。
+   * 代わりに dialog.showOpenDialog で独自ダイアログを表示し、
+   * DOM.setFileInputFiles({ backendNodeId }) でファイルを直接セットする。
+   * DOM.setFileInputFiles は Chromium のネイティブ change + input イベントを発火する
+   * (FileInputType::SetFilesAndDispatchEvents)。
+   */
+  async function handleCDPEvent(_event: unknown, method: string, params: Record<string, unknown>): Promise<void> {
+    if (method !== 'Page.fileChooserOpened') return;
+    const dbg = leftView.webContents.debugger;
+    const multiple = params.mode === 'selectMultiple';
+    const backendNodeId = params.backendNodeId as number | undefined;
+
+    // When interception is enabled, the native dialog is already suppressed.
+    // No need to "cancel" — just ignore the event when disabled/paused.
+    if (!enabled || paused) return;
+
+    if (fileChooserHandling) return;
+    fileChooserHandling = true;
+
+    try {
+      const openFn =
+        showOpenDialog ||
+        (async (opts: { properties: string[] }) => {
+          const { dialog, BrowserWindow } = require('electron');
+          const win = BrowserWindow.getFocusedWindow();
+          return win ? dialog.showOpenDialog(win, opts) : dialog.showOpenDialog(opts);
+        });
+
+      const result = await openFn({
+        properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return;
+      }
+
+      pendingFilePaths = result.filePaths;
+      skipNextFileChangeMessage = true;
+
+      // Set files on LEFT view using DOM.setFileInputFiles
+      // This fires native change + input events via Chromium's FileInputType::SetFilesAndDispatchEvents
+      if (backendNodeId) {
+        await dbg.sendCommand('DOM.setFileInputFiles', {
+          backendNodeId,
+          files: result.filePaths,
+        });
+      }
+
+      // Find selector for right view sync
+      let selector: string | null = null;
+      if (backendNodeId) {
+        try {
+          const { object } = await dbg.sendCommand('DOM.resolveNode', { backendNodeId });
+          const { result: selectorResult } = await dbg.sendCommand('Runtime.callFunctionOn', {
+            objectId: object.objectId,
+            functionDeclaration: `function() {
+              if (this.id) return '#' + CSS.escape(this.id);
+              if (this.name) return this.tagName.toLowerCase() + '[name="' + CSS.escape(this.name) + '"]';
+              var inputs = document.querySelectorAll('input[type="file"]');
+              if (inputs.length === 1) return 'input[type="file"]';
+              return null;
+            }`,
+            returnByValue: true,
+          });
+          selector = selectorResult.value;
+        } catch {
+          /* selector lookup failed */
+        }
+      }
+
+      // Sync to right view
+      if (selector && rightView && !rightView.webContents.isDestroyed()) {
+        try {
+          const names = result.filePaths.map((p: string) => {
+            const parts = p.split(/[/\\]/);
+            return parts[parts.length - 1] || '';
+          });
+          await replayFileChange({ selector, paths: result.filePaths, names });
+        } catch (syncErr: unknown) {
+          const syncMessage = syncErr instanceof Error ? syncErr.message : String(syncErr);
+          console.error('Direct file sync to right view failed:', syncMessage);
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('File chooser handling failed:', message);
+    } finally {
+      fileChooserHandling = false;
+    }
+  }
+
   function inject(): void {
     if (!leftView || leftView.webContents.isDestroyed()) return;
     leftView.webContents
       .executeJavaScript(INJECTION_SCRIPT)
       .catch((err: Error) => console.error('Sync replay failed:', err.message));
+    setupFileChooserInterception();
   }
 
   let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -555,6 +780,9 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
     // Listen for sync messages from injected script
     leftView.webContents.on('console-message', handleMessage);
 
+    // Listen for CDP events (file chooser interception)
+    leftView.webContents.debugger.on('message', handleCDPEvent);
+
     // Inject immediately in case page is already loaded
     inject();
 
@@ -566,6 +794,12 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
     if (!leftView || leftView.webContents.isDestroyed()) return;
     leftView.webContents.removeListener('did-finish-load', inject);
     leftView.webContents.removeListener('console-message', handleMessage);
+    try {
+      leftView.webContents.debugger.removeListener('message', handleCDPEvent);
+    } catch {
+      /* debugger may not be attached */
+    }
+    teardownFileChooserInterception();
   }
 
   return {
@@ -586,8 +820,10 @@ function createSyncManager(leftView: WebContentsView, rightView: WebContentsView
     _replayHover: replayHover,
     _replayClick: replayClick,
     _replayInputValue: replayInputValue,
+    _replayFileChange: replayFileChange,
     _replayKey: replayKey,
     _replayNavigate: replayNavigate,
+    _handleCDPEvent: handleCDPEvent,
   };
 }
 

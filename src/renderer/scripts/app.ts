@@ -6,4 +6,5 @@
 document.addEventListener('DOMContentLoaded', () => {
   initUIControls();
   initCssCompare();
+  initApiMockCapture();
 });

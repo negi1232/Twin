@@ -69,6 +69,48 @@ interface DevicePreset {
   height: number;
 }
 
+// --- API Mock Capture Interfaces ---
+
+interface CapturedApiEntry {
+  requestId: string;
+  timestamp: number;
+  request: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    body?: unknown;
+  };
+  response: {
+    status: number;
+    headers: Record<string, string>;
+    body: unknown;
+  };
+}
+
+interface CapturedApiGroup {
+  method: string;
+  urlPattern: string;
+  entries: CapturedApiEntry[];
+}
+
+interface ApiMockCaptureUpdateData {
+  count: number;
+  endpoints: string[];
+}
+
+interface ApiMockExportResult {
+  outputDir: string;
+  jsonFiles: string[];
+  handlerFile: string;
+  totalEndpoints: number;
+}
+
+interface ApiMockCaptureStatus {
+  capturing: boolean;
+  count: number;
+  endpoints: string[];
+}
+
 // --- Electron API (exposed via preload contextBridge) ---
 
 interface ElectronAPI {
@@ -105,6 +147,15 @@ interface ElectronAPI {
   onCssInspectResult(cb: (data: CssInspectResultData) => void): void;
   onShortcutCssScan(cb: () => void): void;
   onShortcutCssInspect(cb: () => void): void;
+  // API Mock Capture
+  apiMockOpenWindow(): Promise<void>;
+  apiMockStartCapture(): Promise<{ capturing: boolean }>;
+  apiMockStopCapture(): Promise<{ capturing: boolean }>;
+  apiMockGetStatus(): Promise<ApiMockCaptureStatus>;
+  apiMockGetCapturedData(): Promise<CapturedApiGroup[]>;
+  apiMockExport(payload: { mswVersion: 'v1' | 'v2' }): Promise<ApiMockExportResult | null>;
+  apiMockClear(): Promise<{ success: boolean }>;
+  onApiMockCaptureUpdate(cb: (data: ApiMockCaptureUpdateData) => void): void;
 }
 
 interface RegCliResult {
@@ -138,6 +189,7 @@ declare function isSyncEnabled(): boolean;
 declare function toggleSync(): boolean;
 declare function buildScrollToScript(scrollX: number, scrollY: number): string;
 declare function extractPathFromUrl(url: string): string;
+declare function initApiMockCapture(): void;
 
 // Shared constants (loaded via CommonJS shim in index.html)
 declare const ZOOM_STEP: number;
