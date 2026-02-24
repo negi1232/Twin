@@ -61,6 +61,18 @@ function createApiServer(port, htmlFile) {
   });
 }
 
+async function startTwinAppServers() {
+  const expected = await createServer(3500, 'expected.html');
+  const actual = await createServer(3501, 'actual.html');
+  return { expected, actual };
+}
+
+async function startFileUploadServers() {
+  const expected = await createServer(3300, 'file-upload.html');
+  const actual = await createServer(3301, 'file-upload.html');
+  return { expected, actual };
+}
+
 async function startApiMockServers() {
   const expected = await createApiServer(3400, 'api-mock-page.html');
   const actual = await createApiServer(3401, 'api-mock-page.html');
@@ -78,4 +90,4 @@ function stopServers(...servers) {
   );
 }
 
-module.exports = { createServer, createApiServer, startServers, startDemoServers, startApiMockServers, stopServers };
+module.exports = { createServer, createApiServer, startServers, startDemoServers, startTwinAppServers, startFileUploadServers, startApiMockServers, stopServers };
