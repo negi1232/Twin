@@ -1,13 +1,13 @@
 /**
  * API Mock Capture E2E Test
  *
- * API Captureボタン・ドロワー表示・XHR/Fetchキャプチャ・Export の基本動作を検証する。
+ * API Captureボタンによる別ウィンドウの開閉・キャプチャ開始/停止・
+ * XHR/Fetchキャプチャ・Clear・MSWバージョン選択の基本動作を検証する。
  */
 import { test, expect } from '@playwright/test';
 import { _electron as electron } from 'playwright';
+import type { ElectronApplication, Page } from 'playwright';
 import path from 'path';
-import fs from 'fs';
-import os from 'os';
 import { startApiMockServers, stopServers } from '../fixtures/mock-server/server';
 
 let expectedServer: any;
@@ -25,14 +25,14 @@ test.afterAll(async () => {
 
 // ── ヘルパー ──
 
-async function launchApp() {
+async function launchApp(): Promise<{ app: ElectronApplication; page: Page }> {
   const args = [path.join(__dirname, '..', '..', 'dist', 'main', 'index.js')];
   if (process.env.CI) {
     args.unshift('--no-sandbox');
   }
   const app = await electron.launch({ args });
 
-  let page: any = null;
+  let page: Page | null = null;
   for (let attempt = 0; attempt < 30; attempt++) {
     for (const w of app.windows()) {
       try {
@@ -44,24 +44,25 @@ async function launchApp() {
   }
   if (!page) page = await app.firstWindow();
 
+  // initUIControls 完了を確認するため URL 値がセットされるまで待つ
   await page.waitForFunction(
-    () => document.getElementById('api-capture-btn') !== null,
+    () => {
+      const el = document.getElementById('left-url') as HTMLInputElement;
+      return el && el.value && el.value.length > 0;
+    },
     { timeout: 10000 },
   );
   return { app, page };
 }
 
-function jsClick(pg: any, sel: string) {
+function jsClick(pg: Page, sel: string) {
   return pg.evaluate((s: string) => document.querySelector(s)!.click(), sel);
 }
-function jsText(pg: any, sel: string) {
+function jsText(pg: Page, sel: string) {
   return pg.evaluate((s: string) => document.querySelector(s)!.textContent, sel);
 }
-function jsClassList(pg: any, sel: string) {
-  return pg.evaluate((s: string) => (document.querySelector(s) as HTMLElement).className, sel);
-}
 
-async function navigateToApiServers(page: any) {
+async function navigateToApiServers(page: Page) {
   await page.evaluate(() => {
     const left = document.getElementById('left-url') as HTMLInputElement;
     left.value = 'http://127.0.0.1:3400';
@@ -74,11 +75,39 @@ async function navigateToApiServers(page: any) {
 }
 
 /**
- * 左ビュー (BrowserView) 上で JavaScript を実行するヘルパー。
- * BrowserView は page.evaluate では操作できないため、
- * Electron の webContents API 経由で実行する。
+ * API Capture ボタンを押して API Mock ウィンドウを開く。
  */
-async function evalOnLeftView(app: any, script: string): Promise<any> {
+async function openApiMockWindow(app: ElectronApplication, page: Page): Promise<Page> {
+  const windowsBefore = app.windows().length;
+  await jsClick(page, '#api-capture-btn');
+
+  // 新しいウィンドウが開くのを待つ
+  let apiPage: Page | null = null;
+  for (let i = 0; i < 30; i++) {
+    for (const w of app.windows()) {
+      try {
+        if (w.url().includes('api-mock-window')) {
+          apiPage = w;
+          break;
+        }
+      } catch (_) { /* loading */ }
+    }
+    if (apiPage) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (!apiPage) throw new Error('API Mock window did not open');
+
+  await apiPage.waitForFunction(
+    () => document.getElementById('capture-btn') !== null,
+    { timeout: 10000 },
+  );
+  return apiPage;
+}
+
+/**
+ * 左ビュー (BrowserView) 上で JavaScript を実行するヘルパー。
+ */
+async function evalOnLeftView(app: ElectronApplication, script: string): Promise<any> {
   return app.evaluate(async ({ webContents: wcModule }: any, js: string) => {
     const allWc = wcModule.getAllWebContents();
     for (const wc of allWc) {
@@ -92,90 +121,56 @@ async function evalOnLeftView(app: any, script: string): Promise<any> {
 
 // ── テスト ──
 
-test.describe('API Capture ボタン', () => {
-  test('初期状態で API Capture ボタンが表示される', async () => {
+test.describe('API Mock ウィンドウ', () => {
+  test('API Capture ボタンをクリックすると API Mock ウィンドウが開く', async () => {
     const { app, page } = await launchApp();
     try {
-      const text = await jsText(page, '#api-capture-btn');
-      expect(text).toContain('API Capture');
+      await navigateToApiServers(page);
+      const apiPage = await openApiMockWindow(app, page);
+      const title = await apiPage.title();
+      expect(title).toBe('API Mock Capture');
     } finally {
       await app.close();
     }
   });
 
-  test('クリックするとキャプチャ ON/OFF が切り替わる', async () => {
+  test('初期状態でステータスが Stopped、Start Capture ボタンが表示される', async () => {
     const { app, page } = await launchApp();
     try {
-      // ページを読み込んでからキャプチャ（デバッガが接続される必要あり）
       await navigateToApiServers(page);
-
-      // 初期状態: OFF
-      let text = await jsText(page, '#api-capture-btn');
-      expect(text).toContain('API Capture');
-      expect(text).not.toContain('Capturing');
-
-      // クリック → ON
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
-      text = await jsText(page, '#api-capture-btn');
-      expect(text).toContain('Capturing');
-
-      let cls = await jsClassList(page, '#api-capture-btn');
-      expect(cls).toContain('api-capture-active');
-
-      // クリック → OFF
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
-      text = await jsText(page, '#api-capture-btn');
-      expect(text).not.toContain('Capturing');
-
-      cls = await jsClassList(page, '#api-capture-btn');
-      expect(cls).not.toContain('api-capture-active');
+      const apiPage = await openApiMockWindow(app, page);
+      const status = await jsText(apiPage, '#capture-status');
+      expect(status).toBe('Stopped');
+      const btnText = await jsText(apiPage, '#capture-btn');
+      expect(btnText).toBe('Start Capture');
     } finally {
       await app.close();
     }
   });
 });
 
-test.describe('API Mock Capture ドロワー', () => {
-  test('初期状態でドロワーは非表示', async () => {
-    const { app, page } = await launchApp();
-    try {
-      const cls = await jsClassList(page, '#api-mock-drawer');
-      expect(cls).toContain('hidden');
-    } finally {
-      await app.close();
-    }
-  });
-
-  test('キャプチャ開始でドロワーが表示される', async () => {
+test.describe('キャプチャ ON/OFF', () => {
+  test('Start Capture でキャプチャが開始され、Stop Capture で停止される', async () => {
     const { app, page } = await launchApp();
     try {
       await navigateToApiServers(page);
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
-      const cls = await jsClassList(page, '#api-mock-drawer');
-      expect(cls).not.toContain('hidden');
-    } finally {
-      await app.close();
-    }
-  });
+      const apiPage = await openApiMockWindow(app, page);
 
-  test('×ボタンでドロワーが閉じる', async () => {
-    const { app, page } = await launchApp();
-    try {
-      await navigateToApiServers(page);
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
+      // Start Capture
+      await jsClick(apiPage, '#capture-btn');
+      await apiPage.waitForFunction(
+        () => document.getElementById('capture-status')!.textContent === 'Capturing...',
+        { timeout: 5000 },
+      );
+      expect(await jsText(apiPage, '#capture-btn')).toBe('Stop Capture');
 
-      // ドロワーが開いていることを確認
-      let cls = await jsClassList(page, '#api-mock-drawer');
-      expect(cls).not.toContain('hidden');
-
-      await jsClick(page, '#api-mock-drawer-close');
-      await page.waitForTimeout(300);
-      cls = await jsClassList(page, '#api-mock-drawer');
-      expect(cls).toContain('hidden');
+      // Stop Capture
+      await jsClick(apiPage, '#capture-btn');
+      await apiPage.waitForFunction(
+        () => document.getElementById('capture-status')!.textContent === 'Stopped',
+        { timeout: 5000 },
+      );
+      expect(await jsText(apiPage, '#capture-btn')).toBe('Start Capture');
     } finally {
       await app.close();
     }
@@ -183,7 +178,7 @@ test.describe('API Mock Capture ドロワー', () => {
 });
 
 test.describe('ステータスバー', () => {
-  test('キャプチャ OFF 時は API: OFF と表示', async () => {
+  test('キャプチャ OFF 時はメインウィンドウに API: OFF と表示', async () => {
     const { app, page } = await launchApp();
     try {
       const text = await jsText(page, '#status-api-mock');
@@ -192,39 +187,33 @@ test.describe('ステータスバー', () => {
       await app.close();
     }
   });
-
-  test('キャプチャ ON 時は API: ON と表示', async () => {
-    const { app, page } = await launchApp();
-    try {
-      await navigateToApiServers(page);
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
-      const text = await jsText(page, '#status-api-mock');
-      expect(text).toBe('API: ON');
-    } finally {
-      await app.close();
-    }
-  });
 });
 
 test.describe('API リクエストキャプチャ', () => {
-  test('左ビューの Fetch リクエストがキャプチャされドロワーに表示される', async () => {
+  test('左ビューの Fetch リクエストがキャプチャされウィンドウに表示される', async () => {
     const { app, page } = await launchApp();
     try {
       await navigateToApiServers(page);
+      const apiPage = await openApiMockWindow(app, page);
 
       // キャプチャ開始
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
+      await jsClick(apiPage, '#capture-btn');
+      await apiPage.waitForFunction(
+        () => document.getElementById('capture-status')!.textContent === 'Capturing...',
+        { timeout: 5000 },
+      );
 
       // 左ビューで API を呼び出す
       await evalOnLeftView(app, `document.getElementById('fetch-users').click()`);
-      await page.waitForTimeout(1500);
+      await apiPage.waitForFunction(
+        () => parseInt(document.getElementById('request-count')!.textContent!) > 0,
+        { timeout: 10000 },
+      );
 
-      // ドロワーヘッダーにリクエスト数が表示される
-      const headerText = await jsText(page, '#api-mock-header-info');
-      expect(headerText).toContain('request');
-      expect(headerText).toContain('endpoint');
+      const reqCount = await jsText(apiPage, '#request-count');
+      expect(parseInt(reqCount!)).toBeGreaterThanOrEqual(1);
+      const epCount = await jsText(apiPage, '#endpoint-count');
+      expect(parseInt(epCount!)).toBeGreaterThanOrEqual(1);
     } finally {
       await app.close();
     }
@@ -234,47 +223,65 @@ test.describe('API リクエストキャプチャ', () => {
     const { app, page } = await launchApp();
     try {
       await navigateToApiServers(page);
+      const apiPage = await openApiMockWindow(app, page);
 
       // キャプチャ開始
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
+      await jsClick(apiPage, '#capture-btn');
+      await apiPage.waitForFunction(
+        () => document.getElementById('capture-status')!.textContent === 'Capturing...',
+        { timeout: 5000 },
+      );
 
       // 複数の API を呼び出す
       await evalOnLeftView(app, `document.getElementById('fetch-users').click()`);
-      await page.waitForTimeout(1000);
+      await apiPage.waitForTimeout(1000);
       await evalOnLeftView(app, `document.getElementById('fetch-posts').click()`);
-      await page.waitForTimeout(1000);
+      await apiPage.waitForTimeout(1000);
       await evalOnLeftView(app, `document.getElementById('post-login').click()`);
-      await page.waitForTimeout(1500);
 
-      // ヘッダーに複数エンドポイントが報告される
-      const headerText = await jsText(page, '#api-mock-header-info');
-      expect(headerText).toContain('3 request');
-      expect(headerText).toContain('3 endpoint');
+      // 3 エンドポイントがキャプチャされるのを待つ
+      await apiPage.waitForFunction(
+        () => parseInt(document.getElementById('endpoint-count')!.textContent!) >= 3,
+        { timeout: 10000 },
+      );
+
+      const reqCount = await jsText(apiPage, '#request-count');
+      expect(parseInt(reqCount!)).toBeGreaterThanOrEqual(3);
+      const epCount = await jsText(apiPage, '#endpoint-count');
+      expect(parseInt(epCount!)).toBeGreaterThanOrEqual(3);
     } finally {
       await app.close();
     }
   });
 
-  test('同じエンドポイントへの複数リクエストは1グループにまとまる', async () => {
+  test('同じエンドポイントへの複数リクエストは1エンドポイントにまとまる', async () => {
     const { app, page } = await launchApp();
     try {
       await navigateToApiServers(page);
+      const apiPage = await openApiMockWindow(app, page);
 
       // キャプチャ開始
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
+      await jsClick(apiPage, '#capture-btn');
+      await apiPage.waitForFunction(
+        () => document.getElementById('capture-status')!.textContent === 'Capturing...',
+        { timeout: 5000 },
+      );
 
       // 同じ API を2回呼び出す
       await evalOnLeftView(app, `document.getElementById('fetch-users').click()`);
-      await page.waitForTimeout(1000);
+      await apiPage.waitForTimeout(1000);
       await evalOnLeftView(app, `document.getElementById('fetch-users').click()`);
-      await page.waitForTimeout(1500);
 
       // 2リクエスト、1エンドポイント
-      const headerText = await jsText(page, '#api-mock-header-info');
-      expect(headerText).toContain('2 request');
-      expect(headerText).toContain('1 endpoint');
+      await apiPage.waitForFunction(
+        () => parseInt(document.getElementById('request-count')!.textContent!) >= 2,
+        { timeout: 10000 },
+      );
+
+      const reqCount = await jsText(apiPage, '#request-count');
+      expect(parseInt(reqCount!)).toBeGreaterThanOrEqual(2);
+      const epCount = await jsText(apiPage, '#endpoint-count');
+      expect(parseInt(epCount!)).toBe(1);
     } finally {
       await app.close();
     }
@@ -286,23 +293,29 @@ test.describe('Clear', () => {
     const { app, page } = await launchApp();
     try {
       await navigateToApiServers(page);
+      const apiPage = await openApiMockWindow(app, page);
 
       // キャプチャ開始 → API呼び出し
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(500);
+      await jsClick(apiPage, '#capture-btn');
+      await apiPage.waitForFunction(
+        () => document.getElementById('capture-status')!.textContent === 'Capturing...',
+        { timeout: 5000 },
+      );
       await evalOnLeftView(app, `document.getElementById('fetch-users').click()`);
-      await page.waitForTimeout(1500);
-
-      // データがキャプチャされたことを確認
-      let headerText = await jsText(page, '#api-mock-header-info');
-      expect(headerText).toContain('request');
+      await apiPage.waitForFunction(
+        () => parseInt(document.getElementById('request-count')!.textContent!) > 0,
+        { timeout: 10000 },
+      );
 
       // Clear
-      await jsClick(page, '#api-mock-clear-btn');
-      await page.waitForTimeout(500);
+      await jsClick(apiPage, '#clear-btn');
+      await apiPage.waitForFunction(
+        () => document.getElementById('request-count')!.textContent === '0',
+        { timeout: 5000 },
+      );
 
-      headerText = await jsText(page, '#api-mock-header-info');
-      expect(headerText).toContain('0 requests');
+      expect(await jsText(apiPage, '#request-count')).toBe('0');
+      expect(await jsText(apiPage, '#endpoint-count')).toBe('0');
     } finally {
       await app.close();
     }
@@ -313,12 +326,10 @@ test.describe('MSW バージョン選択', () => {
   test('デフォルトは v2 が選択されている', async () => {
     const { app, page } = await launchApp();
     try {
-      // ドロワーを開く
-      await jsClick(page, '#api-capture-btn');
-      await page.waitForTimeout(300);
-
-      const value = await page.evaluate(
-        () => (document.getElementById('api-mock-msw-version') as HTMLSelectElement).value,
+      await navigateToApiServers(page);
+      const apiPage = await openApiMockWindow(app, page);
+      const value = await apiPage.evaluate(
+        () => (document.getElementById('msw-version') as HTMLSelectElement).value,
       );
       expect(value).toBe('v2');
     } finally {

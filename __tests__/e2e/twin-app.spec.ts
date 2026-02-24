@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { _electron as electron } from 'playwright';
 import path from 'path';
-import { startServers, stopServers } from '../fixtures/mock-server/server';
+import { startTwinAppServers, stopServers } from '../fixtures/mock-server/server';
 
 let expectedServer: any;
 let actualServer: any;
 
 test.beforeAll(async () => {
-  const servers = await startServers();
+  const servers = await startTwinAppServers();
   expectedServer = servers.expected;
   actualServer = servers.actual;
 });
@@ -39,8 +39,12 @@ async function launchApp() {
   }
   if (!page) page = await app.firstWindow();
 
+  // initUIControls 完了を確認するため URL 値がセットされるまで待つ
   await page.waitForFunction(
-    () => document.getElementById('left-url') !== null,
+    () => {
+      const el = document.getElementById('left-url') as HTMLInputElement;
+      return el && el.value && el.value.length > 0;
+    },
     { timeout: 10000 }
   );
   return { app, page };
@@ -62,10 +66,10 @@ function jsValue(pg: any, sel: string) {
 async function navigateToDemoServers(page: any) {
   await page.evaluate(() => {
     const left = document.getElementById('left-url');
-    left.value = 'http://127.0.0.1:3100';
+    left.value = 'http://127.0.0.1:3500';
     left.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     const right = document.getElementById('right-url');
-    right.value = 'http://127.0.0.1:3101';
+    right.value = 'http://127.0.0.1:3501';
     right.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   });
   await page.waitForTimeout(1000);
@@ -107,11 +111,11 @@ test.describe('URL ナビゲーション', () => {
     try {
       await page.evaluate(() => {
         const input = document.getElementById('left-url');
-        input.value = 'http://127.0.0.1:3100';
+        input.value = 'http://127.0.0.1:3500';
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       });
       const value = await jsValue(page, '#left-url');
-      expect(value).toBe('http://127.0.0.1:3100');
+      expect(value).toBe('http://127.0.0.1:3500');
     } finally {
       await app.close();
     }
@@ -122,17 +126,21 @@ test.describe('同期トグル', () => {
   test('初期状態で Sync ON、クリックで ON/OFF が切り替わりステータスバーに反映される', async () => {
     const { app, page } = await launchApp();
     try {
+      await navigateToDemoServers(page);
+
       // 初期状態: ON
       expect(await jsText(page, '#toggle-sync')).toContain('Sync ON');
       expect(await jsText(page, '#status-sync')).toBe('Sync: ON');
 
       // 1回クリック → OFF
       await jsClick(page, '#toggle-sync');
+      await page.waitForTimeout(300);
       expect(await jsText(page, '#toggle-sync')).toContain('Sync OFF');
       expect(await jsText(page, '#status-sync')).toBe('Sync: OFF');
 
       // もう1回クリック → ON に戻る
       await jsClick(page, '#toggle-sync');
+      await page.waitForTimeout(300);
       expect(await jsText(page, '#toggle-sync')).toContain('Sync ON');
       expect(await jsText(page, '#status-sync')).toBe('Sync: ON');
     } finally {

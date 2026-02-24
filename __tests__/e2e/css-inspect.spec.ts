@@ -42,8 +42,12 @@ async function launchApp() {
   }
   if (!page) page = await app.firstWindow();
 
+  // initUIControls + initCssCompare 完了を確認するため URL 値がセットされるまで待つ
   await page.waitForFunction(
-    () => document.getElementById('css-scan-btn') !== null,
+    () => {
+      const el = document.getElementById('left-url') as HTMLInputElement;
+      return el && el.value && el.value.length > 0;
+    },
     { timeout: 10000 },
   );
   return { app, page };
@@ -103,6 +107,9 @@ test.describe('CSS Inspect Mode', () => {
   test('Inspect ボタンをクリックするとモードが ON/OFF に切り替わる', async () => {
     const { app, page } = await launchApp();
     try {
+      // ビューにページを読み込んでから Inspect を有効化
+      await navigateToDemoServers(page);
+
       // 初期状態: Inspect (OFF)
       let text = await jsText(page, '#css-inspect-btn');
       expect(text).toContain('Inspect');
@@ -110,7 +117,7 @@ test.describe('CSS Inspect Mode', () => {
 
       // クリック → ON
       await jsClick(page, '#css-inspect-btn');
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
       text = await jsText(page, '#css-inspect-btn');
       expect(text).toContain('Inspect ON');
 
@@ -143,9 +150,12 @@ test.describe('CSS Inspect Mode', () => {
   test('Escape キーで Inspect モードが OFF になる', async () => {
     const { app, page } = await launchApp();
     try {
+      // ビューにページを読み込んでから Inspect を有効化
+      await navigateToDemoServers(page);
+
       // Inspect ON
       await jsClick(page, '#css-inspect-btn');
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
       let text = await jsText(page, '#css-inspect-btn');
       expect(text).toContain('Inspect ON');
 

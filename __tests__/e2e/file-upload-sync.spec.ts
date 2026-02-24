@@ -59,7 +59,14 @@ async function launchApp(): Promise<{ app: ElectronApplication; page: Page }> {
   }
   if (!page) page = await app.firstWindow();
 
-  await page.waitForFunction(() => document.getElementById('left-url') !== null, { timeout: 10000 });
+  // initUIControls 完了を確認するため URL 値がセットされるまで待つ
+  await page.waitForFunction(
+    () => {
+      const el = document.getElementById('left-url') as HTMLInputElement;
+      return el && el.value && el.value.length > 0;
+    },
+    { timeout: 10000 },
+  );
   return { app, page };
 }
 
