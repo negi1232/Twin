@@ -18,6 +18,7 @@ import {
   TOOLBAR_HEIGHT,
 } from '../shared/constants';
 import { classifyProperty } from '../shared/utils';
+import { type ApiMockCaptureManager, createApiMockCaptureManager } from './api-mock-capture';
 import {
   buildGetElementStylesScript,
   buildHighlightScript,
@@ -96,7 +97,7 @@ function registerIpcHandlers({
   rightView,
   setSidebarWidth,
   getSidebarWidth,
-}: IpcHandlerOptions): { syncManager: SyncManager } {
+}: IpcHandlerOptions): { syncManager: SyncManager; apiMockCapture: ApiMockCaptureManager } {
   // --- Sync Manager ---
   const syncManager = createSyncManager(leftView, rightView);
   syncManager.start();
@@ -557,7 +558,78 @@ function registerIpcHandlers({
     });
   }
 
-  return { syncManager };
+  // --- API Mock Capture ---
+  const apiMockCapture = createApiMockCaptureManager();
+  apiMockCapture.register(leftView, mainWindow);
+
+  let apiMockWindow: BrowserWindow | null = null;
+
+  ipcMain.handle('api-mock-open-window', () => {
+    if (apiMockWindow && !apiMockWindow.isDestroyed()) {
+      apiMockWindow.focus();
+      return;
+    }
+    apiMockWindow = new BrowserWindow({
+      width: 960,
+      height: 600,
+      minWidth: 640,
+      minHeight: 400,
+      parent: mainWindow,
+      title: 'API Mock Capture',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    apiMockWindow.setMenuBarVisibility(false);
+    apiMockWindow.loadFile(path.join(__dirname, '..', 'renderer', 'api-mock-window.html'));
+    apiMockCapture.setChildWindow(apiMockWindow);
+    apiMockWindow.on('closed', () => {
+      apiMockCapture.setChildWindow(null);
+      apiMockWindow = null;
+    });
+  });
+
+  ipcMain.handle('api-mock-start-capture', async () => {
+    await apiMockCapture.startCapture();
+    return { capturing: apiMockCapture.isCapturing() };
+  });
+
+  ipcMain.handle('api-mock-stop-capture', async () => {
+    apiMockCapture.stopCapture();
+    return { capturing: apiMockCapture.isCapturing() };
+  });
+
+  ipcMain.handle('api-mock-get-status', () => {
+    const data = apiMockCapture.getCapturedData();
+    return {
+      capturing: apiMockCapture.isCapturing(),
+      count: apiMockCapture.getCapturedCount(),
+      endpoints: data.map((g) => `${g.method} ${g.urlPattern}`),
+    };
+  });
+
+  ipcMain.handle('api-mock-get-captured-data', () => {
+    return apiMockCapture.getCapturedData();
+  });
+
+  ipcMain.handle('api-mock-export', async (_event: IpcMainInvokeEvent, { mswVersion }: { mswVersion: 'v1' | 'v2' }) => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return apiMockCapture.exportToFiles(result.filePaths[0], mswVersion);
+  });
+
+  ipcMain.handle('api-mock-clear', () => {
+    apiMockCapture.clearCapturedData();
+    return { success: true };
+  });
+
+  return { syncManager, apiMockCapture };
 }
 
 export { registerIpcHandlers };

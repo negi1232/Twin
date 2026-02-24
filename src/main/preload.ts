@@ -48,4 +48,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('css-inspect-result', (_event: IpcRendererEvent, data: CssInspectResultData) => cb(data)),
   onShortcutCssScan: (cb: () => void) => ipcRenderer.on('shortcut-css-scan', () => cb()),
   onShortcutCssInspect: (cb: () => void) => ipcRenderer.on('shortcut-css-inspect', () => cb()),
+  // API Mock Capture
+  apiMockOpenWindow: () => ipcRenderer.invoke('api-mock-open-window'),
+  apiMockStartCapture: () => ipcRenderer.invoke('api-mock-start-capture'),
+  apiMockStopCapture: () => ipcRenderer.invoke('api-mock-stop-capture'),
+  apiMockGetStatus: () => ipcRenderer.invoke('api-mock-get-status'),
+  apiMockGetCapturedData: () => ipcRenderer.invoke('api-mock-get-captured-data'),
+  apiMockExport: (payload: { mswVersion: 'v1' | 'v2' }) => ipcRenderer.invoke('api-mock-export', payload),
+  apiMockClear: () => ipcRenderer.invoke('api-mock-clear'),
+  onApiMockCaptureUpdate: (cb: (data: ApiMockCaptureUpdateData) => void) =>
+    ipcRenderer.on('api-mock-capture-update', (_event: IpcRendererEvent, data: ApiMockCaptureUpdateData) => cb(data)),
 });
