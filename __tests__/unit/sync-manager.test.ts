@@ -1,6 +1,6 @@
 export {};
 
-const { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, HEALTH_CHECK_INTERVAL, escapeForScript } = require('../../src/main/sync-manager');
+const { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, HEALTH_CHECK_INTERVAL, HOVER_REPLAY_INTERVAL, escapeForScript } = require('../../src/main/sync-manager');
 
 function createMockDebugger() {
   const dbgListeners: Record<string, any[]> = {};
@@ -1563,5 +1563,243 @@ describe('SyncManager edge cases', () => {
     expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'mouseDown', x: 100, y: 200 })
     );
+  });
+});
+
+// --- Hover sync stabilization tests ---
+describe('Hover sync stabilization', () => {
+  let leftView: any;
+  let rightView: any;
+
+  function createMockView3() {
+    const listeners: Record<string, any[]> = {};
+    return {
+      webContents: {
+        on: jest.fn((event: any, cb: any) => {
+          if (!listeners[event]) listeners[event] = [];
+          listeners[event].push(cb);
+        }),
+        removeListener: jest.fn((event: any, cb: any) => {
+          if (listeners[event]) {
+            listeners[event] = listeners[event].filter((l: any) => l !== cb);
+          }
+        }),
+        executeJavaScript: jest.fn().mockResolvedValue(undefined),
+        sendInputEvent: jest.fn(),
+        isDestroyed: jest.fn(() => false),
+        getZoomFactor: jest.fn(() => 1.0),
+        getURL: jest.fn(() => 'http://localhost:3001/'),
+        loadURL: jest.fn().mockResolvedValue(undefined),
+        debugger: createMockDebugger(),
+      },
+      _listeners: listeners,
+      _emit(event: any, ...args: any[]) {
+        (listeners[event] || []).forEach((cb: any) => cb(...args));
+      },
+    };
+  }
+
+  beforeEach(() => {
+    leftView = createMockView3();
+    rightView = createMockView3();
+  });
+
+  // Fix 1: Race condition — stale hover results are discarded
+  describe('Fix 1: hoverVersion race condition guard', () => {
+    test('stale hover result is discarded when a newer hover has been sent', async () => {
+      const manager = createSyncManager(leftView, rightView);
+      let resolveFirst: (v: any) => void;
+      let resolveSecond: (v: any) => void;
+
+      rightView.webContents.executeJavaScript
+        .mockReturnValueOnce(new Promise((r) => { resolveFirst = r; }))
+        .mockReturnValueOnce(new Promise((r) => { resolveSecond = r; }));
+
+      // Send two hover replays directly (bypassing throttle)
+      manager._replayHover({ selector: '#old' });
+      manager._replayHover({ selector: '#new' });
+
+      // Resolve the second (newer) hover first
+      resolveSecond!({ x: 200, y: 300 });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(1);
+      expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'mouseMove', x: 200, y: 300 })
+      );
+
+      // Now resolve the first (stale) hover — should be ignored
+      resolveFirst!({ x: 100, y: 150 });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(1);
+    });
+
+    test('only latest hover result triggers sendInputEvent', async () => {
+      const manager = createSyncManager(leftView, rightView);
+      let resolveFns: Array<(v: any) => void> = [];
+
+      rightView.webContents.executeJavaScript
+        .mockReturnValueOnce(new Promise((r) => { resolveFns.push(r); }))
+        .mockReturnValueOnce(new Promise((r) => { resolveFns.push(r); }))
+        .mockReturnValueOnce(new Promise((r) => { resolveFns.push(r); }));
+
+      manager._replayHover({ selector: '#a' });
+      manager._replayHover({ selector: '#b' });
+      manager._replayHover({ selector: '#c' });
+
+      // Resolve all in order
+      resolveFns[0]({ x: 10, y: 10 });
+      resolveFns[1]({ x: 20, y: 20 });
+      resolveFns[2]({ x: 30, y: 30 });
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Only the last one should have triggered sendInputEvent
+      expect(rightView.webContents.sendInputEvent).toHaveBeenCalledTimes(1);
+      expect(rightView.webContents.sendInputEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ x: 30, y: 30 })
+      );
+    });
+  });
+
+  // Fix 2: Overlay filtering in INJECTION_SCRIPT
+  describe('Fix 2: overlay filtering in INJECTION_SCRIPT', () => {
+    test('INJECTION_SCRIPT defines TWIN_OVERLAY_IDS array', () => {
+      expect(INJECTION_SCRIPT).toContain('TWIN_OVERLAY_IDS');
+    });
+
+    test('INJECTION_SCRIPT contains all three overlay IDs', () => {
+      expect(INJECTION_SCRIPT).toContain('__twin_inspect_overlay');
+      expect(INJECTION_SCRIPT).toContain('__twin_inspect_tooltip');
+      expect(INJECTION_SCRIPT).toContain('__twin_right_highlight');
+    });
+
+    test('INJECTION_SCRIPT contains elementFromPointExcludingOverlays function', () => {
+      expect(INJECTION_SCRIPT).toContain('elementFromPointExcludingOverlays');
+    });
+
+    test('hover handler uses elementFromPointExcludingOverlays instead of raw elementFromPoint', () => {
+      // The hover handler should use the wrapper, not direct elementFromPoint
+      const hoverSection = INJECTION_SCRIPT.split('Hover sync')[1].split('Click sync')[0];
+      expect(hoverSection).toContain('elementFromPointExcludingOverlays');
+    });
+
+    test('click handler uses elementFromPointExcludingOverlays instead of raw elementFromPoint', () => {
+      const clickSection = INJECTION_SCRIPT.split('Click sync')[1].split('Input value sync')[0];
+      expect(clickSection).toContain('elementFromPointExcludingOverlays');
+    });
+  });
+
+  // Fix 3: Robust selector generation
+  describe('Fix 3: robust selector generation in INJECTION_SCRIPT', () => {
+    test('getSelector checks data-testid attribute', () => {
+      expect(INJECTION_SCRIPT).toContain('data-testid');
+    });
+
+    test('getSelector checks aria-label attribute with uniqueness check', () => {
+      expect(INJECTION_SCRIPT).toContain('aria-label');
+      // Should verify uniqueness via querySelectorAll
+      expect(INJECTION_SCRIPT).toContain("querySelectorAll('[aria-label=");
+    });
+
+    test('getSelector checks role attribute with uniqueness check', () => {
+      expect(INJECTION_SCRIPT).toContain("getAttribute('role')");
+      expect(INJECTION_SCRIPT).toContain("querySelectorAll('[role=");
+    });
+
+    test('selector priority: id before data-testid before aria-label before role before name', () => {
+      const getSelectorSection = INJECTION_SCRIPT.split('function getSelector')[1].split('function isFormElement')[0];
+      const idIndex = getSelectorSection.indexOf('el.id');
+      const testIdIndex = getSelectorSection.indexOf('data-testid');
+      const ariaIndex = getSelectorSection.indexOf('aria-label');
+      const roleIndex = getSelectorSection.indexOf("getAttribute('role')");
+      const nameIndex = getSelectorSection.indexOf('el.name');
+      expect(idIndex).toBeLessThan(testIdIndex);
+      expect(testIdIndex).toBeLessThan(ariaIndex);
+      expect(ariaIndex).toBeLessThan(roleIndex);
+      expect(roleIndex).toBeLessThan(nameIndex);
+    });
+  });
+
+  // Fix 4: Hover replay throttling
+  describe('Fix 4: hover replay throttling', () => {
+    test('HOVER_REPLAY_INTERVAL is exported and equals 50', () => {
+      expect(HOVER_REPLAY_INTERVAL).toBe(50);
+    });
+
+    test('first hover is executed immediately', () => {
+      jest.useFakeTimers();
+      const manager = createSyncManager(leftView, rightView);
+
+      const msg = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#el1' } });
+      manager._handleMessage(null, 0, msg);
+
+      expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+      jest.useRealTimers();
+    });
+
+    test('rapid hover messages are throttled — second is deferred, third replaces second', () => {
+      jest.useFakeTimers();
+      const manager = createSyncManager(leftView, rightView);
+
+      // First hover — immediate
+      const msg1 = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#el1' } });
+      manager._handleMessage(null, 0, msg1);
+      expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+
+      // Second hover — within throttle interval, should be deferred
+      jest.advanceTimersByTime(10);
+      const msg2 = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#el2' } });
+      manager._handleMessage(null, 0, msg2);
+      expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+
+      // Third hover — replaces second in pending buffer
+      jest.advanceTimersByTime(10);
+      const msg3 = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#el3' } });
+      manager._handleMessage(null, 0, msg3);
+      expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+
+      // Advance past throttle interval — pending (#el3) should execute
+      jest.advanceTimersByTime(HOVER_REPLAY_INTERVAL);
+      expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(2);
+
+      // Verify the last call contains #el3, not #el2
+      const lastScript = rightView.webContents.executeJavaScript.mock.calls[1][0];
+      expect(lastScript).toContain('#el3');
+      expect(lastScript).not.toContain('#el2');
+
+      jest.useRealTimers();
+    });
+
+    test('hover after throttle interval expires is executed immediately', () => {
+      jest.useFakeTimers();
+      const manager = createSyncManager(leftView, rightView);
+
+      const msg1 = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#el1' } });
+      manager._handleMessage(null, 0, msg1);
+      expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(1);
+
+      // Wait past the throttle interval
+      jest.advanceTimersByTime(HOVER_REPLAY_INTERVAL + 10);
+
+      const msg2 = SYNC_PREFIX + JSON.stringify({ type: 'hover', data: { selector: '#el2' } });
+      manager._handleMessage(null, 0, msg2);
+      expect(rightView.webContents.executeJavaScript).toHaveBeenCalledTimes(2);
+
+      jest.useRealTimers();
+    });
+  });
+
+  // Fix 5: __twin_ element skip guard
+  describe('Fix 5: __twin_ element skip guard in INJECTION_SCRIPT', () => {
+    test('hover handler contains __twin_ prefix check', () => {
+      const hoverSection = INJECTION_SCRIPT.split('Hover sync')[1].split('Click sync')[0];
+      expect(hoverSection).toContain("__twin_");
+      expect(hoverSection).toContain("el.id.indexOf('__twin_') === 0");
+    });
+
+    test('click handler contains __twin_ prefix check', () => {
+      const clickSection = INJECTION_SCRIPT.split('Click sync')[1].split('Input value sync')[0];
+      expect(clickSection).toContain("__twin_");
+      expect(clickSection).toContain("el.id.indexOf('__twin_') === 0");
+    });
   });
 });
