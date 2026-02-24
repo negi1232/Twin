@@ -2,6 +2,30 @@ export {};
 
 const { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, HEALTH_CHECK_INTERVAL, escapeForScript } = require('../../src/main/sync-manager');
 
+function createMockDebugger() {
+  const dbgListeners: Record<string, any[]> = {};
+  return {
+    isAttached: jest.fn(() => false),
+    attach: jest.fn(),
+    detach: jest.fn(),
+    sendCommand: jest.fn().mockImplementation((cmd: string) => {
+      if (cmd === 'DOM.getDocument') return Promise.resolve({ root: { nodeId: 1 } });
+      if (cmd === 'DOM.querySelector') return Promise.resolve({ nodeId: 2 });
+      return Promise.resolve({});
+    }),
+    on: jest.fn((event: any, cb: any) => {
+      if (!dbgListeners[event]) dbgListeners[event] = [];
+      dbgListeners[event].push(cb);
+    }),
+    removeListener: jest.fn((event: any, cb: any) => {
+      if (dbgListeners[event]) {
+        dbgListeners[event] = dbgListeners[event].filter((l: any) => l !== cb);
+      }
+    }),
+    _listeners: dbgListeners,
+  };
+}
+
 function createMockView() {
   const listeners: Record<string, any[]> = {};
   return {
@@ -21,6 +45,7 @@ function createMockView() {
       getZoomFactor: jest.fn(() => 1.0),
       getURL: jest.fn(() => 'http://localhost:3001/'),
       loadURL: jest.fn().mockResolvedValue(undefined),
+      debugger: createMockDebugger(),
     },
     _listeners: listeners,
     _emit(event: any, ...args: any[]) {
@@ -898,6 +923,319 @@ describe('SyncManager', () => {
     expect(leftView.webContents.executeJavaScript).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
+
+  // --- File upload sync via CDP ---
+  describe('replayFileChange', () => {
+    test('sets files on right view via CDP', async () => {
+      const data = { selector: '#file-input', paths: ['/tmp/a.txt'], names: ['a.txt'] };
+      await manager._replayFileChange(data);
+
+      const dbg = rightView.webContents.debugger;
+      expect(dbg.attach).toHaveBeenCalledWith('1.3');
+      expect(dbg.sendCommand).toHaveBeenCalledWith('DOM.getDocument');
+      expect(dbg.sendCommand).toHaveBeenCalledWith('DOM.querySelector', {
+        nodeId: 1,
+        selector: '#file-input',
+      });
+      expect(dbg.sendCommand).toHaveBeenCalledWith('DOM.setFileInputFiles', {
+        nodeId: 2,
+        files: ['/tmp/a.txt'],
+      });
+      expect(dbg.detach).toHaveBeenCalled();
+    });
+
+    test('returns early when paths are empty and no pendingFilePaths', async () => {
+      await manager._replayFileChange({ selector: '#file-input', paths: [], names: [] });
+      expect(rightView.webContents.debugger.attach).not.toHaveBeenCalled();
+    });
+
+    test('skips when nodeId is 0', async () => {
+      rightView.webContents.debugger.sendCommand.mockImplementation((cmd: string) => {
+        if (cmd === 'DOM.getDocument') return Promise.resolve({ root: { nodeId: 1 } });
+        if (cmd === 'DOM.querySelector') return Promise.resolve({ nodeId: 0 });
+        return Promise.resolve({});
+      });
+
+      await manager._replayFileChange({ selector: '#missing', paths: ['/tmp/a.txt'], names: ['a.txt'] });
+
+      expect(rightView.webContents.debugger.sendCommand).not.toHaveBeenCalledWith(
+        'DOM.setFileInputFiles',
+        expect.anything(),
+      );
+      expect(rightView.webContents.debugger.detach).toHaveBeenCalled();
+    });
+
+    test('handles error gracefully', async () => {
+      rightView.webContents.debugger.sendCommand.mockRejectedValue(new Error('CDP error'));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await manager._replayFileChange({ selector: '#file', paths: ['/tmp/a.txt'], names: ['a.txt'] });
+
+      expect(consoleSpy).toHaveBeenCalledWith('Sync file replay failed:', 'CDP error');
+      expect(rightView.webContents.debugger.detach).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('handleCDPEvent', () => {
+    let mockShowOpenDialog: jest.Mock;
+    let mgr: any;
+
+    beforeEach(() => {
+      mockShowOpenDialog = jest.fn();
+      mgr = createSyncManager(leftView, rightView, mockShowOpenDialog);
+
+      leftView.webContents.debugger.sendCommand.mockImplementation((cmd: string) => {
+        if (cmd === 'DOM.setFileInputFiles') return Promise.resolve({});
+        if (cmd === 'DOM.getDocument') return Promise.resolve({ root: { nodeId: 1 } });
+        if (cmd === 'DOM.querySelector') return Promise.resolve({ nodeId: 2 });
+        if (cmd === 'DOM.resolveNode') return Promise.resolve({ object: { objectId: 'obj-1' } });
+        if (cmd === 'Runtime.callFunctionOn') return Promise.resolve({ result: { value: '#file-input' } });
+        return Promise.resolve({});
+      });
+
+      rightView.webContents.debugger.sendCommand.mockImplementation((cmd: string) => {
+        if (cmd === 'DOM.getDocument') return Promise.resolve({ root: { nodeId: 1 } });
+        if (cmd === 'DOM.querySelector') return Promise.resolve({ nodeId: 2 });
+        return Promise.resolve({});
+      });
+    });
+
+    test('ignores non-Page.fileChooserOpened events', async () => {
+      await mgr._handleCDPEvent(null, 'Network.requestWillBeSent', {});
+      expect(leftView.webContents.debugger.sendCommand).not.toHaveBeenCalled();
+      expect(mockShowOpenDialog).not.toHaveBeenCalled();
+    });
+
+    test('ignores event when disabled', async () => {
+      mgr.setEnabled(false);
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+      expect(mockShowOpenDialog).not.toHaveBeenCalled();
+    });
+
+    test('ignores event when paused', async () => {
+      mgr.pause();
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+      expect(mockShowOpenDialog).not.toHaveBeenCalled();
+    });
+
+    test('re-entrancy guard ignores second event', async () => {
+      let resolveFirst: (v: any) => void;
+      const firstCallPromise = new Promise((r) => { resolveFirst = r; });
+      mockShowOpenDialog.mockReturnValueOnce(firstCallPromise);
+
+      const first = mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 11 });
+
+      expect(mockShowOpenDialog).toHaveBeenCalledTimes(1);
+
+      resolveFirst!({ canceled: true, filePaths: [] });
+      await first;
+    });
+
+    test('shows own dialog on fileChooserOpened event', async () => {
+      mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/tmp/test.txt'] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+
+      expect(mockShowOpenDialog).toHaveBeenCalledWith({
+        properties: ['openFile'],
+      });
+    });
+
+    test('sets files on left view via DOM.setFileInputFiles with backendNodeId', async () => {
+      mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/tmp/doc.pdf'] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 42 });
+
+      expect(leftView.webContents.debugger.sendCommand).toHaveBeenCalledWith(
+        'DOM.setFileInputFiles',
+        { backendNodeId: 42, files: ['/tmp/doc.pdf'] },
+      );
+    });
+
+    test('gets selector from backendNodeId and syncs to right view', async () => {
+      mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/tmp/photo.jpg'] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+
+      expect(leftView.webContents.debugger.sendCommand).toHaveBeenCalledWith(
+        'DOM.resolveNode',
+        { backendNodeId: 10 },
+      );
+      expect(leftView.webContents.debugger.sendCommand).toHaveBeenCalledWith(
+        'Runtime.callFunctionOn',
+        expect.objectContaining({ objectId: 'obj-1', returnByValue: true }),
+      );
+      expect(rightView.webContents.debugger.sendCommand).toHaveBeenCalledWith(
+        'DOM.setFileInputFiles',
+        expect.objectContaining({ files: ['/tmp/photo.jpg'] }),
+      );
+    });
+
+    test('sets skipNextFileChangeMessage flag', async () => {
+      mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/tmp/a.txt'] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+
+      const msg = SYNC_PREFIX + JSON.stringify({
+        type: 'filechange',
+        data: { selector: '#file-input', paths: ['/tmp/a.txt'], names: ['a.txt'] },
+      });
+
+      rightView.webContents.debugger.sendCommand.mockClear();
+      rightView.webContents.debugger.attach.mockClear();
+      mgr._handleMessage(null, 0, msg);
+
+      expect(rightView.webContents.debugger.attach).not.toHaveBeenCalled();
+    });
+
+    test('handles user cancelling own dialog', async () => {
+      mockShowOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+
+      expect(leftView.webContents.debugger.sendCommand).not.toHaveBeenCalledWith(
+        'DOM.setFileInputFiles',
+        expect.anything(),
+      );
+    });
+
+    test('shows multiSelections when mode is selectMultiple', async () => {
+      mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/tmp/a.txt', '/tmp/b.txt'] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', {
+        backendNodeId: 10,
+        mode: 'selectMultiple',
+      });
+
+      expect(mockShowOpenDialog).toHaveBeenCalledWith({
+        properties: ['openFile', 'multiSelections'],
+      });
+    });
+
+    test('handles outer error gracefully and resets fileChooserHandling', async () => {
+      mockShowOpenDialog.mockRejectedValueOnce(new Error('Dialog crashed'));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+      expect(consoleSpy).toHaveBeenCalledWith('File chooser handling failed:', 'Dialog crashed');
+
+      mockShowOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', { backendNodeId: 10 });
+      expect(mockShowOpenDialog).toHaveBeenCalledTimes(2);
+
+      consoleSpy.mockRestore();
+    });
+
+    test('skips left view DOM.setFileInputFiles when no backendNodeId', async () => {
+      mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/tmp/a.txt'] });
+      await mgr._handleCDPEvent(null, 'Page.fileChooserOpened', {});
+
+      const setFileCalls = leftView.webContents.debugger.sendCommand.mock.calls.filter(
+        (c: any[]) => c[0] === 'DOM.setFileInputFiles',
+      );
+      expect(setFileCalls).toHaveLength(0);
+    });
+  });
+
+  describe('INJECTION_SCRIPT file upload features', () => {
+    test('disables showOpenFilePicker', () => {
+      expect(INJECTION_SCRIPT).toContain('showOpenFilePicker = undefined');
+    });
+
+    test('click handler skips file inputs', () => {
+      expect(INJECTION_SCRIPT).toContain("el.tagName === 'INPUT' && el.type === 'file'");
+      expect(INJECTION_SCRIPT).toContain('input[type="file"]');
+    });
+
+    test('sends filechange on file input change', () => {
+      expect(INJECTION_SCRIPT).toContain("send('filechange'");
+      expect(INJECTION_SCRIPT).toContain("el.type !== 'file'");
+    });
+  });
+
+  describe('setupFileChooserInterception', () => {
+    test('attaches debugger on inject', () => {
+      leftView.webContents.debugger.isAttached.mockReturnValue(false);
+      leftView.webContents.debugger.sendCommand.mockResolvedValue({});
+      manager.inject();
+      expect(leftView.webContents.debugger.attach).toHaveBeenCalledWith('1.3');
+    });
+
+    test('does not re-attach if debugger already attached', () => {
+      leftView.webContents.debugger.isAttached.mockReturnValue(true);
+      leftView.webContents.debugger.sendCommand.mockResolvedValue({});
+      manager.inject();
+      expect(leftView.webContents.debugger.attach).not.toHaveBeenCalled();
+    });
+
+    test('handles attach failure gracefully', () => {
+      leftView.webContents.debugger.isAttached.mockReturnValue(false);
+      leftView.webContents.debugger.attach.mockImplementation(() => {
+        throw new Error('Another debugger already attached');
+      });
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      manager.inject();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'File chooser interception setup failed:',
+        'Another debugger already attached',
+      );
+      consoleSpy.mockRestore();
+    });
+
+    test('handles Page.setInterceptFileChooserDialog rejection', async () => {
+      leftView.webContents.debugger.isAttached.mockReturnValue(false);
+      leftView.webContents.debugger.sendCommand.mockImplementation((cmd: string) => {
+        if (cmd === 'Page.enable') return Promise.resolve({});
+        if (cmd === 'Page.setInterceptFileChooserDialog') return Promise.reject(new Error('Not supported'));
+        return Promise.resolve({});
+      });
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      manager.inject();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'File chooser interception setup failed:',
+        'Not supported',
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('teardownFileChooserInterception', () => {
+    test('detaches debugger on stop when attached', async () => {
+      leftView.webContents.debugger.sendCommand.mockResolvedValue({});
+      leftView.webContents.debugger.isAttached.mockReturnValue(true);
+      manager.start();
+      manager.stop();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(leftView.webContents.debugger.sendCommand).toHaveBeenCalledWith(
+        'Page.setInterceptFileChooserDialog',
+        { enabled: false },
+      );
+      expect(leftView.webContents.debugger.detach).toHaveBeenCalled();
+    });
+
+    test('does nothing when debugger is not attached', () => {
+      leftView.webContents.debugger.sendCommand.mockResolvedValue({});
+      leftView.webContents.debugger.isAttached.mockReturnValue(false);
+      manager.start();
+      leftView.webContents.debugger.detach.mockClear();
+      leftView.webContents.debugger.sendCommand.mockClear();
+      leftView.webContents.debugger.isAttached.mockReturnValue(false);
+      manager.stop();
+      const teardownCalls = leftView.webContents.debugger.sendCommand.mock.calls.filter(
+        (c: any[]) => c[0] === 'Page.setInterceptFileChooserDialog' && c[1]?.enabled === false,
+      );
+      expect(teardownCalls).toHaveLength(0);
+    });
+  });
+
+  // --- filechange message sync ---
+  test('filechange message replays file set via CDP', async () => {
+    const msg = SYNC_PREFIX + JSON.stringify({
+      type: 'filechange',
+      data: { selector: '#upload', paths: ['/tmp/file.txt'], names: ['file.txt'] },
+    });
+    manager._handleMessage(null, 0, msg);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rightView.webContents.debugger.attach).toHaveBeenCalledWith('1.3');
+    expect(rightView.webContents.debugger.sendCommand).toHaveBeenCalledWith('DOM.getDocument');
+  });
 });
 
 describe('escapeForScript', () => {
@@ -978,6 +1316,7 @@ describe('SyncManager edge cases', () => {
         getZoomFactor: jest.fn(() => 1.0),
         getURL: jest.fn(() => 'http://localhost:3001/'),
         loadURL: jest.fn().mockResolvedValue(undefined),
+        debugger: createMockDebugger(),
       },
       _listeners: listeners,
       _emit(event: any, ...args: any[]) {
