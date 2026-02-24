@@ -16,6 +16,9 @@ const SYNC_PREFIX: string = '__twin_sync__';
 /** ヘルスチェック間隔（ミリ秒） */
 const HEALTH_CHECK_INTERVAL = 3000;
 
+/** ホバーリプレイのスロットリング間隔（ミリ秒） */
+const HOVER_REPLAY_INTERVAL = 50;
+
 interface ScrollData {
   scrollX: number;
   scrollY: number;
@@ -88,6 +91,7 @@ export interface SyncManager {
   _handleMessage(event: unknown, level: number, message: string): void;
   _replayScroll(data: ScrollData): void;
   _replayElementScroll(data: ElementScrollData): void;
+  _scheduleHoverReplay(data: HoverData): void;
   _replayHover(data: HoverData): void;
   _replayClick(data: ClickData): void;
   _replayInputValue(data: InputValueData): void;
@@ -132,6 +136,19 @@ const INJECTION_SCRIPT: string = `
   // --- Element selector generator ---
   function getSelector(el) {
     if (el.id) return '#' + CSS.escape(el.id);
+    // data-testid: stable test attribute
+    var testId = el.getAttribute && el.getAttribute('data-testid');
+    if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
+    // aria-label: unique accessibility label
+    var ariaLabel = el.getAttribute && el.getAttribute('aria-label');
+    if (ariaLabel && document.querySelectorAll('[aria-label="' + CSS.escape(ariaLabel) + '"]').length === 1) {
+      return '[aria-label="' + CSS.escape(ariaLabel) + '"]';
+    }
+    // role: unique ARIA role
+    var role = el.getAttribute && el.getAttribute('role');
+    if (role && document.querySelectorAll('[role="' + CSS.escape(role) + '"]').length === 1) {
+      return '[role="' + CSS.escape(role) + '"]';
+    }
     if (el.name) return el.tagName.toLowerCase() + '[name="' + CSS.escape(el.name) + '"]';
     var tag = el.tagName.toLowerCase();
     var parent = el.parentElement;
@@ -188,14 +205,34 @@ const INJECTION_SCRIPT: string = `
     }
   }, { capture: true, passive: true });
 
+  // --- Twin overlay IDs to exclude from elementFromPoint ---
+  var TWIN_OVERLAY_IDS = ['__twin_inspect_overlay', '__twin_inspect_tooltip', '__twin_right_highlight'];
+
+  function elementFromPointExcludingOverlays(x, y) {
+    var hidden = [];
+    TWIN_OVERLAY_IDS.forEach(function(id) {
+      var overlay = document.getElementById(id);
+      if (overlay) {
+        hidden.push({ el: overlay, display: overlay.style.display });
+        overlay.style.display = 'none';
+      }
+    });
+    var el = document.elementFromPoint(x, y);
+    hidden.forEach(function(item) {
+      item.el.style.display = item.display;
+    });
+    return el;
+  }
+
   // --- Hover sync (element-based, throttled via rAF) ---
   var hoverTicking = false;
   var lastHoverSelector = null;
   window.addEventListener('mousemove', function(e) {
     if (!hoverTicking) {
       requestAnimationFrame(function() {
-        var el = document.elementFromPoint(e.clientX, e.clientY);
+        var el = elementFromPointExcludingOverlays(e.clientX, e.clientY);
         if (el) {
+          if (el.id && el.id.indexOf('__twin_') === 0) { hoverTicking = false; return; }
           var selector = getSelector(el);
           if (selector !== lastHoverSelector) {
             send('hover', { selector: selector });
@@ -210,8 +247,9 @@ const INJECTION_SCRIPT: string = `
 
   // --- Click sync (element-based) ---
   window.addEventListener('click', function(e) {
-    var el = document.elementFromPoint(e.clientX, e.clientY);
+    var el = elementFromPointExcludingOverlays(e.clientX, e.clientY);
     if (el) {
+      if (el.id && el.id.indexOf('__twin_') === 0) return;
       // Skip file inputs — synthetic clicks cannot open file dialogs
       if (el.tagName === 'INPUT' && el.type === 'file') return;
       // Skip wrapper elements containing file inputs (e.g. react-dropzone)
@@ -334,6 +372,10 @@ function createSyncManager(
   let pendingFilePaths: string[] = [];
   let fileChooserHandling = false;
   let skipNextFileChangeMessage = false;
+  let hoverVersion = 0;
+  let lastHoverReplayTime = 0;
+  let pendingHoverTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingHoverData: HoverData | null = null;
 
   function isEnabled(): boolean {
     return enabled;
@@ -389,7 +431,7 @@ function createSyncManager(
         replayElementScroll(parsed.data);
         break;
       case 'hover':
-        replayHover(parsed.data);
+        scheduleHoverReplay(parsed.data);
         break;
       case 'click':
         replayClick(parsed.data);
@@ -435,7 +477,34 @@ function createSyncManager(
       .catch((err: Error) => console.error('Sync replay failed:', err.message));
   }
 
+  function scheduleHoverReplay(data: HoverData): void {
+    const now = Date.now();
+    const elapsed = now - lastHoverReplayTime;
+    if (elapsed >= HOVER_REPLAY_INTERVAL) {
+      lastHoverReplayTime = now;
+      if (pendingHoverTimer) {
+        clearTimeout(pendingHoverTimer);
+        pendingHoverTimer = null;
+      }
+      pendingHoverData = null;
+      replayHover(data);
+    } else {
+      pendingHoverData = data;
+      if (!pendingHoverTimer) {
+        pendingHoverTimer = setTimeout(() => {
+          pendingHoverTimer = null;
+          if (pendingHoverData) {
+            lastHoverReplayTime = Date.now();
+            replayHover(pendingHoverData);
+            pendingHoverData = null;
+          }
+        }, HOVER_REPLAY_INTERVAL - elapsed);
+      }
+    }
+  }
+
   function replayHover({ selector }: HoverData): void {
+    const currentVersion = ++hoverVersion;
     const escapedSelector = escapeForScript(selector);
     const script = `(function(){
       var el = document.querySelector('${escapedSelector}');
@@ -448,6 +517,7 @@ function createSyncManager(
     rightView.webContents
       .executeJavaScript(script)
       .then((coords: { x: number; y: number } | null) => {
+        if (currentVersion !== hoverVersion) return;
         if (coords) {
           const zoom = rightView.webContents.getZoomFactor ? rightView.webContents.getZoomFactor() : 1;
           rightView.webContents.sendInputEvent({
@@ -817,6 +887,7 @@ function createSyncManager(
     _handleMessage: handleMessage,
     _replayScroll: replayScroll,
     _replayElementScroll: replayElementScroll,
+    _scheduleHoverReplay: scheduleHoverReplay,
     _replayHover: replayHover,
     _replayClick: replayClick,
     _replayInputValue: replayInputValue,
@@ -827,4 +898,11 @@ function createSyncManager(
   };
 }
 
-export { createSyncManager, SYNC_PREFIX, INJECTION_SCRIPT, HEALTH_CHECK_INTERVAL, escapeForScript };
+export {
+  createSyncManager,
+  SYNC_PREFIX,
+  INJECTION_SCRIPT,
+  HEALTH_CHECK_INTERVAL,
+  HOVER_REPLAY_INTERVAL,
+  escapeForScript,
+};
