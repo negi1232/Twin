@@ -51,4 +51,12 @@ export const IPC_CHANNELS = {
   CSS_INSPECT_TOGGLE: 'css-inspect-toggle',
   CSS_EXPORT_JSON: 'css-export-json',
   CSS_INSPECT_RESULT: 'css-inspect-result',
+  API_MOCK_START_CAPTURE: 'api-mock-start-capture',
+  API_MOCK_STOP_CAPTURE: 'api-mock-stop-capture',
+  API_MOCK_GET_STATUS: 'api-mock-get-status',
+  API_MOCK_GET_CAPTURED_DATA: 'api-mock-get-captured-data',
+  API_MOCK_EXPORT: 'api-mock-export',
+  API_MOCK_CLEAR: 'api-mock-clear',
+  API_MOCK_CAPTURE_UPDATE: 'api-mock-capture-update',
+  API_MOCK_OPEN_WINDOW: 'api-mock-open-window',
 } as const;

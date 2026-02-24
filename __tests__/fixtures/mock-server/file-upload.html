@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Twin Test - File Upload</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 24px;
+      background: #f0f0f0;
+      transition: background 0.3s;
+    }
+    body.has-file { background: #d4edda; }
+
+    h1 { font-size: 20px; margin-bottom: 16px; }
+
+    #status-banner {
+      text-align: center;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 16px;
+      font-weight: 700;
+      background: #fff3cd;
+      color: #856404;
+      border: 2px solid #ffc107;
+    }
+    #status-banner.uploaded {
+      background: #28a745;
+      color: #fff;
+      border-color: #1e7e34;
+    }
+
+    .section { margin-bottom: 24px; }
+    .section-title {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .upload-area {
+      border: 2px dashed #aaa;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    /* react-dropzone style dropzone */
+    .dropzone {
+      border: 3px dashed #007bff;
+      border-radius: 12px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: #fff;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .dropzone:hover {
+      background: #e8f0fe;
+      border-color: #0056b3;
+    }
+    .dropzone.has-file {
+      border-color: #28a745;
+      border-style: solid;
+      background: #f0fff4;
+    }
+    .dropzone input[type="file"] { display: none; }
+    .dropzone-label {
+      font-size: 16px;
+      font-weight: 600;
+      color: #007bff;
+    }
+    .dropzone.has-file .dropzone-label { color: #28a745; }
+    .dropzone-sub {
+      font-size: 12px;
+      color: #999;
+      margin-top: 6px;
+    }
+
+    /* Standard label pattern */
+    .standard-label {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #6c757d;
+      color: #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .standard-label:hover { background: #545b62; }
+    .standard-label input[type="file"] { display: none; }
+
+    .file-info { margin-top: 10px; font-style: italic; color: #555; }
+    .file-count { margin-top: 5px; color: #333; }
+  </style>
+</head>
+<body>
+
+  <h1>File Upload Test Page</h1>
+
+  <div id="status-banner">ファイル未選択</div>
+
+  <!-- Pattern 1: react-dropzone style (hidden input + wrapper onClick) -->
+  <div class="section">
+    <div class="section-title">react-dropzone pattern</div>
+    <div class="dropzone" id="dropzone" role="button" tabindex="0">
+      <input type="file" id="file-input" name="upload">
+      <div class="dropzone-label">Click to select a file</div>
+      <div class="dropzone-sub">hidden input + wrapper onClick (react-dropzone style)</div>
+    </div>
+    <p id="file-name" class="file-info">No file selected</p>
+    <p id="file-count" class="file-count">Files: 0</p>
+  </div>
+
+  <!-- Pattern 2: Standard HTML label pattern -->
+  <div class="section">
+    <div class="section-title">Standard HTML pattern</div>
+    <div class="upload-area">
+      <label class="standard-label" for="standard-file-input">
+        Choose file
+        <input type="file" id="standard-file-input" name="standard-upload">
+      </label>
+      <p id="standard-file-name" class="file-info">No file selected</p>
+    </div>
+  </div>
+
+  <!-- Pattern 3: Multi-file input -->
+  <div class="section">
+    <div class="section-title">Multi-file input</div>
+    <div class="upload-area">
+      <input type="file" id="multi-file-input" name="multi-upload" multiple>
+      <p id="multi-file-name" class="file-info">No files selected</p>
+      <p id="multi-file-count" class="file-count">Files: 0</p>
+    </div>
+  </div>
+
+  <script>
+    var statusBanner = document.getElementById('status-banner');
+    var dropzone = document.getElementById('dropzone');
+    var fileInput = document.getElementById('file-input');
+    var fileName = document.getElementById('file-name');
+    var fileCount = document.getElementById('file-count');
+    var standardInput = document.getElementById('standard-file-input');
+    var standardFileName = document.getElementById('standard-file-name');
+    var multiInput = document.getElementById('multi-file-input');
+    var multiFileName = document.getElementById('multi-file-name');
+    var multiFileCount = document.getElementById('multi-file-count');
+
+    function updateStatus() {
+      var hasAny = (fileInput.files && fileInput.files.length > 0)
+        || (standardInput.files && standardInput.files.length > 0)
+        || (multiInput.files && multiInput.files.length > 0);
+      if (hasAny) {
+        document.body.className = 'has-file';
+        statusBanner.className = 'uploaded';
+        statusBanner.textContent = 'ファイル選択済み';
+      }
+    }
+
+    // --- Pattern 1: react-dropzone style ---
+    // stopPropagation on the file input click to prevent the click from
+    // bubbling back to the dropzone wrapper (prevents infinite loop).
+    // react-dropzone does the same thing. With CDP interception the dialog
+    // doesn't block JS, making the loop fatal without this guard.
+    fileInput.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+
+    dropzone.addEventListener('click', function() {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function() {
+      var files = this.files;
+      fileName.textContent = files.length > 0 ? files[0].name : 'No file selected';
+      fileCount.textContent = 'Files: ' + files.length;
+      if (files.length > 0) dropzone.classList.add('has-file');
+      updateStatus();
+    });
+
+    // --- Pattern 2: Standard HTML label ---
+    standardInput.addEventListener('change', function() {
+      var files = this.files;
+      standardFileName.textContent = files.length > 0 ? files[0].name : 'No file selected';
+      updateStatus();
+    });
+
+    // --- Pattern 3: Multi-file ---
+    multiInput.addEventListener('change', function() {
+      var files = this.files;
+      var names = Array.from(files).map(function(f) { return f.name; }).join(', ');
+      multiFileName.textContent = files.length > 0 ? names : 'No files selected';
+      multiFileCount.textContent = 'Files: ' + files.length;
+      updateStatus();
+    });
+
+    // --- Polling: detect files set via CDP (DOM.setFileInputFiles) ---
+    // CDP sets files without firing change events, so poll as safety net.
+    var lastKnownSingle = '';
+    var lastKnownStandard = '';
+    var lastKnownMultiCount = 0;
+    setInterval(function() {
+      // Check dropzone input
+      if (fileInput.files && fileInput.files.length > 0) {
+        var name = fileInput.files[0].name;
+        if (name !== lastKnownSingle) {
+          lastKnownSingle = name;
+          fileName.textContent = name;
+          fileCount.textContent = 'Files: ' + fileInput.files.length;
+          dropzone.classList.add('has-file');
+          updateStatus();
+        }
+      }
+      // Check standard input
+      if (standardInput.files && standardInput.files.length > 0) {
+        var sName = standardInput.files[0].name;
+        if (sName !== lastKnownStandard) {
+          lastKnownStandard = sName;
+          standardFileName.textContent = sName;
+          updateStatus();
+        }
+      }
+      // Check multi input
+      if (multiInput.files && multiInput.files.length > 0) {
+        if (multiInput.files.length !== lastKnownMultiCount) {
+          lastKnownMultiCount = multiInput.files.length;
+          var names = Array.from(multiInput.files).map(function(f) { return f.name; }).join(', ');
+          multiFileName.textContent = names;
+          multiFileCount.textContent = 'Files: ' + multiInput.files.length;
+          updateStatus();
+        }
+      }
+    }, 500);
+  </script>
+</body>
+</html>

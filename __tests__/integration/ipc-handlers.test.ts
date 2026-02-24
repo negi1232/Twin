@@ -54,10 +54,17 @@ const mockRightView: Record<string, any> = {
   setBounds: jest.fn(),
 };
 
-const mockBrowserWindow = jest.fn().mockImplementation(() => ({
+const mockChildWindow: Record<string, any> = {
   loadFile: jest.fn(),
   loadURL: jest.fn(),
-}));
+  setMenuBarVisibility: jest.fn(),
+  focus: jest.fn(),
+  isDestroyed: jest.fn().mockReturnValue(false),
+  on: jest.fn(),
+  webContents: { isDestroyed: jest.fn().mockReturnValue(false), send: jest.fn() },
+};
+
+const mockBrowserWindow = jest.fn().mockImplementation(() => mockChildWindow);
 
 const mockDialog: Record<string, any> = {
   showOpenDialog: jest.fn().mockResolvedValue({ canceled: false, filePaths: ['/selected/folder'] }),
@@ -150,6 +157,33 @@ const mockScanResult = {
   summary: { changedElements: 1, addedElements: 0, deletedElements: 0, totalDiffProperties: 1 },
 };
 
+let mockApiMockCapturing = false;
+const mockApiMockCapturedData: any[] = [];
+const mockApiMockCapture = {
+  register: jest.fn(),
+  unregister: jest.fn(),
+  isCapturing: jest.fn(() => mockApiMockCapturing),
+  startCapture: jest.fn(async () => { mockApiMockCapturing = true; }),
+  stopCapture: jest.fn(() => { mockApiMockCapturing = false; }),
+  getCapturedData: jest.fn(() => mockApiMockCapturedData),
+  getCapturedCount: jest.fn(() => {
+    let count = 0;
+    for (const g of mockApiMockCapturedData) count += g.entries.length;
+    return count;
+  }),
+  exportToFiles: jest.fn().mockResolvedValue({
+    outputDir: '/output',
+    jsonFiles: ['GET-api-users.json'],
+    handlerFile: 'handlers.ts',
+    totalEndpoints: 1,
+  }),
+  clearCapturedData: jest.fn(),
+  setChildWindow: jest.fn(),
+};
+jest.mock('../../src/main/api-mock-capture', () => ({
+  createApiMockCaptureManager: jest.fn(() => mockApiMockCapture),
+}));
+
 jest.mock('../../src/main/css-compare', () => ({
   runFullScan: jest.fn().mockResolvedValue(mockScanResult),
   generateScanReportHTML: jest.fn().mockReturnValue('<html><body>Report</body></html>'),
@@ -183,6 +217,8 @@ describe('ipc-handlers integration', () => {
     mockSyncPaused = false;
     mockNavSyncSuppressed = false;
     mockSidebarWidth = 0;
+    mockApiMockCapturing = false;
+    mockApiMockCapturedData.length = 0;
 
     const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
     registerIpcHandlers({
@@ -213,12 +249,14 @@ describe('ipc-handlers integration', () => {
       });
       expect(result).toHaveProperty('syncManager');
       expect(result.syncManager).toBe(mockSyncManager);
+      expect(result).toHaveProperty('apiMockCapture');
+      expect(result.apiMockCapture).toBe(mockApiMockCapture);
     });
   });
 
   // ===== Channel Registration =====
   describe('channel registration', () => {
-    test('registers all 21 expected IPC channels', () => {
+    test('registers all 28 expected IPC channels', () => {
       const expected = [
         'capture-and-compare',
         'open-report',
@@ -241,6 +279,13 @@ describe('ipc-handlers integration', () => {
         'css-full-scan',
         'css-inspect-toggle',
         'css-export-json',
+        'api-mock-open-window',
+        'api-mock-start-capture',
+        'api-mock-stop-capture',
+        'api-mock-get-status',
+        'api-mock-get-captured-data',
+        'api-mock-export',
+        'api-mock-clear',
       ];
       expected.forEach((channel) => {
         expect(handlers[channel]).toBeDefined();
@@ -1490,6 +1535,126 @@ describe('ipc-handlers integration', () => {
       });
       await expect(handlers['create-directory']({}, { dirPath: '/some/path' }))
         .rejects.toThrow('Access denied');
+    });
+  });
+
+  // ===== API Mock Capture =====
+  describe('api-mock-open-window', () => {
+    test('creates a new BrowserWindow for API Mock Capture', () => {
+      mockBrowserWindow.mockClear();
+      handlers['api-mock-open-window']({});
+      expect(mockBrowserWindow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'API Mock Capture',
+          parent: mockMainWindow,
+        }),
+      );
+      expect(mockChildWindow.loadFile).toHaveBeenCalled();
+      expect(mockApiMockCapture.setChildWindow).toHaveBeenCalledWith(mockChildWindow);
+    });
+
+    test('focuses existing window if already open', () => {
+      // First call creates the window
+      handlers['api-mock-open-window']({});
+      mockBrowserWindow.mockClear();
+      mockChildWindow.focus.mockClear();
+      // Second call within same handler scope — should focus, not create
+      handlers['api-mock-open-window']({});
+      expect(mockBrowserWindow).not.toHaveBeenCalled();
+      expect(mockChildWindow.focus).toHaveBeenCalled();
+    });
+  });
+
+  describe('api-mock-start-capture', () => {
+    test('starts capture and returns capturing state', async () => {
+      const result = await handlers['api-mock-start-capture']({});
+      expect(mockApiMockCapture.startCapture).toHaveBeenCalled();
+      expect(result).toEqual({ capturing: true });
+    });
+  });
+
+  describe('api-mock-stop-capture', () => {
+    test('stops capture and returns capturing state', async () => {
+      mockApiMockCapturing = true;
+      const result = await handlers['api-mock-stop-capture']({});
+      expect(mockApiMockCapture.stopCapture).toHaveBeenCalled();
+      expect(result).toEqual({ capturing: false });
+    });
+  });
+
+  describe('api-mock-get-status', () => {
+    test('returns status with capturing state, count, and endpoints', () => {
+      mockApiMockCapturedData.push({
+        method: 'GET',
+        urlPattern: '/api/users',
+        entries: [{ requestId: '1' }],
+      });
+      const result = handlers['api-mock-get-status']({});
+      expect(result).toEqual({
+        capturing: false,
+        count: 1,
+        endpoints: ['GET /api/users'],
+      });
+    });
+  });
+
+  describe('api-mock-get-captured-data', () => {
+    test('returns captured data array', () => {
+      mockApiMockCapturedData.push({
+        method: 'POST',
+        urlPattern: '/api/auth',
+        entries: [],
+      });
+      const result = handlers['api-mock-get-captured-data']({});
+      expect(result).toHaveLength(1);
+      expect(result[0].method).toBe('POST');
+    });
+  });
+
+  describe('api-mock-export', () => {
+    test('shows folder dialog and exports files', async () => {
+      mockDialog.showOpenDialog = jest.fn().mockResolvedValue({
+        canceled: false,
+        filePaths: ['/export/dir'],
+      });
+      const result = await handlers['api-mock-export']({}, { mswVersion: 'v2' });
+      expect(mockDialog.showOpenDialog).toHaveBeenCalled();
+      expect(mockApiMockCapture.exportToFiles).toHaveBeenCalledWith('/export/dir', 'v2');
+      expect(result).toEqual({
+        outputDir: '/output',
+        jsonFiles: ['GET-api-users.json'],
+        handlerFile: 'handlers.ts',
+        totalEndpoints: 1,
+      });
+    });
+
+    test('returns null when dialog is canceled', async () => {
+      mockDialog.showOpenDialog = jest.fn().mockResolvedValue({ canceled: true, filePaths: [] });
+      const result = await handlers['api-mock-export']({}, { mswVersion: 'v1' });
+      expect(result).toBeNull();
+    });
+
+    test('returns null when mainWindow is null', async () => {
+      jest.resetModules();
+      Object.keys(handlers).forEach((k) => delete handlers[k]);
+      const { registerIpcHandlers } = require('../../src/main/ipc-handlers');
+      registerIpcHandlers({
+        mainWindow: null,
+        leftView: mockLeftView,
+        rightView: mockRightView,
+        setSidebarWidth: mockSetSidebarWidth,
+        getSidebarWidth: mockGetSidebarWidth,
+      });
+      const result = await handlers['api-mock-export']({}, { mswVersion: 'v2' });
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('api-mock-clear', () => {
+    test('clears captured data and returns success', () => {
+      const result = handlers['api-mock-clear']({});
+      expect(mockApiMockCapture.clearCapturedData).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
     });
   });
 });

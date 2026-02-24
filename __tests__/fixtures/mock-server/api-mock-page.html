@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>API Mock Test Page</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    button { padding: 8px 16px; margin: 4px; cursor: pointer; }
+    #result { margin-top: 16px; padding: 12px; background: #fff; border: 1px solid #ddd; min-height: 40px; }
+  </style>
+</head>
+<body>
+  <h1>API Mock Test Page</h1>
+  <div>
+    <button id="fetch-users" onclick="fetchUsers()">Fetch Users</button>
+    <button id="fetch-posts" onclick="fetchPosts()">Fetch Posts</button>
+    <button id="post-login" onclick="postLogin()">POST Login</button>
+  </div>
+  <div id="result">Ready</div>
+
+  <script>
+    var apiCallCount = 0;
+
+    async function fetchUsers() {
+      var res = await fetch('/api/users');
+      var data = await res.json();
+      apiCallCount++;
+      document.getElementById('result').textContent = 'users:' + apiCallCount + ':' + JSON.stringify(data);
+    }
+
+    async function fetchPosts() {
+      var res = await fetch('/api/posts');
+      var data = await res.json();
+      apiCallCount++;
+      document.getElementById('result').textContent = 'posts:' + apiCallCount + ':' + JSON.stringify(data);
+    }
+
+    async function postLogin() {
+      var res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'test', password: 'pass' }),
+      });
+      var data = await res.json();
+      apiCallCount++;
+      document.getElementById('result').textContent = 'login:' + apiCallCount + ':' + JSON.stringify(data);
+    }
+  </script>
+</body>
+</html>
