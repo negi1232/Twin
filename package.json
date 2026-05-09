@@ -31,7 +31,7 @@
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
     "husky": "^9.1.7",
-    "jest": "^30.3.0",
+    "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.2.0",
     "ts-jest": "^29.4.9",
     "typescript": "^5.9.3"
